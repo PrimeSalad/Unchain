@@ -15,7 +15,7 @@ interface ScreenProps {
 
 /**
  * Safe-area screen wrapper. Adapts gutters to device size and centers the
- * content in a capped reading column on tablets/web (research §10.2, §8.2).
+ * content in a capped reading column on tablets/web.
  */
 export function Screen({
   children,

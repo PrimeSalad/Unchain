@@ -15,8 +15,8 @@ import type {
 import { sameDay } from '@/domain/records';
 
 /**
- * Single local store for the gambling recovery companion. Offline-first: no
- * accounts, no backend — persisted to the device with AsyncStorage.
+ * Single local store for the recovery companion. Offline-first: no accounts,
+ * no backend — persisted to the device with AsyncStorage.
  */
 
 type ThemePref = 'system' | 'light' | 'dark';
@@ -45,19 +45,26 @@ interface RecoveryState {
   addPoints: (n: number) => void;
   pushTimeline: (type: TimelineType, label: string) => void;
   setTheme: (t: ThemePref) => void;
+  /** Wipes all recovery records and restarts the streak from now, but keeps
+   *  profile details (name, addiction type, reason, theme). */
+  resetRecovery: () => void;
+  /** Deletes every piece of local data and returns the app to onboarding. */
   resetAll: () => void;
 }
 
-function id() {
+function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
+
 function evt(type: TimelineType, label: string): TimelineEvent {
-  return { id: id(), at: Date.now(), type, label };
+  return { id: uid(), at: Date.now(), type, label };
 }
+
+const PERSIST_KEY = 'unchained-gambling-v1';
 
 export const useStore = create<RecoveryState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       onboarded: false,
       profile: null,
       checkIns: [],
@@ -82,20 +89,20 @@ export const useStore = create<RecoveryState>()(
         set((s) => (s.profile ? { profile: { ...s.profile, ...patch } } : s)),
 
       submitCheckIn: (data) => {
-        const entry: DailyCheckIn = { ...data, id: id(), at: Date.now() };
+        const entry: DailyCheckIn = { ...data, id: uid(), at: Date.now() };
         set((s) => ({
           checkIns: [entry, ...s.checkIns],
           points: s.points + 10,
           timeline: [
             evt('checkin', 'Completed daily check-in'),
-            ...(data.gambled ? [] : [evt('clean', 'Stayed gambling-free today')]),
+            ...(data.gambled ? [] : [evt('clean', 'Stayed clean today')]),
             ...s.timeline,
           ],
         }));
       },
 
       logUrge: (data) => {
-        const entry: UrgeLog = { ...data, id: id(), at: Date.now() };
+        const entry: UrgeLog = { ...data, id: uid(), at: Date.now() };
         set((s) => ({
           urges: [entry, ...s.urges],
           points: s.points + 5,
@@ -107,7 +114,7 @@ export const useStore = create<RecoveryState>()(
         set((s) => {
           if (!s.profile) return s;
           const prevDays = streakDays(s.profile.startedAt);
-          const relapse: RelapseEvent = { ...data, id: id(), at: Date.now() };
+          const relapse: RelapseEvent = { ...data, id: uid(), at: Date.now() };
           return {
             relapses: [relapse, ...s.relapses],
             longestStreak: Math.max(s.longestStreak, prevDays),
@@ -118,7 +125,7 @@ export const useStore = create<RecoveryState>()(
       },
 
       addJournal: (data) => {
-        const entry: JournalEntry = { ...data, id: id(), at: Date.now() };
+        const entry: JournalEntry = { ...data, id: uid(), at: Date.now() };
         set((s) => ({
           journal: [entry, ...s.journal],
           points: s.points + 5,
@@ -127,18 +134,38 @@ export const useStore = create<RecoveryState>()(
       },
 
       addReflection: (text) => {
-        const entry: Reflection = { id: id(), at: Date.now(), text: text.trim() };
+        const entry: Reflection = { id: uid(), at: Date.now(), text: text.trim() };
         set((s) => ({ reflections: [entry, ...s.reflections] }));
       },
-      deleteReflection: (rid) => set((s) => ({ reflections: s.reflections.filter((r) => r.id !== rid) })),
+
+      deleteReflection: (rid) =>
+        set((s) => ({ reflections: s.reflections.filter((r) => r.id !== rid) })),
 
       addPoints: (n) => set((s) => ({ points: s.points + n })),
 
-      pushTimeline: (type, label) => set((s) => ({ timeline: [evt(type, label), ...s.timeline] })),
+      pushTimeline: (type, label) =>
+        set((s) => ({ timeline: [evt(type, label), ...s.timeline] })),
 
       setTheme: (t) => set({ themePref: t }),
 
-      resetAll: () =>
+      resetRecovery: () =>
+        set((s) => ({
+          checkIns: [],
+          urges: [],
+          relapses: [],
+          journal: [],
+          reflections: [],
+          timeline: [evt('start', 'Recovery restarted')],
+          points: 0,
+          longestStreak: 0,
+          // Restart the streak from right now, keeping all profile details.
+          profile: s.profile ? { ...s.profile, startedAt: Date.now() } : null,
+        })),
+
+      resetAll: () => {
+        // Remove the AsyncStorage key so wiped state persists across restarts.
+        // Without this, Zustand would rehydrate the old data on next launch.
+        AsyncStorage.removeItem(PERSIST_KEY).catch(() => {});
         set({
           onboarded: false,
           profile: null,
@@ -151,10 +178,11 @@ export const useStore = create<RecoveryState>()(
           points: 0,
           longestStreak: 0,
           themePref: 'system',
-        }),
+        });
+      },
     }),
     {
-      name: 'unchained-gambling-v1',
+      name: PERSIST_KEY,
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),
@@ -166,7 +194,7 @@ export function useProfile(): RecoveryProfile | null {
   return useStore((s) => s.profile);
 }
 
-/** Today's check-in (stable element ref or undefined). */
+/** Today's check-in, or undefined if none logged yet. */
 export function useTodayCheckIn(): DailyCheckIn | undefined {
   return useStore((s) => s.checkIns.find((c) => sameDay(c.at, Date.now())));
 }

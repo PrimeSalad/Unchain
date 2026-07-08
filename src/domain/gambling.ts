@@ -1,5 +1,5 @@
 /**
- * Gambling recovery domain (V1 — gambling only). Pure logic, no framework.
+ * Recovery domain — pure TS, zero framework dependencies.
  * Offline-first: everything here is computed from locally-stored data.
  */
 
@@ -68,7 +68,6 @@ export function addictionMeta(k: AddictionType): AddictionMeta {
 
 export type ExpensePeriod = 'daily' | 'weekly' | 'monthly';
 
-/** Unified trigger vocabulary (onboarding + check-in + urge log). */
 export const TRIGGERS = [
   'Stress',
   'Boredom',
@@ -85,20 +84,25 @@ export interface RecoveryProfile {
   name: string;
   age?: number;
   addictionType: AddictionType;
-  /** Addiction-specific answer (what they gamble on / smoke / drink…). */
   addictionDetail?: string;
-  /** Recovery start = the moment they last acted on the addiction. Streak counts from here. */
+  /**
+   * The LOCAL midnight timestamp of the day they last used.
+   * Stored as local-calendar midnight (00:00:00) so calendar
+   * arithmetic is always exact — no fractional-day drift.
+   */
   startedAt: number;
   expenseAmount: number;
   expensePeriod: ExpensePeriod;
-  currency: string; // e.g. "₱"
+  currency: string;
   triggers: string[];
   reason: string;
 }
 
 const MS_PER_DAY = 86_400_000;
 
-// --- streak & timer ---------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Streak & timer
+// ---------------------------------------------------------------------------
 
 export function streakDays(startedAt: number, now = Date.now()): number {
   return Math.max(0, Math.floor((now - startedAt) / MS_PER_DAY));
@@ -112,7 +116,9 @@ export function recoveryTimer(startedAt: number, now = Date.now()) {
   return { days, hours, minutes };
 }
 
-// --- money ------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Money
+// ---------------------------------------------------------------------------
 
 export function dailyRate(p: Pick<RecoveryProfile, 'expenseAmount' | 'expensePeriod'>): number {
   const div = p.expensePeriod === 'weekly' ? 7 : p.expensePeriod === 'monthly' ? 30 : 1;
@@ -142,13 +148,14 @@ export function formatMoney(amount: number, currency = '₱'): string {
   return currency + Math.round(amount).toLocaleString('en-PH');
 }
 
-// --- milestones -------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Milestones
+// ---------------------------------------------------------------------------
 
 export const MILESTONES = [1, 3, 7, 14, 21, 30, 45, 60, 90, 120, 180, 270, 365];
 
 export function nextMilestone(days: number): number {
   for (const m of MILESTONES) if (days < m) return m;
-  // past the last — next full year
   return Math.ceil((days + 1) / 365) * 365;
 }
 
@@ -163,7 +170,9 @@ export function milestoneCrossed(prevDays: number, days: number): number | null 
   return null;
 }
 
-// --- urge response (spec: escalate by level) --------------------------------
+// ---------------------------------------------------------------------------
+// Urge level
+// ---------------------------------------------------------------------------
 
 export type UrgeLevel = 'low' | 'medium' | 'high';
 
