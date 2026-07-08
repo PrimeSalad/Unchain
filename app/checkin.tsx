@@ -11,8 +11,8 @@ import { Slider } from '@/presentation/components/Slider';
 import { Mascot } from '@/presentation/components/Mascot';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
-import { useStore, useTodayCheckIn } from '@/application/store';
-import { TRIGGERS } from '@/domain/gambling';
+import { useStore, useTodayCheckIn, useProfile } from '@/application/store';
+import { TRIGGERS, addictionMeta } from '@/domain/gambling';
 
 export default function CheckIn() {
   const theme = useTheme();
@@ -20,6 +20,8 @@ export default function CheckIn() {
   const submit = useStore((s) => s.submitCheckIn);
   const logRelapse = useStore((s) => s.logRelapse);
   const already = useTodayCheckIn();
+  const profile = useProfile();
+  const verb = profile ? addictionMeta(profile.addictionType).verb : 'gamble';
 
   const [gambled, setGambled] = useState<boolean | null>(null);
   const [saved, setSaved] = useState(false);
@@ -96,7 +98,7 @@ export default function CheckIn() {
       {Header}
       <Text variant="title1" style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>Daily Check-in</Text>
 
-      <Text variant="headline" style={{ marginBottom: spacing.md }}>Did you gamble today?</Text>
+      <Text variant="headline" style={{ marginBottom: spacing.md }}>Did you {verb} today?</Text>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <Choice label="No" active={gambled === false} onPress={() => setGambled(false)} good />
         <Choice label="Yes" active={gambled === true} onPress={() => setGambled(true)} />

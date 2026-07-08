@@ -36,6 +36,14 @@ export interface JournalEntry {
   trigger?: string;
 }
 
+/** Emergency Reflection — captured during a crisis (SOS). Stored separately
+ *  from the Journal so the two features never mix. */
+export interface Reflection {
+  id: string;
+  at: number;
+  text: string;
+}
+
 export type TimelineType =
   | 'checkin'
   | 'clean'

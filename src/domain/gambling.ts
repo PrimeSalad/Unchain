@@ -3,24 +3,68 @@
  * Offline-first: everything here is computed from locally-stored data.
  */
 
-export type GamblingType =
-  | 'online_casino'
-  | 'sports'
-  | 'lottery'
-  | 'slots'
-  | 'bingo'
-  | 'sabong'
+export type AddictionType =
+  | 'gambling'
+  | 'pornography'
+  | 'social_media'
+  | 'smoking'
+  | 'alcohol'
+  | 'drugs'
   | 'other';
 
-export const GAMBLING_TYPES: { key: GamblingType; label: string }[] = [
-  { key: 'online_casino', label: 'Online Casino' },
-  { key: 'sports', label: 'Sports Betting' },
-  { key: 'lottery', label: 'Lottery' },
-  { key: 'slots', label: 'Slots' },
-  { key: 'bingo', label: 'Bingo' },
-  { key: 'sabong', label: 'Sabong' },
-  { key: 'other', label: 'Other' },
+export interface AddictionMeta {
+  key: AddictionType;
+  label: string;
+  /** Present-tense verb for prompts, e.g. "Did you gamble today?" */
+  verb: string;
+  /** Suffix for the streak label, e.g. "Gambling-Free" → "18 Days Gambling-Free". */
+  freeLabel: string;
+  /** The addiction-specific follow-up question. */
+  specificQuestion: string;
+  /** Options for the follow-up; if omitted, a free-text field is shown. */
+  specificOptions?: string[];
+  /** Whether a spending question applies (social media / porn usually have none). */
+  hasExpense: boolean;
+}
+
+export const ADDICTIONS: AddictionMeta[] = [
+  {
+    key: 'gambling', label: 'Gambling', verb: 'gamble', freeLabel: 'Gambling-Free', hasExpense: true,
+    specificQuestion: 'What do you gamble on?',
+    specificOptions: ['Sports betting', 'Casino games', 'Online slots', 'Poker', 'Lottery', 'Bingo', 'Sabong', 'Other'],
+  },
+  {
+    key: 'pornography', label: 'Pornography', verb: 'watch porn', freeLabel: 'Porn-Free', hasExpense: false,
+    specificQuestion: 'Anything you want to note? (optional)',
+  },
+  {
+    key: 'social_media', label: 'Social Media', verb: 'binge social media', freeLabel: 'Free', hasExpense: false,
+    specificQuestion: 'Which platforms pull you in most?',
+    specificOptions: ['Facebook', 'TikTok', 'Instagram', 'X (Twitter)', 'YouTube', 'Other'],
+  },
+  {
+    key: 'smoking', label: 'Smoking', verb: 'smoke', freeLabel: 'Smoke-Free', hasExpense: true,
+    specificQuestion: 'What do you smoke?',
+    specificOptions: ['Cigarettes', 'Vape', 'Cigar', 'Roll-your-own', 'Other'],
+  },
+  {
+    key: 'alcohol', label: 'Alcohol', verb: 'drink', freeLabel: 'Alcohol-Free', hasExpense: true,
+    specificQuestion: 'What do you usually drink?',
+    specificOptions: ['Beer', 'Wine', 'Spirits / Hard liquor', 'Mixed drinks', 'Other'],
+  },
+  {
+    key: 'drugs', label: 'Drugs / Substances', verb: 'use', freeLabel: 'Substance-Free', hasExpense: true,
+    specificQuestion: 'What substance? (optional)',
+  },
+  {
+    key: 'other', label: 'Other', verb: 'do it', freeLabel: 'Free', hasExpense: true,
+    specificQuestion: 'Describe the habit you want to quit',
+  },
 ];
+
+export function addictionMeta(k: AddictionType): AddictionMeta {
+  return ADDICTIONS.find((a) => a.key === k) ?? ADDICTIONS[0];
+}
 
 export type ExpensePeriod = 'daily' | 'weekly' | 'monthly';
 
@@ -40,8 +84,10 @@ export type Trigger = (typeof TRIGGERS)[number];
 export interface RecoveryProfile {
   name: string;
   age?: number;
-  gamblingType: GamblingType;
-  /** Recovery start = the moment they last gambled. Streak counts from here. */
+  addictionType: AddictionType;
+  /** Addiction-specific answer (what they gamble on / smoke / drink…). */
+  addictionDetail?: string;
+  /** Recovery start = the moment they last acted on the addiction. Streak counts from here. */
   startedAt: number;
   expenseAmount: number;
   expensePeriod: ExpensePeriod;

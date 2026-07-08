@@ -24,7 +24,7 @@ export default function Sos() {
     { icon: 'book', label: 'Read Journal', onPress: () => router.replace('/(tabs)/journal') },
     { icon: 'walk', label: 'Healthy Alternatives', onPress: () => setPanel(panel === 'alt' ? null : 'alt') },
     { icon: 'heart', label: 'Recovery Motivation', onPress: () => setPanel(panel === 'motiv' ? null : 'motiv') },
-    { icon: 'create', label: 'Emergency Reflection', onPress: () => router.replace('/(tabs)/journal') },
+    { icon: 'create', label: 'Emergency Reflection', onPress: () => router.replace('/reflection') },
   ];
 
   return (
@@ -72,9 +72,8 @@ export default function Sos() {
           {panel === 'alt' && (
             <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
               {HEALTHY_ALTERNATIVES.map((a) => (
-                <View key={a} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Ionicons name="ellipse" size={6} color={palette.grape300} />
-                  <Text variant="callout" color={palette.fog}>{a}</Text>
+                <View key={a} style={{ backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg }}>
+                  <Text variant="body" color={palette.fog}>{a}</Text>
                 </View>
               ))}
             </View>

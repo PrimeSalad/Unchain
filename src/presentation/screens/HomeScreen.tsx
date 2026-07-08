@@ -12,7 +12,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { useNow } from '../hooks/useNow';
 import { useStore, useProfile, useTodayCheckIn } from '@/application/store';
 import {
-  streakDays, recoveryTimer, nextMilestone, moneySaved, formatMoney, milestoneCrossed,
+  streakDays, recoveryTimer, nextMilestone, moneySaved, formatMoney, milestoneCrossed, addictionMeta,
 } from '@/domain/gambling';
 import { quoteOfNow, randomFrom, MOTIVATION } from '@/domain/content';
 import type { TimelineType } from '@/domain/records';
@@ -84,7 +84,7 @@ export function HomeScreen() {
       {/* Recovery Dashboard */}
       <Card raised style={{ marginTop: spacing.lg, alignItems: 'center' }}>
         <RecoveryRing current={days} target={target} size={190} caption={`of ${target} days`} />
-        <Text variant="title2" style={{ marginTop: spacing.md }}>{days} Days Gambling-Free</Text>
+        <Text variant="title2" style={{ marginTop: spacing.md }}>{days} Days {addictionMeta(profile.addictionType).freeLabel}</Text>
         <Text variant="callout" dim style={{ marginTop: 2 }}>
           {timer.days}d · {timer.hours}h · {timer.minutes}m · Next goal: {target} days
         </Text>

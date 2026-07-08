@@ -8,7 +8,7 @@ import { Pill } from '../components/Pill';
 import { radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
-import { streakDays, GAMBLING_TYPES, TRIGGERS } from '@/domain/gambling';
+import { streakDays, addictionMeta, TRIGGERS } from '@/domain/gambling';
 
 const THEMES: { key: 'system' | 'light' | 'dark'; label: string }[] = [
   { key: 'system', label: 'System' },
@@ -27,13 +27,13 @@ export function ProfileScreen() {
 
   if (!profile) return null;
   const days = streakDays(profile.startedAt);
-  const typeLabel = GAMBLING_TYPES.find((g) => g.key === profile.gamblingType)?.label ?? 'Other';
+  const typeLabel = addictionMeta(profile.addictionType).label;
 
   const exportData = async () => {
     const snap = useStore.getState();
     const data = {
       profile: snap.profile, checkIns: snap.checkIns, urges: snap.urges, relapses: snap.relapses,
-      journal: snap.journal, timeline: snap.timeline, points: snap.points, longestStreak: snap.longestStreak,
+      journal: snap.journal, reflections: snap.reflections, timeline: snap.timeline, points: snap.points, longestStreak: snap.longestStreak,
     };
     await Share.share({ message: JSON.stringify(data) }).catch(() => {});
   };
@@ -76,7 +76,8 @@ export function ProfileScreen() {
           <TextInput defaultValue={profile.name} onEndEditing={(e) => update({ name: e.nativeEvent.text.trim() || profile.name })} style={input} placeholderTextColor={theme.color.textDim} />
         </Field>
         <View style={{ height: spacing.md }} />
-        <ReadRow label="Gambling type" value={typeLabel} />
+        <ReadRow label="Addiction" value={typeLabel} />
+        {profile.addictionDetail ? <ReadRow label="Specifically" value={profile.addictionDetail} /> : null}
         <ReadRow label="Current streak" value={`${days} days`} />
         <ReadRow label="Recovery start" value={new Date(profile.startedAt).toLocaleDateString()} />
         <ReadRow label="Average expense" value={`${profile.currency}${profile.expenseAmount} / ${profile.expensePeriod}`} />

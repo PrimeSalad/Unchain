@@ -6,6 +6,7 @@ import { streakDays } from '@/domain/gambling';
 import type {
   DailyCheckIn,
   JournalEntry,
+  Reflection,
   RelapseEvent,
   TimelineEvent,
   TimelineType,
@@ -27,6 +28,7 @@ interface RecoveryState {
   urges: UrgeLog[];
   relapses: RelapseEvent[];
   journal: JournalEntry[];
+  reflections: Reflection[];
   timeline: TimelineEvent[];
   points: number;
   longestStreak: number;
@@ -38,6 +40,8 @@ interface RecoveryState {
   logUrge: (data: Omit<UrgeLog, 'id' | 'at'>) => void;
   logRelapse: (data: Omit<RelapseEvent, 'id' | 'at'>) => void;
   addJournal: (data: Omit<JournalEntry, 'id' | 'at'>) => void;
+  addReflection: (text: string) => void;
+  deleteReflection: (id: string) => void;
   addPoints: (n: number) => void;
   pushTimeline: (type: TimelineType, label: string) => void;
   setTheme: (t: ThemePref) => void;
@@ -60,6 +64,7 @@ export const useStore = create<RecoveryState>()(
       urges: [],
       relapses: [],
       journal: [],
+      reflections: [],
       timeline: [],
       points: 0,
       longestStreak: 0,
@@ -121,6 +126,12 @@ export const useStore = create<RecoveryState>()(
         }));
       },
 
+      addReflection: (text) => {
+        const entry: Reflection = { id: id(), at: Date.now(), text: text.trim() };
+        set((s) => ({ reflections: [entry, ...s.reflections] }));
+      },
+      deleteReflection: (rid) => set((s) => ({ reflections: s.reflections.filter((r) => r.id !== rid) })),
+
       addPoints: (n) => set((s) => ({ points: s.points + n })),
 
       pushTimeline: (type, label) => set((s) => ({ timeline: [evt(type, label), ...s.timeline] })),
@@ -135,6 +146,7 @@ export const useStore = create<RecoveryState>()(
           urges: [],
           relapses: [],
           journal: [],
+          reflections: [],
           timeline: [],
           points: 0,
           longestStreak: 0,

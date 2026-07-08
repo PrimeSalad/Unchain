@@ -26,24 +26,31 @@ export function ProgressScreen() {
   const currency = profile?.currency ?? '₱';
   const resisted = urges.filter((u) => u.resisted).length;
 
-  // Calendar for the current month.
+  // Calendar for the current month. Clean days are derived from the recovery
+  // start date (last relapse): every day AFTER it, up to today, is clean —
+  // filled automatically, not just days with a stored check-in.
+  const startOfDay = (ts: number) => { const x = new Date(ts); x.setHours(0, 0, 0, 0); return x.getTime(); };
   const calendar = useMemo(() => {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
     const first = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startedMid = profile ? startOfDay(profile.startedAt) : startOfDay(Date.now());
+    const todayMid = startOfDay(Date.now());
+
     const cells: ({ day: number; status: 'clean' | 'high' | 'relapse' | 'none' } | null)[] = [];
     for (let i = 0; i < first.getDay(); i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d).getTime();
-      const relapse = relapses.some((r) => sameDay(r.at, date));
+      const isRelapse = sameDay(profile?.startedAt ?? -1, date) || relapses.some((r) => sameDay(r.at, date));
+      const isClean = date > startedMid && date <= todayMid;
       const high = urges.some((u) => sameDay(u.at, date) && u.intensity >= 7) || checkIns.some((c) => sameDay(c.at, date) && (c.urgeStrength ?? 0) >= 7);
-      const clean = checkIns.some((c) => sameDay(c.at, date) && !c.gambled);
-      cells.push({ day: d, status: relapse ? 'relapse' : high ? 'high' : clean ? 'clean' : 'none' });
+      const status = isRelapse ? 'relapse' : isClean && high ? 'high' : isClean ? 'clean' : 'none';
+      cells.push({ day: d, status });
     }
     return cells;
-  }, [checkIns, urges, relapses]);
+  }, [checkIns, urges, relapses, profile]);
 
   // Trigger analysis.
   const analysis = useMemo(() => {
