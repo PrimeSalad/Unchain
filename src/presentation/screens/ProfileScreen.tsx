@@ -166,6 +166,8 @@ export function ProfileScreen() {
         timeline: snap.timeline,
         points: snap.points,
         longestStreak: snap.longestStreak,
+        goals: snap.goals,
+        celebratedBadges: snap.celebratedBadges,
       };
       await Share.share({ message: JSON.stringify(data) });
       showToast('Data exported');
@@ -378,7 +380,7 @@ export function ProfileScreen() {
         </Text>
       </Card>
       <Text variant="caption" dim center style={{ marginTop: spacing.lg }}>
-        Unchained · Recovery Companion · v1
+        Unchain · Recovery Companion · v1.0
       </Text>
 
       {/* ── Confirmation modal ─────────────────────────────────────────── */}

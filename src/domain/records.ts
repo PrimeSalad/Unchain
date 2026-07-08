@@ -53,6 +53,7 @@ export type TimelineType =
   | 'journal'
   | 'milestone'
   | 'badge'
+  | 'achievement'
   | 'breathing'
   | 'start';
 

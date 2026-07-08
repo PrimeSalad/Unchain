@@ -3,6 +3,14 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RecoveryProfile } from '@/domain/gambling';
 import { streakDays } from '@/domain/gambling';
+import type { Badge, Goal, GoalKind } from '@/domain/achievements';
+import {
+  BADGES,
+  computeStats,
+  earnedBadgeIds,
+  goalProgress,
+  goalTitle,
+} from '@/domain/achievements';
 import type {
   DailyCheckIn,
   JournalEntry,
@@ -32,9 +40,17 @@ interface RecoveryState {
   timeline: TimelineEvent[];
   points: number;
   longestStreak: number;
+  goals: Goal[];
+  /** Badge ids already surfaced to the user (so we celebrate each only once). */
+  celebratedBadges: string[];
   themePref: ThemePref;
 
   completeSetup: (profile: RecoveryProfile) => void;
+  addGoal: (kind: GoalKind, target: number) => void;
+  removeGoal: (id: string) => void;
+  /** Recompute earned badges + goal completions; returns badges newly earned
+   *  since the last call (for celebration). Safe to call on any change. */
+  syncAchievements: () => Badge[];
   updateProfile: (patch: Partial<RecoveryProfile>) => void;
   submitCheckIn: (data: Omit<DailyCheckIn, 'id' | 'at'>) => void;
   logUrge: (data: Omit<UrgeLog, 'id' | 'at'>) => void;
@@ -64,7 +80,7 @@ const PERSIST_KEY = 'unchained-gambling-v1';
 
 export const useStore = create<RecoveryState>()(
   persist(
-    (set, _get) => ({
+    (set, get) => ({
       onboarded: false,
       profile: null,
       checkIns: [],
@@ -75,6 +91,8 @@ export const useStore = create<RecoveryState>()(
       timeline: [],
       points: 0,
       longestStreak: 0,
+      goals: [],
+      celebratedBadges: [],
       themePref: 'system',
 
       completeSetup: (profile) => {
@@ -83,6 +101,45 @@ export const useStore = create<RecoveryState>()(
           profile,
           timeline: [evt('start', 'Recovery started')],
         });
+      },
+
+      addGoal: (kind, target) =>
+        set((s) => ({
+          goals: [...s.goals, { id: uid(), kind, target, createdAt: Date.now() }],
+        })),
+
+      removeGoal: (id) => set((s) => ({ goals: s.goals.filter((g) => g.id !== id) })),
+
+      syncAchievements: () => {
+        const s = get();
+        if (!s.profile) return [];
+        const stats = computeStats({ ...s, profile: s.profile });
+
+        // Newly earned badges.
+        const earned = earnedBadgeIds(stats);
+        const newlyIds = earned.filter((id) => !s.celebratedBadges.includes(id));
+
+        // Newly achieved goals.
+        const goals = s.goals.map((g) =>
+          g.achievedAt ? g : goalProgress(g, stats).done ? { ...g, achievedAt: Date.now() } : g,
+        );
+        const newlyGoals = goals.filter((g, i) => g.achievedAt && !s.goals[i].achievedAt);
+
+        if (newlyIds.length === 0 && newlyGoals.length === 0) return [];
+
+        const title = (id: string) => BADGES.find((b) => b.id === id)?.title ?? id;
+        set({
+          celebratedBadges: [...s.celebratedBadges, ...newlyIds],
+          goals,
+          timeline: [
+            ...newlyIds.map((id) => evt('achievement', `Badge earned — ${title(id)}`)),
+            ...newlyGoals.map((g) => evt('milestone', `Goal reached — ${goalTitle(g)}`)),
+            ...s.timeline,
+          ],
+        });
+        return newlyIds
+          .map((id) => BADGES.find((b) => b.id === id))
+          .filter((b): b is Badge => !!b);
       },
 
       updateProfile: (patch) =>
@@ -158,6 +215,8 @@ export const useStore = create<RecoveryState>()(
           timeline: [evt('start', 'Recovery restarted')],
           points: 0,
           longestStreak: 0,
+          goals: [],
+          celebratedBadges: [],
           // Restart the streak from right now, keeping all profile details.
           profile: s.profile ? { ...s.profile, startedAt: Date.now() } : null,
         })),
@@ -177,6 +236,8 @@ export const useStore = create<RecoveryState>()(
           timeline: [],
           points: 0,
           longestStreak: 0,
+          goals: [],
+          celebratedBadges: [],
           themePref: 'system',
         });
       },

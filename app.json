@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Unchained",
-    "slug": "unchained",
+    "name": "Unchain",
+    "slug": "unchain",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -38,6 +38,13 @@
           "dark": {
             "backgroundColor": "#1A1420"
           }
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Unchain uses a photo only as the background for the progress card you choose to share. Photos never leave your device otherwise."
         }
       ]
     ],

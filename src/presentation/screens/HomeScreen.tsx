@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from 'react';
 import { Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
 import { Card } from '../components/Card';
 import { RecoveryRing } from '../components/RecoveryRing';
+import { StatTile } from '../components/StatTile';
 import { Mascot } from '../components/Mascot';
 import { spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -40,6 +41,7 @@ const TIMELINE_ICON: Record<TimelineType, keyof typeof Ionicons.glyphMap> = {
   journal: 'book',
   milestone: 'ribbon',
   badge: 'medal',
+  achievement: 'trophy',
   breathing: 'leaf',
   start: 'flag',
 };
@@ -74,7 +76,7 @@ export function HomeScreen() {
       pushTimeline('milestone', `Reached Day ${crossed}`);
       router.push({
         pathname: '/celebrate',
-        params: { title: `Day ${crossed} gambling-free!`, arm: 'Keep going — one day at a time.' },
+        params: { title: `Day ${crossed} ${addictionMeta(profile.addictionType).freeLabel}!`, arm: 'Keep going — one day at a time.' },
       });
     }
   }, [days, profile, timeline, pushTimeline, router]);
@@ -100,22 +102,41 @@ export function HomeScreen() {
         <Mascot state={days > 0 ? 'happy' : 'braced'} size={72} />
       </View>
 
-      {/* Recovery Dashboard */}
-      <Card raised style={{ marginTop: spacing.lg, alignItems: 'center' }}>
+      {/* Recovery Dashboard — flat, sits directly on the page */}
+      <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
         <RecoveryRing current={days} target={target} size={190} caption={`of ${target} days`} />
         <Text variant="title2" style={{ marginTop: spacing.md }}>
-          {days} Days {addictionMeta(profile.addictionType).freeLabel}
+          {days} Day{days === 1 ? '' : 's'} {addictionMeta(profile.addictionType).freeLabel}
         </Text>
-        <Text variant="callout" dim style={{ marginTop: 2 }}>
-          {timer.days}d · {timer.hours}h · {timer.minutes}m · Next goal: {target} days
+        <Text variant="callout" dim style={{ marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          {timer.days}d {timer.hours}h {timer.minutes}m clean · Goal: {target} days
         </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.lg, alignSelf: 'stretch' }}>
-          <Money label="Today"      value={formatMoney(money.today, currency)} />
-          <Money label="This Week"  value={formatMoney(money.week, currency)} />
-          <Money label="This Month" value={formatMoney(money.month, currency)} />
-          <Money label="Total"      value={formatMoney(money.total, currency)} highlight />
+
+        <View style={{ alignSelf: 'stretch', marginTop: spacing.xl, gap: spacing.md }}>
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <StatTile value={formatMoney(money.today, currency)} label="Today" />
+            <StatTile value={formatMoney(money.week, currency)} label="This Week" />
+          </View>
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <StatTile value={formatMoney(money.month, currency)} label="This Month" />
+            <StatTile value={formatMoney(money.total, currency)} label="Total" tone="primarySoft" />
+          </View>
         </View>
-      </Card>
+      </View>
+
+      {/* Share progress */}
+      <Pressable
+        onPress={() => router.push('/share' as Href)}
+        style={({ pressed }) => ({ marginTop: spacing.md, opacity: pressed ? 0.85 : 1 })}
+      >
+        <Card tone="primarySoft" style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="share-social" size={20} color={theme.color.primary} />
+          <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }} color={theme.color.primary}>
+            Share your progress
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={theme.color.primary} />
+        </Card>
+      </Pressable>
 
       {/* Today's Recovery */}
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
@@ -191,21 +212,6 @@ export function HomeScreen() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function Money({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  const theme = useTheme();
-  return (
-    <View style={{ width: '50%', paddingVertical: spacing.sm }}>
-      <Text variant="footnote" dim>{label}</Text>
-      <Text
-        variant="title2"
-        color={highlight ? theme.color.primary : theme.color.text}
-        style={{ fontVariant: ['tabular-nums'] }}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
 
 function QuickAction({
   icon, label, onPress, accent,
@@ -217,13 +223,21 @@ function QuickAction({
   accent?: boolean;
 }) {
   const theme = useTheme();
+  const tint = accent ? theme.color.accentText : theme.color.primary;
+  const chipBg = accent ? theme.color.accentSoft : theme.color.primarySoft;
   return (
-    <Pressable onPress={onPress} style={{ width: '47%', flexGrow: 1 }}>
-      <Card tone={accent ? 'accentSoft' : 'surface'} style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
-        <Ionicons name={icon} size={26} color={accent ? theme.color.accentText : theme.color.primary} />
-        <Text variant="callout" style={{ marginTop: spacing.sm }} color={accent ? theme.color.accentText : theme.color.text}>
-          {label}
-        </Text>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({ flexBasis: '40%', flexGrow: 1, minWidth: 130, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
+    >
+      <Card style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.sm }}>
+        <View style={{
+          width: 48, height: 48, borderRadius: radius.round,
+          backgroundColor: chipBg, alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Ionicons name={icon} size={24} color={tint} />
+        </View>
+        <Text variant="callout" color={theme.color.text}>{label}</Text>
       </Card>
     </Pressable>
   );

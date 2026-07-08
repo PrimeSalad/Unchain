@@ -82,10 +82,10 @@ export default function CheckIn() {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Mascot state={gambled ? 'comfort' : 'celebrate'} size={150} />
           <Text variant="title2" center style={{ marginTop: spacing.lg }}>
-            {gambled ? "A slip isn't the end. Your recovery continues." : 'Great job.'}
+            {gambled ? "A slip isn't the end. Your recovery continues." : "That's another day protected."}
           </Text>
           <Text variant="body" dim center style={{ marginTop: spacing.sm, paddingHorizontal: spacing.md }}>
-            Every honest check-in helps your recovery.
+            Every honest check-in makes your recovery stronger.
           </Text>
         </View>
         <Button label="Done" onPress={() => router.replace('/(tabs)/home')} full />

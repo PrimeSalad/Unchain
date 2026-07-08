@@ -113,27 +113,39 @@ export function OnboardingScreen() {
 
   return (
     <Screen edges={['top', 'bottom']} scroll={step === 'type' || step === 'specific' || step === 'triggers'}>
-      {/* Top bar: iOS-style back + progress bar */}
+      {/* Top bar: circular back button + progress + step counter */}
       {index > 0 && (
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.md,
-          marginTop: spacing.sm,
+          marginTop: spacing.xs,
           marginBottom: spacing.xl,
         }}>
           <Pressable
             onPress={back}
-            hitSlop={16}
+            hitSlop={12}
+            accessibilityRole="button"
             accessibilityLabel="Go back"
-            style={({ pressed }) => ({ opacity: pressed ? 0.4 : 1, flexDirection: 'row', alignItems: 'center', gap: 2 })}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: radius.round,
+              backgroundColor: theme.color.surfaceAlt,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [{ scale: pressed ? 0.94 : 1 }],
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
-            <Ionicons name="chevron-back" size={18} color={theme.color.primary} />
-            <Text variant="callout" color={theme.color.primary}>Back</Text>
+            <Ionicons name="chevron-back" size={22} color={theme.color.primary} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <ProgressBar progress={index / (steps.length - 1)} height={6} />
+            <ProgressBar progress={index / (steps.length - 1)} height={8} />
           </View>
+          <Text variant="footnote" dim style={{ fontVariant: ['tabular-nums'] }}>
+            {index + 1} of {steps.length}
+          </Text>
         </View>
       )}
 
@@ -141,11 +153,11 @@ export function OnboardingScreen() {
       {step === 'welcome' && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Mascot state="happy" size={180} />
-          <Text variant="title1" center style={{ marginTop: spacing.lg }}>
-            Welcome to Unchained
+          <Text variant="display" center style={{ marginTop: spacing.lg, fontSize: 34, lineHeight: 40 }}>
+            Welcome to Unchain
           </Text>
           <Text variant="body" dim center style={{ marginTop: spacing.md, paddingHorizontal: spacing.md }}>
-            A private recovery companion. Everything stays on your device — no account, no internet required.
+            Your private companion for breaking free — one day at a time. Everything stays on your device. No account, no internet, no judgment.
           </Text>
           <Button label="Get started" onPress={next} full style={{ marginTop: spacing.xxxl }} />
         </View>
@@ -156,7 +168,7 @@ export function OnboardingScreen() {
         <View style={{ flex: 1 }}>
           <Text variant="title1">What's your name?</Text>
           <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
-            So Unchained can speak to you personally.
+            So Unchain can speak to you personally. This never leaves your device.
           </Text>
           <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>Name</Text>
           <TextInput

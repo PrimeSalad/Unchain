@@ -49,6 +49,7 @@ export default function RootLayout() {
             <Stack.Screen name="log-urge" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="reflection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="share" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>
