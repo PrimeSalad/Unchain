@@ -31,9 +31,24 @@ export interface RelapseEvent {
 export interface JournalEntry {
   id: string;
   at: number;
+  /** Free-text reflection / notes. */
   text: string;
+  /** Mood rating 1–10. */
   mood?: number;
+  /** Craving / trigger tag (legacy urge-journal path). */
   trigger?: string;
+
+  // ── Gambling-specific fields (only populated for gambling addiction) ──────
+  /** Did the user gamble on this day? */
+  gambled?: boolean;
+  /** Amount wagered (if gambled). */
+  amountWagered?: number;
+  /** Did the user lose money? */
+  lost?: boolean;
+  /** Amount lost (if applicable). */
+  amountLost?: number;
+  /** Why they gambled — selected option or free-text when "Other" chosen. */
+  whyGambled?: string;
 }
 
 /** Emergency Reflection — captured during a crisis (SOS). Stored separately

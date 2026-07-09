@@ -14,6 +14,7 @@ import { useNow } from '../hooks/useNow';
 import { useStore, useProfile, useTodayCheckIn } from '@/application/store';
 import {
   streakDays,
+  currentStreakStart,
   recoveryTimer,
   nextMilestone,
   moneySaved,
@@ -55,11 +56,17 @@ export function HomeScreen() {
   const timeline = useStore((s) => s.timeline);
   const urges = useStore((s) => s.urges);
   const journal = useStore((s) => s.journal);
+  const relapses = useStore((s) => s.relapses);
   const pushTimeline = useStore((s) => s.pushTimeline);
   const todayCheckIn = useTodayCheckIn();
 
-  const days = profile ? streakDays(profile.startedAt, now) : 0;
-  const timer = profile ? recoveryTimer(profile.startedAt, now) : { days: 0, hours: 0, minutes: 0 };
+  // Derive the current streak start from the event log — never from startedAt
+  // directly — so a relapse only marks today red without wiping history.
+  const streakStart = profile
+    ? currentStreakStart(profile.startedAt, relapses, journal)
+    : 0;
+  const days = streakStart ? streakDays(streakStart, now) : 0;
+  const timer = streakStart ? recoveryTimer(streakStart, now) : { days: 0, hours: 0, minutes: 0 };
   const target = nextMilestone(days);
   const money = profile ? moneySaved(profile, now) : { today: 0, week: 0, month: 0, total: 0 };
   const currency = profile?.currency ?? '₱';

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RecoveryProfile } from '@/domain/gambling';
-import { streakDays } from '@/domain/gambling';
+import { streakDays, currentStreakStart } from '@/domain/gambling';
 import type { Badge, Goal, GoalKind } from '@/domain/achievements';
 import type { SudokuLevel } from '@/domain/games/sudoku';
 import type { Difficulty as CheckersDifficulty } from '@/domain/games/checkers';
@@ -299,9 +299,21 @@ export const useStore = create<RecoveryState>()(
         }),
 
       completeSetup: (profile) => {
+        // If the user last used on a past day, seed an initial RelapseEvent
+        // for that day so the calendar immediately marks it red and
+        // currentStreakStart() has a concrete anchor to work from.
+        const now = new Date();
+        const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const isToday = profile.startedAt >= todayMid;
+
+        const initialRelapses: RelapseEvent[] = isToday
+          ? []
+          : [{ id: uid(), at: profile.startedAt + 1, whatHappened: 'Last use before recovery' }];
+
         set({
           onboarded: true,
           profile,
+          relapses: initialRelapses,
           timeline: [evt('start', 'Recovery started')],
         });
       },
@@ -383,24 +395,56 @@ export const useStore = create<RecoveryState>()(
       logRelapse: (data) => {
         set((s) => {
           if (!s.profile) return s;
-          const prevDays = streakDays(s.profile.startedAt);
+          // Compute current streak from events so longestStreak is accurate.
+          const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
+          const prevDays = streakDays(streakStart);
           const relapse: RelapseEvent = { ...data, id: uid(), at: Date.now() };
+          // Do NOT mutate profile.startedAt — the relapses array is the
+          // canonical history.  streakDays is now derived from events.
           return {
             relapses: [relapse, ...s.relapses],
             longestStreak: Math.max(s.longestStreak, prevDays),
-            profile: { ...s.profile, startedAt: Date.now() },
             timeline: [evt('relapse', 'Logged a relapse — recovery continues'), ...s.timeline],
           };
         });
       },
 
       addJournal: (data) => {
-        const entry: JournalEntry = { ...data, id: uid(), at: Date.now() };
-        set((s) => ({
-          journal: [entry, ...s.journal],
-          points: s.points + 5,
-          timeline: [evt('journal', 'Wrote a journal entry'), ...s.timeline],
-        }));
+        set((s) => {
+          if (!s.profile) return s;
+          const entry: JournalEntry = { ...data, id: uid(), at: Date.now() };
+
+          if (data.gambled) {
+            // Record the relapse event but do NOT touch profile.startedAt.
+            // The streak and calendar are derived purely from the events array.
+            const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
+            const prevDays = streakDays(streakStart);
+            const relapseEntry: RelapseEvent = {
+              id: uid(),
+              at: Date.now(),
+              amount: data.amountLost,
+              whatHappened: data.whyGambled,
+              cause: data.whyGambled,
+            };
+            return {
+              journal: [entry, ...s.journal],
+              relapses: [relapseEntry, ...s.relapses],
+              longestStreak: Math.max(s.longestStreak, prevDays),
+              points: s.points + 5,
+              timeline: [
+                evt('journal', 'Journal entry — gambling relapse logged'),
+                evt('relapse', 'Logged a relapse via journal — recovery continues'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          return {
+            journal: [entry, ...s.journal],
+            points: s.points + 5,
+            timeline: [evt('journal', 'Wrote a journal entry'), ...s.timeline],
+          };
+        });
       },
 
       addReflection: (text) => {

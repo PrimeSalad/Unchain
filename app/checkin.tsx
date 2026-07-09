@@ -44,8 +44,12 @@ export default function CheckIn() {
   const toggle = (t: string) => setTriggers((c) => (c.includes(t) ? c.filter((x) => x !== t) : [...c, t]));
 
   const input = {
-    borderRadius: radius.input, backgroundColor: theme.color.surface, borderWidth: 1,
-    borderColor: theme.color.hairline, padding: spacing.lg, color: theme.color.text, fontSize: 16, textAlignVertical: 'top' as const,
+    borderRadius: radius.input,
+    backgroundColor: theme.color.surface,
+    padding: spacing.lg,
+    color: theme.color.text,
+    fontSize: 16,
+    textAlignVertical: 'top' as const,
   };
 
   const save = () => {

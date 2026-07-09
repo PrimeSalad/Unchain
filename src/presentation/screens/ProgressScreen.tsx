@@ -12,7 +12,7 @@ import { Pill } from '../components/Pill';
 import { elevation, spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
-import { streakDays, moneySaved, formatMoney } from '@/domain/gambling';
+import { streakDays, currentStreakStart, moneySaved, formatMoney } from '@/domain/gambling';
 import { sameDay } from '@/domain/records';
 import {
   computeStats,
@@ -66,7 +66,9 @@ export function ProgressScreen() {
 
   const [goalModal, setGoalModal] = useState(false);
 
-  const current = profile ? streakDays(profile.startedAt) : 0;
+  const current = profile
+    ? streakDays(currentStreakStart(profile.startedAt, relapses, journal))
+    : 0;
   const best = Math.max(longestStreak, current);
   const money = profile ? moneySaved(profile) : { today: 0, week: 0, month: 0, total: 0 };
   const currency = profile?.currency ?? '₱';
@@ -91,10 +93,16 @@ export function ProgressScreen() {
   // ---------------------------------------------------------------------------
   // Calendar
   //
-  // Rule: a calendar cell is GREEN (clean) if and only if:
-  //   1. Its LOCAL calendar date is strictly AFTER the local calendar date of
-  //      `startedAt` (the day they last used — that day itself is the relapse dot).
-  //   2. Its LOCAL calendar date is on or before TODAY's local calendar date.
+  // Status rules — evaluated in priority order:
+  //   relapse : a RelapseEvent OR a journal entry with gambled=true falls on
+  //             this calendar day.
+  //   future  : day is after today → none
+  //   clean   : day is strictly after profile.startedAt and not a relapse
+  //   high    : clean day that also has a high-intensity urge (≥ 7)
+  //   none    : before recovery started, or today's setup day itself
+  //
+  // profile.startedAt is NEVER mutated by relapses — it is the original
+  // recovery-start date and stays fixed for the lifetime of the profile.
   // ---------------------------------------------------------------------------
   const calendar = useMemo(() => {
     const now = new Date();
@@ -103,33 +111,42 @@ export function ProgressScreen() {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDow = new Date(year, month, 1).getDay();
 
+    // The original recovery start (local midnight).
     const startedMid = profile ? localMidnight(profile.startedAt) : todayLocalMidnight();
     const todayMid = todayLocalMidnight();
+
+    // Build a Set of relapse day-midnights for O(1) lookup.
+    const relapseDays = new Set<number>();
+    relapses.forEach((r) => relapseDays.add(localMidnight(r.at)));
+    journal.forEach((j) => {
+      if (j.gambled === true) relapseDays.add(localMidnight(j.at));
+    });
 
     const cells: ({ day: number; status: 'clean' | 'high' | 'relapse' | 'none' } | null)[] = [];
     for (let i = 0; i < firstDow; i++) cells.push(null);
 
     for (let d = 1; d <= daysInMonth; d++) {
       const cellMid = new Date(year, month, d).getTime();
-      const isLastUseDay =
-        sameDay(profile?.startedAt ?? -1, cellMid) || relapses.some((r) => sameDay(r.at, cellMid));
-      const isFuture = cellMid > todayMid;
-      const isClean = !isFuture && cellMid > startedMid;
+
+      const isRelapse = relapseDays.has(cellMid);
+      const isFuture  = cellMid > todayMid;
+      // Strictly after startedAt: the setup day itself counts as "day 0", not clean.
+      const isAfterStart = cellMid > startedMid;
       const hasHighUrge =
         urges.some((u) => sameDay(u.at, cellMid) && u.intensity >= 7) ||
         checkIns.some((c) => sameDay(c.at, cellMid) && (c.urgeStrength ?? 0) >= 7);
 
       let status: 'clean' | 'high' | 'relapse' | 'none';
-      if (isLastUseDay) status = 'relapse';
-      else if (isFuture) status = 'none';
-      else if (isClean && hasHighUrge) status = 'high';
-      else if (isClean) status = 'clean';
-      else status = 'none';
+      if (isRelapse)                     status = 'relapse';
+      else if (isFuture)                 status = 'none';
+      else if (isAfterStart && hasHighUrge) status = 'high';
+      else if (isAfterStart)             status = 'clean';
+      else                               status = 'none';
 
       cells.push({ day: d, status });
     }
     return cells;
-  }, [checkIns, urges, relapses, profile]);
+  }, [checkIns, urges, relapses, journal, profile]);
 
   // ---------------------------------------------------------------------------
   // Trigger analysis

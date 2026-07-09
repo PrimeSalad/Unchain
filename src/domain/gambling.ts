@@ -104,6 +104,41 @@ const MS_PER_DAY = 86_400_000;
 // Streak & timer
 // ---------------------------------------------------------------------------
 
+/**
+ * Derive the start of the current clean window purely from event arrays.
+ *
+ * Rules:
+ *  1. Collect every relapse timestamp from `relapses` and every journal entry
+ *     where `gambled === true`.
+ *  2. Find the MOST RECENT one (if any).  That event's LOCAL calendar midnight
+ *     is the start of the current streak window.
+ *  3. If there are no relapse events, fall back to `profile.startedAt` —
+ *     meaning the user has been clean since they first set up the app.
+ *
+ * This makes the calendar and streak counter independent of `profile.startedAt`
+ * mutations.  Relapses are stored as immutable events; history is never wiped.
+ */
+export function currentStreakStart(
+  profileStartedAt: number,
+  relapses: Array<{ at: number }>,
+  journalEntries: Array<{ gambled?: boolean; at: number }>,
+): number {
+  const relapseTimestamps: number[] = [
+    ...relapses.map((r) => r.at),
+    ...journalEntries.filter((j) => j.gambled === true).map((j) => j.at),
+  ];
+
+  if (relapseTimestamps.length === 0) {
+    // No relapses ever — use the original setup date.
+    return profileStartedAt;
+  }
+
+  const latestRelapse = Math.max(...relapseTimestamps);
+  // Return local midnight of the relapse day so streak arithmetic is whole-day.
+  const d = new Date(latestRelapse);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
 export function streakDays(startedAt: number, now = Date.now()): number {
   return Math.max(0, Math.floor((now - startedAt) / MS_PER_DAY));
 }
