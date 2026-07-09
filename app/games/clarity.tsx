@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, View } from 'react-native';
+import { Animated, Easing, Pressable, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,6 +37,52 @@ const FLIP_STAGGER = 240;
 const FLIP_DURATION = 340;
 const REVEAL_TOTAL = FLIP_STAGGER * (WORD_LENGTH - 1) + FLIP_DURATION + 80;
 
+// ---------------------------------------------------------------------------
+// Responsive layout — derived from the real screen size so the game fits every
+// device, from iPhone SE (320 × 568 pt) to large phones and tablets.
+// ---------------------------------------------------------------------------
+
+/**
+ * Single source of truth for every dimension that must adapt to screen size.
+ *
+ * Design constraints (iPhone SE = 320 × 568 pt logical pixels):
+ *   - Board must sit within the screen width with a small breathing margin.
+ *   - 5 tiles + 4 gaps fill the board width exactly (flex: 1 + aspectRatio: 1).
+ *   - Tile font scales with tile size so text is never clipped.
+ *   - Keyboard rows must fit the remaining height (screen − header − toggle −
+ *     status − board − message).
+ *   - Key height shrinks linearly on small screens; gap tightens too.
+ *
+ * IMPORTANT: the board outer container uses NO paddingHorizontal so the
+ * boardWidth value here maps 1-to-1 onto the rendered width.  Instead the
+ * board <View> is sized explicitly via `width: boardWidth` and centred with
+ * `alignSelf: 'center'`.
+ */
+function useClarityLayout() {
+  const { width, height } = useWindowDimensions();
+
+  // Leave 16 pt safe margin on each side (matches the app gutter token).
+  const SIDE_MARGIN = 16;
+  const tileGap = width < 360 ? 4 : 5;
+  // Board fills the available width exactly — no maxWidth cap needed because
+  // we already express it as available pixels, not a hard number.
+  const boardWidth = width - SIDE_MARGIN * 2;
+  // 5 tiles across, separated by 4 gaps.
+  const tileSize = (boardWidth - tileGap * (WORD_LENGTH - 1)) / WORD_LENGTH;
+  // 56 % of tile size gives natural letter weight; hard-clamp for a11y.
+  const tileFontSize = Math.round(Math.max(13, Math.min(tileSize * 0.56, 28)));
+
+  // Remaining vertical space after fixed chrome (rough budget):
+  //   header ~56, toggle ~64, status 30, message 46, safe-areas ~40 → ~236 left
+  //   on SE (568 pt total).  Split ~55% board / 45% keyboard.
+  // Key height: use 6.5% of screen height, tight floor on small screens.
+  const keyHeight = Math.round(Math.max(34, Math.min(height * 0.065, 52)));
+  const keyGap = width < 360 ? 3 : 4;
+  const rowGap = Math.round(Math.max(4, Math.min(height * 0.009, 8)));
+
+  return { boardWidth, tileGap, tileSize, tileFontSize, keyHeight, keyGap, rowGap };
+}
+
 export default function Clarity() {
   const router = useRouter();
   const theme = useTheme();
@@ -44,6 +90,7 @@ export default function Clarity() {
   const saveProgress = useStore((s) => s.saveClarityProgress);
   const recordResult = useStore((s) => s.recordClarityResult);
   const recordPractice = useStore((s) => s.recordClarityPractice);
+  const layout = useClarityLayout();
 
   const [mode, setMode] = useState<'daily' | 'practice'>('daily');
   const daily = useMemo(() => dailyAnswer(), []);
@@ -240,9 +287,9 @@ export default function Clarity() {
           })}
         </View>
 
-        {/* Board */}
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.lg }}>
-          <View style={{ width: '100%', maxWidth: 340, gap: 6 }}>
+        {/* Board — no horizontal padding here; boardWidth already accounts for margins */}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: layout.boardWidth, gap: layout.rowGap }}>
             {Array.from({ length: MAX_GUESSES }).map((_, r) => {
               const submitted = rows[r];
               const isCurrentRow = r === guesses.length && !done;
@@ -252,7 +299,7 @@ export default function Clarity() {
                 <Animated.View
                   key={r}
                   style={{
-                    flexDirection: 'row', gap: 6,
+                    flexDirection: 'row', gap: layout.tileGap,
                     transform: [{ translateX: isCurrentRow ? shakeX : 0 }],
                   }}
                 >
@@ -266,11 +313,12 @@ export default function Clarity() {
                           delay={c * FLIP_STAGGER}
                           instant={rowRevealed}
                           bounce={isWinRow ? c : null}
+                          fontSize={layout.tileFontSize}
                         />
                       );
                     }
                     return (
-                      <TypeTile key={`${r}-${c}`} letter={isCurrentRow ? current[c] ?? '' : ''} />
+                      <TypeTile key={`${r}-${c}`} letter={isCurrentRow ? current[c] ?? '' : ''} fontSize={layout.tileFontSize} />
                     );
                   })}
                 </Animated.View>
@@ -309,14 +357,14 @@ export default function Clarity() {
             </Pressable>
           </View>
         ) : (
-          <View style={{ paddingHorizontal: spacing.sm, paddingBottom: spacing.md, gap: 6 }}>
+          <View style={{ paddingHorizontal: spacing.sm, paddingBottom: spacing.md, gap: layout.keyGap }}>
             {KEYS.map((row, ri) => (
-              <View key={ri} style={{ flexDirection: 'row', justifyContent: 'center', gap: 5 }}>
-                {ri === 2 && <Key label="ENTER" flex={1.6} onPress={onEnter} />}
+              <View key={ri} style={{ flexDirection: 'row', justifyContent: 'center', gap: layout.keyGap }}>
+                {ri === 2 && <Key label="ENTER" flex={1.6} onPress={onEnter} height={layout.keyHeight} />}
                 {row.split('').map((k) => (
-                  <Key key={k} label={k} state={keyStates[k]} onPress={() => onKey(k)} />
+                  <Key key={k} label={k} state={keyStates[k]} onPress={() => onKey(k)} height={layout.keyHeight} />
                 ))}
-                {ri === 2 && <Key label="⌫" flex={1.6} onPress={onDelete} />}
+                {ri === 2 && <Key label="⌫" flex={1.6} onPress={onDelete} height={layout.keyHeight} />}
               </View>
             ))}
           </View>
@@ -362,7 +410,7 @@ function tileBg(state: TileState, dark: boolean): string {
 }
 
 /** Empty/typing tile — pops softly when a letter lands in it. */
-function TypeTile({ letter }: { letter: string }) {
+function TypeTile({ letter, fontSize }: { letter: string; fontSize: number }) {
   const theme = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -386,7 +434,7 @@ function TypeTile({ letter }: { letter: string }) {
         transform: [{ scale }],
       }}
     >
-      <Text variant="title2" color={theme.color.text} style={{ textTransform: 'uppercase', fontSize: 26 }}>
+      <Text variant="title2" color={theme.color.text} style={{ textTransform: 'uppercase', fontSize }}>
         {letter}
       </Text>
     </Animated.View>
@@ -395,7 +443,7 @@ function TypeTile({ letter }: { letter: string }) {
 
 /** Submitted tile — flips to reveal its colour (instant when resuming). */
 function FlipTile({
-  letter, state, delay, instant, bounce,
+  letter, state, delay, instant, bounce, fontSize,
 }: {
   letter: string;
   state: TileState;
@@ -403,6 +451,7 @@ function FlipTile({
   instant: boolean;
   /** Column index for the win bounce, or null. */
   bounce: number | null;
+  fontSize: number;
 }) {
   const theme = useTheme();
   const dark = theme.mode === 'dark';
@@ -452,7 +501,7 @@ function FlipTile({
       <Text
         variant="title2"
         color={shown ? '#FFFFFF' : theme.color.text}
-        style={{ textTransform: 'uppercase', fontSize: 26 }}
+        style={{ textTransform: 'uppercase', fontSize }}
       >
         {letter}
       </Text>
@@ -464,7 +513,7 @@ function FlipTile({
 // Keyboard
 // ---------------------------------------------------------------------------
 
-function Key({ label, state, onPress, flex = 1 }: { label: string; state?: TileState; onPress: () => void; flex?: number }) {
+function Key({ label, state, onPress, flex = 1, height = 52 }: { label: string; state?: TileState; onPress: () => void; flex?: number; height?: number }) {
   const theme = useTheme();
   const dark = theme.mode === 'dark';
   const bg =
@@ -477,7 +526,7 @@ function Key({ label, state, onPress, flex = 1 }: { label: string; state?: TileS
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flex, height: 52, borderRadius: 8, backgroundColor: bg,
+        flex, height, borderRadius: 8, backgroundColor: bg,
         alignItems: 'center', justifyContent: 'center',
         opacity: pressed ? 0.6 : 1,
         transform: [{ scale: pressed ? 0.94 : 1 }],

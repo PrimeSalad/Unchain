@@ -6,7 +6,7 @@
  * AI    = black ('b'), starts at the top, moves DOWN (row increasing).
  * Only dark squares ((row+col) % 2 === 1) are used.
  *
- * Rules implemented: forced captures, multi-jumps, king promotion (a man that
+ * Rules implemented: optional captures, multi-jumps, king promotion (a man that
  * reaches the crown-head is promoted and its move ends), win/loss detection.
  */
 
@@ -116,7 +116,8 @@ function simpleMoves(board: Board, idx: number): Move[] {
   return moves;
 }
 
-/** All legal moves for a player. Forced-capture rule: if any jump exists, only jumps are legal. */
+/** All legal moves for a player. Captures are optional — the player may choose
+ *  any legal move whether or not a jump is available. */
 export function legalMoves(board: Board, player: Player): Move[] {
   const jumps: Move[] = [];
   const plain: Move[] = [];
@@ -126,7 +127,7 @@ export function legalMoves(board: Board, player: Player): Move[] {
     jumps.push(...jumpSequences(board, i));
     plain.push(...simpleMoves(board, i));
   }
-  return jumps.length > 0 ? jumps : plain;
+  return [...jumps, ...plain];
 }
 
 /** Legal moves originating from a given square (respecting the forced-capture rule). */

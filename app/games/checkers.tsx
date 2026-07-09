@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Foundation } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
@@ -41,6 +41,8 @@ interface Flight {
   nextBoard: Board;
   mover: Player;
   piece: Piece;
+  /** The piece as it will look after landing (may be promoted to king). */
+  landingPiece: Piece;
 }
 
 export default function Checkers() {
@@ -174,6 +176,9 @@ export default function Checkers() {
     if (!piece || !committedRef.current) return; // no piece, or a flight is already running
     const nextBoard = applyMove(board, move);
     const promoted = !piece.king && !!nextBoard[move.to]?.king;
+    const landingPiece: Piece = promoted
+      ? { player: piece.player, king: true }
+      : piece;
     const gen = genRef.current;
     committedRef.current = false;
     setSelected(null);
@@ -183,7 +188,7 @@ export default function Checkers() {
       const [fr, fc] = rc(move.from);
       flightPos.setValue({ x: fc * cell, y: fr * cell });
       captureFade.setValue(1);
-      setFlight({ move, nextBoard, mover, piece });
+      setFlight({ move, nextBoard, mover, piece, landingPiece });
 
       // Slide through every hop of the path; fade captured pieces along the way.
       const hops = move.path.map((idx) => {
@@ -292,6 +297,11 @@ export default function Checkers() {
             <Text variant="callout" dim>{winner === 'r' ? 'You win! 🎉' : 'AI wins — rematch?'}</Text>
           ) : thinking ? (
             <ThinkingDots />
+          ) : popIdx != null ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFD70022', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.input }}>
+              <Foundation name="crown" size={15} color="#FFD700" />
+              <Text variant="callout" color="#C8A000">King!</Text>
+            </View>
           ) : (
             <Text variant="callout" dim>{flight ? '…' : 'Your move'}</Text>
           )}
@@ -363,7 +373,7 @@ export default function Checkers() {
                 }}
               >
                 <View style={{ width: cell * 0.74, height: cell * 0.74 }}>
-                  <PieceDot piece={flight.piece} highlight={false} shadow />
+                  <PieceDot piece={flight.landingPiece} highlight={false} shadow />
                 </View>
               </Animated.View>
             )}
@@ -412,32 +422,66 @@ export default function Checkers() {
 
 function PieceDot({ piece, highlight, pop, shadow }: { piece: Piece; highlight: boolean; pop?: boolean; shadow?: boolean }) {
   const scale = useRef(new Animated.Value(1)).current;
+  const crownScale = useRef(new Animated.Value(piece.king ? 1 : 0)).current;
 
-  // Promotion pop — a proud little swell when a man becomes a king.
+  // Promotion pop — a proud swell when a man becomes a king.
   useEffect(() => {
     if (!pop) return;
     scale.setValue(1);
+    crownScale.setValue(0);
     Animated.sequence([
-      Animated.timing(scale, { toValue: 1.25, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 260, easing: Easing.bounce, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1.3, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(scale, { toValue: 1, duration: 300, easing: Easing.bounce, useNativeDriver: true }),
+        Animated.timing(crownScale, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      ]),
     ]).start();
-  }, [pop, scale]);
+  }, [pop, scale, crownScale]);
+
+  // King pieces have a gold border, brighter body, and a prominent crown.
+  // Men are solid-colour with a subtle inner ring.
+  const isKing = piece.king;
+  const isRed = piece.player === 'r';
+  const bodyColor = isKing
+    ? (isRed ? '#F08090' : '#7A4EA0')   // brightened body when promoted
+    : (isRed ? RED : BLACK);
+  const borderColor = isKing ? '#FFD700' : 'rgba(0,0,0,0.25)';
+  const borderWidth = isKing ? 3 : 2;
 
   return (
     <Animated.View
       style={{
         flex: 1, borderRadius: 999,
-        backgroundColor: piece.player === 'r' ? RED : BLACK,
-        borderWidth: 2, borderColor: 'rgba(0,0,0,0.25)',
+        backgroundColor: bodyColor,
+        borderWidth, borderColor,
         alignItems: 'center', justifyContent: 'center',
         opacity: highlight || piece.player === 'b' ? 1 : 0.92,
         transform: [{ scale }],
         ...(shadow
           ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 8 }
-          : null),
+          : undefined),
+        ...(isKing
+          ? { shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 6, elevation: 6 }
+          : undefined),
       }}
     >
-      {piece.king && <Ionicons name="star" size={16} color="#FFFFFF" />}
+      {/* Subtle inner highlight ring — gives pieces a 3-D button feel */}
+      <View
+        style={{
+          position: 'absolute', top: 4, left: 4, right: 4, bottom: 4,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.25)',
+        }}
+        pointerEvents="none"
+      />
+
+      {/* King crown — animates in on promotion */}
+      {isKing && (
+        <Animated.View style={{ transform: [{ scale: crownScale.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }}>
+          <Foundation name="crown" size={18} color="#FFD700" />
+        </Animated.View>
+      )}
     </Animated.View>
   );
 }
