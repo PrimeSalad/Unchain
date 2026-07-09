@@ -23,6 +23,9 @@ import {
   type TileState,
 } from '@/domain/games/clarity';
 
+// A crash inside the game must never take navigation down with it.
+export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
+
 // Vivid, unmistakable feedback colours (classic word-game palette).
 const GREEN = '#6AAA64';
 const YELLOW = '#C9B458';
@@ -193,7 +196,7 @@ export default function Clarity() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <BackButton />
+          <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Clarity</Text>
           {mode === 'daily' ? (
             <View style={{ alignItems: 'flex-end' }}>

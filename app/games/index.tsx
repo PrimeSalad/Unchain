@@ -1,14 +1,19 @@
-import { Image, Pressable, View, type ImageSourcePropType } from 'react-native';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { Animated, Easing, Image, Pressable, View, type ImageSourcePropType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView } from 'react-native';
 import { Text } from '@/presentation/components/Text';
 import { Card } from '@/presentation/components/Card';
+import { BackButton } from '@/presentation/components/BackButton';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import { GAME_ACHIEVEMENTS, type GameId } from '@/domain/games/achievements';
+
+// A crash inside the hub must never take navigation down with it.
+export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
 
 interface GameDef {
   route: string;
@@ -44,17 +49,7 @@ export default function GamesHub() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md }}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            accessibilityLabel="Go back"
-            style={({ pressed }) => ({
-              width: 40, height: 40, borderRadius: radius.round, backgroundColor: theme.color.surfaceAlt,
-              alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Ionicons name="chevron-back" size={22} color={theme.color.primary} />
-          </Pressable>
+          <BackButton />
           <Text variant="title1" style={{ flex: 1 }}>Games</Text>
           <Pressable
             onPress={() => router.push('/games/achievements' as Href)}
@@ -73,31 +68,58 @@ export default function GamesHub() {
           <Text variant="footnote" dim style={{ marginBottom: spacing.xs }}>
             A calm distraction when a craving hits. All offline.
           </Text>
-          {defs.map((g) => (
-            <Pressable
-              key={g.route}
-              onPress={() => router.push(g.route as Href)}
-              style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
-            >
-              <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
-                <Image source={g.icon} style={{ width: 56, height: 56, borderRadius: radius.card }} />
-                <View style={{ flex: 1 }}>
-                  <Text variant="headline">{g.title}</Text>
-                  <Text variant="footnote" dim style={{ marginTop: 2 }}>{g.desc}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 }}>
-                    <Text variant="caption" color={theme.color.primary}>{g.stat}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <Ionicons name="trophy" size={11} color="#E3B34C" />
-                      <Text variant="caption" dim>{trophies(g.game)}</Text>
+          {defs.map((g, i) => (
+            <EnterFade key={g.route} index={i}>
+              <Pressable
+                onPress={() => router.push(g.route as Href)}
+                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
+              >
+                <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+                  <Image source={g.icon} style={{ width: 56, height: 56, borderRadius: radius.card }} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="headline">{g.title}</Text>
+                    <Text variant="footnote" dim style={{ marginTop: 2 }}>{g.desc}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 }}>
+                      <Text variant="caption" color={theme.color.primary}>{g.stat}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Ionicons name="trophy" size={11} color="#E3B34C" />
+                        <Text variant="caption" dim>{trophies(g.game)}</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.color.textDim} />
-              </Card>
-            </Pressable>
+                  <Ionicons name="chevron-forward" size={20} color={theme.color.textDim} />
+                </Card>
+              </Pressable>
+            </EnterFade>
           ))}
         </ScrollView>
       </SafeAreaView>
     </View>
+  );
+}
+
+/** Soft staggered entrance for the hub cards. */
+function EnterFade({ index, children }: { index: number; children: ReactNode }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 320,
+      delay: index * 70,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+      }}
+    >
+      {children}
+    </Animated.View>
   );
 }

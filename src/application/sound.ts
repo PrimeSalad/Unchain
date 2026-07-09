@@ -29,6 +29,18 @@ async function ensureMode() {
 
 const players = new Map<SoundName, AudioPlayer>();
 
+/** Swallow both sync throws and async rejections from a native audio call. */
+function safe(fn: () => unknown) {
+  try {
+    const r = fn();
+    if (r && typeof (r as Promise<unknown>).catch === 'function') {
+      (r as Promise<unknown>).catch(() => {});
+    }
+  } catch {
+    /* keep silent */
+  }
+}
+
 /** Play a short effect. Safe to call from anywhere, any number of times. */
 export function playSound(name: SoundName, volume = 1) {
   try {
@@ -39,8 +51,10 @@ export function playSound(name: SoundName, volume = 1) {
       players.set(name, p);
     }
     p.volume = volume;
-    p.seekTo(0);
-    p.play();
+    // seekTo is async native work — a rejection (e.g. still loading) must
+    // never surface as an unhandled error mid-game.
+    safe(() => p!.seekTo(0));
+    safe(() => p!.play());
   } catch {
     /* keep silent */
   }
@@ -61,8 +75,8 @@ export function startCalmMusic() {
       music.loop = true;
     }
     music.volume = 0;
-    music.seekTo(0);
-    music.play();
+    safe(() => music!.seekTo(0));
+    safe(() => music!.play());
     fadeTo(0.6, 2000);
   } catch {
     /* keep silent */

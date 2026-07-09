@@ -15,6 +15,9 @@ import {
   type GameId,
 } from '@/domain/games/achievements';
 
+// A crash inside the screen must never take navigation down with it.
+export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
+
 const GAME_ORDER: GameId[] = ['clarity', 'checkers', 'sudoku', 'blocks'];
 
 export default function Achievements() {
@@ -27,7 +30,7 @@ export default function Achievements() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md }}>
-          <BackButton />
+          <BackButton fallback="/games" />
           <View style={{ flex: 1 }}>
             <Text variant="title1">Achievements</Text>
           </View>

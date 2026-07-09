@@ -14,7 +14,12 @@ import { playSound } from '@/application/sound';
 import { nextAchievementHint, type GameAchievement } from '@/domain/games/achievements';
 import { conflicts, generate, type Grid, type SudokuLevel } from '@/domain/games/sudoku';
 
+// A crash inside the game must never take navigation down with it.
+export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
+
 const LEVELS: SudokuLevel[] = ['easy', 'medium', 'hard', 'expert'];
+/** Hard cap on hints per puzzle. */
+const HINT_LIMIT = 3;
 
 const fmt = (totalSeconds: number) =>
   `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
@@ -38,7 +43,11 @@ export default function Sudoku() {
   const [celebrate, setCelebrate] = useState(false);
   const [unlocked, setUnlocked] = useState<GameAchievement[]>([]);
   const [popCell, setPopCell] = useState<number | null>(null);
+  const [unitFlashCells, setUnitFlashCells] = useState<Set<number>>(new Set());
+  const unitFlashAnim = useRef(new Animated.Value(0)).current;
   const recorded = useRef(false);
+  // Synchronous hint counter — state alone can be raced by rapid taps.
+  const hintsRef = useRef(0);
 
   const givens = useMemo(() => new Set(puzzle.map((v, i) => (v !== 0 ? i : -1)).filter((i) => i >= 0)), [puzzle]);
   const bad = useMemo(() => conflicts(grid), [grid]);
@@ -59,11 +68,13 @@ export default function Sudoku() {
     setSelected(null);
     setMistakes(0);
     setHints(0);
+    hintsRef.current = 0;
     setSeconds(0);
     setDone(false);
     setCelebrate(false);
     setUnlocked([]);
     setPopCell(null);
+    setUnitFlashCells(new Set());
     setNotesMode(false);
     recorded.current = false;
     playSound('tap', 0.4);
@@ -106,27 +117,55 @@ export default function Sudoku() {
       playSound('capture', 0.3);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
     } else {
-      if (val !== 0) playSound('tap', 0.45);
+      if (val !== 0) {
+        playSound('tap', 0.45);
+        flashCompletedUnits(g, selected);
+      }
       setPopCell(selected);
       checkDone(g);
     }
   };
 
+  /** Briefly glow any row/column/box the placement just completed. */
+  const flashCompletedUnits = (g: Grid, at: number) => {
+    const r = Math.floor(at / 9);
+    const c = at % 9;
+    const br = Math.floor(r / 3) * 3;
+    const bc = Math.floor(c / 3) * 3;
+    const units = [
+      Array.from({ length: 9 }, (_, k) => r * 9 + k),
+      Array.from({ length: 9 }, (_, k) => k * 9 + c),
+      Array.from({ length: 9 }, (_, k) => (br + Math.floor(k / 3)) * 9 + bc + (k % 3)),
+    ];
+    const completed = units.filter((u) => u.every((i) => g[i] === solution[i]));
+    if (completed.length === 0) return;
+    setUnitFlashCells(new Set(completed.flat()));
+    playSound('clear', 0.45);
+    unitFlashAnim.setValue(0.65);
+    Animated.timing(unitFlashAnim, { toValue: 0, duration: 600, useNativeDriver: true })
+      .start(() => setUnitFlashCells(new Set()));
+  };
+
+  const hintsLeft = HINT_LIMIT - hints;
+
   const hint = () => {
-    if (done) return;
+    // Ref-based guard: immune to rapid-tap races that could exceed the cap.
+    if (done || hintsRef.current >= HINT_LIMIT) return;
     const target =
       selected != null && grid[selected] === 0 && !givens.has(selected)
         ? selected
         : grid.findIndex((v, i) => v !== solution[i]);
     if (target < 0) return;
+    hintsRef.current += 1;
     const g = grid.slice();
     g[target] = solution[target];
     setGrid(g);
     setNotes((n) => { const next = n.slice(); next[target] = 0; return next; });
-    setHints((h) => h + 1);
+    setHints(hintsRef.current);
     setSelected(target);
     setPopCell(target);
     playSound('flip', 0.5);
+    flashCompletedUnits(g, target);
     checkDone(g);
   };
 
@@ -139,7 +178,7 @@ export default function Sudoku() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <BackButton />
+          <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Sudoku</Text>
           <Text variant="callout" dim style={{ fontVariant: ['tabular-nums'] }}>{mm}:{ss}</Text>
         </View>
@@ -158,7 +197,7 @@ export default function Sudoku() {
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
           <Text variant="footnote" dim>Mistakes: {mistakes}</Text>
-          <Text variant="footnote" dim>Hints: {hints}</Text>
+          <Text variant="footnote" dim>Hints: {hints}/{HINT_LIMIT}</Text>
         </View>
 
         {/* Board */}
@@ -193,6 +232,15 @@ export default function Sudoku() {
                         borderColor: theme.color.hairline,
                       }}
                     >
+                      {unitFlashCells.has(idx) && (
+                        <Animated.View
+                          pointerEvents="none"
+                          style={{
+                            position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+                            backgroundColor: theme.color.success, opacity: unitFlashAnim,
+                          }}
+                        />
+                      )}
                       {v !== 0 ? (
                         <CellValue
                           value={v}
@@ -248,7 +296,12 @@ export default function Sudoku() {
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <Control icon="backspace-outline" label="Erase" onPress={() => input(0)} />
               <Control icon={notesMode ? 'pencil' : 'pencil-outline'} label="Notes" active={notesMode} onPress={() => setNotesMode((v) => !v)} />
-              <Control icon="bulb-outline" label="Hint" onPress={hint} />
+              <Control
+                icon="bulb-outline"
+                label={hintsLeft > 0 ? `Hint (${hintsLeft})` : 'No hints'}
+                onPress={hint}
+                disabled={hintsLeft <= 0}
+              />
               <Control icon="refresh" label="New" onPress={() => newGame(level)} />
             </View>
           </View>
@@ -304,14 +357,21 @@ function CellValue({ value, color, pop }: { value: number; color: string; pop: b
 
 const box = (i: number) => Math.floor(Math.floor(i / 9) / 3) * 3 + Math.floor((i % 9) / 3);
 
-function Control({ icon, label, onPress, active }: { icon: any; label: string; onPress: () => void; active?: boolean }) {
+function Control({ icon, label, onPress, active, disabled }: { icon: any; label: string; onPress: () => void; active?: boolean; disabled?: boolean }) {
   const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => ({ flex: 1, height: 52, borderRadius: 10, backgroundColor: active ? theme.color.primary : theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', gap: 2, opacity: pressed ? 0.6 : 1 })}
+      disabled={disabled}
+      style={({ pressed }) => ({
+        flex: 1, height: 52, borderRadius: 10,
+        backgroundColor: active ? theme.color.primary : theme.color.surfaceAlt,
+        alignItems: 'center', justifyContent: 'center', gap: 2,
+        opacity: disabled ? 0.35 : pressed ? 0.6 : 1,
+        transform: [{ scale: pressed && !disabled ? 0.96 : 1 }],
+      })}
     >
-      <Ionicons name={icon} size={18} color={active ? theme.color.onPrimary : theme.color.primary} />
+      <Ionicons name={icon} size={18} color={active ? theme.color.onPrimary : disabled ? theme.color.textDim : theme.color.primary} />
       <Text variant="caption" color={active ? theme.color.onPrimary : theme.color.text}>{label}</Text>
     </Pressable>
   );

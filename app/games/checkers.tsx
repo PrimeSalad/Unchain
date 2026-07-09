@@ -27,18 +27,20 @@ import {
   type Player,
 } from '@/domain/games/checkers';
 
+// A crash inside the game must never take navigation down with it.
+export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
+
 const RED = '#E8697A';
 const BLACK = '#5A2E7A';
 const DIFFS: Difficulty[] = ['easy', 'medium', 'hard'];
 const HOP_MS = 190;
 
+/** Plain data only — the Animated values live in stable refs. */
 interface Flight {
   move: Move;
   nextBoard: Board;
   mover: Player;
   piece: Piece;
-  pos: Animated.ValueXY;
-  fade: Animated.Value;
 }
 
 export default function Checkers() {
@@ -63,6 +65,27 @@ export default function Checkers() {
   const recorded = useRef(false);
   const cell = boardW / 8;
 
+  // Stable animation plumbing — values are created once and reused for every
+  // move, so no Animated node is ever torn down mid-animation.
+  const flightPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const captureFade = useRef(new Animated.Value(1)).current;
+  /** Bumped on new game / unmount; stale animation callbacks bail out. */
+  const genRef = useRef(0);
+  /** false while a flight is uncommitted — makes the commit idempotent. */
+  const committedRef = useRef(true);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      genRef.current += 1;
+      try {
+        flightPos.stopAnimation();
+        captureFade.stopAnimation();
+      } catch { /* nothing to stop */ }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const selectedMoves = useMemo(
     () => (selected != null ? movesFrom(board, selected) : []),
     [selected, board],
@@ -75,6 +98,13 @@ export default function Checkers() {
   }, [board, turn, over, flight]);
 
   const newGame = () => {
+    // Invalidate any in-flight animation so its callbacks can't touch the new game.
+    genRef.current += 1;
+    committedRef.current = true;
+    try {
+      flightPos.stopAnimation();
+      captureFade.stopAnimation();
+    } catch { /* nothing to stop */ }
     setBoard(initialBoard());
     setTurn('r');
     setSelected(null);
@@ -106,38 +136,15 @@ export default function Checkers() {
     }
   };
 
-  /** Animate a move (player or AI), then commit it and hand over the turn. */
-  const doMove = (move: Move, mover: Player) => {
-    const piece = board[move.from];
-    if (!piece || cell === 0) return;
-    const nextBoard = applyMove(board, move);
-    const [fr, fc] = rc(move.from);
-    const pos = new Animated.ValueXY({ x: fc * cell, y: fr * cell });
-    const fade = new Animated.Value(1);
-    setSelected(null);
-    setFlight({ move, nextBoard, mover, piece, pos, fade });
-
-    // Slide through every hop of the path; fade captured pieces along the way.
-    const hops = move.path.map((idx) => {
-      const [r, c] = rc(idx);
-      return Animated.timing(pos, {
-        toValue: { x: c * cell, y: r * cell },
-        duration: HOP_MS,
-        easing: Easing.inOut(Easing.quad),
-        useNativeDriver: false, // ValueXY drives left/top here
-      });
-    });
-    if (move.captures.length > 0) {
-      setTimeout(() => playSound('capture', 0.7), HOP_MS / 2);
-      Animated.timing(fade, {
-        toValue: 0,
-        duration: HOP_MS * move.path.length,
-        useNativeDriver: false,
-      }).start();
-    }
-
-    Animated.sequence(hops).start(() => {
-      const promoted = !piece.king && !!nextBoard[move.to]?.king;
+  /**
+   * Commit a finished move. Idempotent (the animation callback AND a failsafe
+   * timer both call it), generation-guarded (a new game or unmount voids it),
+   * and wrapped so an error can never strand the game or the navigator.
+   */
+  const commitFlight = (gen: number, move: Move, nextBoard: Board, mover: Player, promoted: boolean) => {
+    if (!mountedRef.current || gen !== genRef.current || committedRef.current) return;
+    committedRef.current = true;
+    try {
       setBoard(nextBoard);
       setLastMove(move);
       setFlight(null);
@@ -146,14 +153,64 @@ export default function Checkers() {
       if (promoted) {
         setPopIdx(move.to);
         playSound('clear', 0.5);
-        setTimeout(() => setPopIdx(null), 700);
+        setTimeout(() => { if (mountedRef.current) setPopIdx(null); }, 700);
       }
 
       const opponentOf: Player = mover === 'r' ? 'b' : 'r';
       const st = status(nextBoard, opponentOf);
       if (st.over) return finish(st.winner, nextBoard);
       setTurn(opponentOf);
-    });
+    } catch {
+      // Force a consistent state rather than leaving a half-applied move.
+      setFlight(null);
+      setBoard(nextBoard);
+      setTurn(mover === 'r' ? 'b' : 'r');
+    }
+  };
+
+  /** Animate a move (player or AI), then commit it and hand over the turn. */
+  const doMove = (move: Move, mover: Player) => {
+    const piece = board[move.from];
+    if (!piece || !committedRef.current) return; // no piece, or a flight is already running
+    const nextBoard = applyMove(board, move);
+    const promoted = !piece.king && !!nextBoard[move.to]?.king;
+    const gen = genRef.current;
+    committedRef.current = false;
+    setSelected(null);
+
+    try {
+      if (cell <= 0) throw new Error('board not measured yet');
+      const [fr, fc] = rc(move.from);
+      flightPos.setValue({ x: fc * cell, y: fr * cell });
+      captureFade.setValue(1);
+      setFlight({ move, nextBoard, mover, piece });
+
+      // Slide through every hop of the path; fade captured pieces along the way.
+      const hops = move.path.map((idx) => {
+        const [r, c] = rc(idx);
+        return Animated.timing(flightPos, {
+          toValue: { x: c * cell, y: r * cell },
+          duration: HOP_MS,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        });
+      });
+      if (move.captures.length > 0) {
+        setTimeout(() => playSound('capture', 0.7), HOP_MS / 2);
+        Animated.timing(captureFade, {
+          toValue: 0,
+          duration: HOP_MS * move.path.length,
+          useNativeDriver: true,
+        }).start();
+      }
+
+      Animated.sequence(hops).start(() => commitFlight(gen, move, nextBoard, mover, promoted));
+      // Failsafe: even if the animation callback is dropped, the move lands.
+      setTimeout(() => commitFlight(gen, move, nextBoard, mover, promoted), HOP_MS * move.path.length + 450);
+    } catch {
+      // Animation setup failed — play the move instantly instead of crashing.
+      commitFlight(gen, move, nextBoard, mover, promoted);
+    }
   };
 
   // AI turn — brief natural "thinking" beat, then an animated reply.
@@ -197,7 +254,7 @@ export default function Checkers() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <BackButton />
+          <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Checkers</Text>
           <Pressable
             onPress={newGame}
@@ -280,7 +337,7 @@ export default function Checkers() {
                       {/* piece (hidden while it flies; fading while captured) */}
                       {piece && !flying && (
                         captured && flight ? (
-                          <Animated.View style={{ width: '74%', height: '74%', opacity: flight.fade }}>
+                          <Animated.View style={{ width: '74%', height: '74%', opacity: captureFade }}>
                             <PieceDot piece={piece} highlight={false} />
                           </Animated.View>
                         ) : (
@@ -295,14 +352,14 @@ export default function Checkers() {
               </View>
             ))}
 
-            {/* Flying piece overlay */}
+            {/* Flying piece overlay — native-driver transforms, stable values */}
             {flight && cell > 0 && (
               <Animated.View
                 pointerEvents="none"
                 style={{
-                  position: 'absolute', width: cell, height: cell,
-                  left: flight.pos.x, top: flight.pos.y,
+                  position: 'absolute', left: 0, top: 0, width: cell, height: cell,
                   alignItems: 'center', justifyContent: 'center',
+                  transform: [{ translateX: flightPos.x }, { translateY: flightPos.y }],
                 }}
               >
                 <View style={{ width: cell * 0.74, height: cell * 0.74 }}>

@@ -26,6 +26,9 @@ import {
   type Piece,
 } from '@/domain/games/blocks';
 
+// A crash inside the game must never take navigation down with it.
+export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
+
 const BLOCK_COLORS = ['#5A2E7A', '#E8697A', '#D0A070', '#4E7A5A', '#4A6FA5', '#3E9C9C'];
 const TRAY_CELL = 20;
 
@@ -210,7 +213,7 @@ export default function Blocks() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <BackButton />
+          <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Block Puzzle</Text>
         </View>
 
@@ -271,7 +274,9 @@ export default function Blocks() {
               {p && !over && (
                 <GestureDetector gesture={gestures[i]}>
                   <View style={{ opacity: drag?.index === i ? 0.25 : 1 }}>
-                    <PiecePreview piece={p} cell={TRAY_CELL} />
+                    <TrayPopIn key={p.id} index={i}>
+                      <PiecePreview piece={p} cell={TRAY_CELL} />
+                    </TrayPopIn>
                   </View>
                 </GestureDetector>
               )}
@@ -321,6 +326,19 @@ export default function Blocks() {
       })()}
     </View>
   );
+}
+
+/** New tray pieces spring in with a small stagger. */
+function TrayPopIn({ index, children }: { index: number; children: React.ReactNode }) {
+  const scale = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: 1, useNativeDriver: true, damping: 13, stiffness: 220, delay: index * 60,
+    }).start();
+  }, [scale, index]);
+
+  return <Animated.View style={{ transform: [{ scale }] }}>{children}</Animated.View>;
 }
 
 function PiecePreview({ piece, cell, dim }: { piece: Piece; cell: number; dim?: boolean }) {
