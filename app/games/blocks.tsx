@@ -16,6 +16,7 @@ import { nextAchievementHint, type GameAchievement } from '@/domain/games/achiev
 import {
   SIZE,
   canPlace,
+  canPlaceAnywhere,
   clearLines,
   emptyGrid,
   hasAnyMove,
@@ -73,6 +74,10 @@ export default function Blocks() {
   const scoreRef = useRef(score); scoreRef.current = score;
   const comboRef = useRef(combo); comboRef.current = combo;
   const overRef = useRef(over); overRef.current = over;
+  // Written synchronously alongside setDrag so drop logic never runs inside a
+  // state updater (side effects there crash React) and onEnd/onFinalize can't
+  // double-place a piece.
+  const dragRef = useRef<Drag | null>(null);
 
   const measure = useCallback(() => {
     gridBoxRef.current?.measureInWindow((x, y, w) => setGridFrame({ x, y, cell: w / SIZE }));
@@ -97,7 +102,9 @@ export default function Blocks() {
     if (!p) return;
     const c = cellFor(absX, absY, i);
     if (!c) return;
-    setDrag({ index: i, ...c, valid: canPlace(gridRef.current, p.shape, c.row, c.col) });
+    const next: Drag = { index: i, ...c, valid: canPlace(gridRef.current, p.shape, c.row, c.col) };
+    dragRef.current = next;
+    setDrag(next);
   }, [cellFor]);
 
   const moveDrag = useCallback((i: number, absX: number, absY: number) => {
@@ -105,7 +112,9 @@ export default function Blocks() {
     if (!p) return;
     const c = cellFor(absX, absY, i);
     if (!c) return;
-    setDrag({ index: i, ...c, valid: canPlace(gridRef.current, p.shape, c.row, c.col) });
+    const next: Drag = { index: i, ...c, valid: canPlace(gridRef.current, p.shape, c.row, c.col) };
+    dragRef.current = next;
+    setDrag(next);
   }, [cellFor]);
 
   const finishGame = useCallback((finalScore: number) => {
@@ -125,47 +134,51 @@ export default function Blocks() {
   }, [recordBlocks]);
 
   const dropDrag = useCallback((i: number) => {
-    setDrag((d) => {
-      if (!d || d.index !== i || !d.valid) return null;
-      const piece = piecesRef.current[i];
-      if (!piece) return null;
+    // Claim the drag synchronously: onEnd AND onFinalize both call this, and
+    // the second call must find nothing to do.
+    const d = dragRef.current;
+    if (!d || d.index !== i) return;
+    dragRef.current = null;
+    setDrag(null);
+    if (!d.valid) return;
+    const piece = piecesRef.current[i];
+    if (!piece) return;
 
-      // Place, then clear full lines.
-      const placed = place(gridRef.current, piece.shape, d.row, d.col, piece.color);
-      const { grid: cleared, lines } = clearLines(placed);
-      const nextCombo = lines > 0 ? comboRef.current + 1 : 0;
-      const gained = scorePlacement(piece.shape.size, lines, nextCombo);
-      const nextScore = scoreRef.current + gained;
-      maxComboRef.current = Math.max(maxComboRef.current, nextCombo);
-      maxLinesRef.current = Math.max(maxLinesRef.current, lines);
+    // Place, then clear full lines.
+    const placed = place(gridRef.current, piece.shape, d.row, d.col, piece.color);
+    const { grid: cleared, lines } = clearLines(placed);
+    const nextCombo = lines > 0 ? comboRef.current + 1 : 0;
+    const gained = scorePlacement(piece.shape.size, lines, nextCombo);
+    const nextScore = scoreRef.current + gained;
+    maxComboRef.current = Math.max(maxComboRef.current, nextCombo);
+    maxLinesRef.current = Math.max(maxLinesRef.current, lines);
 
-      Haptics.impactAsync(lines > 0 ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      playSound(lines > 0 ? 'clear' : 'place', lines > 0 ? 0.8 : 0.7);
+    Haptics.impactAsync(lines > 0 ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    playSound(lines > 0 ? 'clear' : 'place', lines > 0 ? 0.8 : 0.7);
 
-      // Flash the cells that just cleared.
-      if (lines > 0) {
-        const clearedSet = new Set<number>();
-        for (let k = 0; k < placed.length; k++) if (placed[k] !== 0 && cleared[k] === 0) clearedSet.add(k);
-        setFlashCells(clearedSet);
-        flashAnim.setValue(0.9);
-        Animated.timing(flashAnim, { toValue: 0, duration: 380, easing: Easing.out(Easing.quad), useNativeDriver: false })
-          .start(() => setFlashCells(new Set()));
-      }
-      // Floating score pop.
-      if (gained > 0) setScorePop({ amount: gained, key: Date.now() });
+    // Flash the cells that just cleared.
+    if (lines > 0) {
+      const clearedSet = new Set<number>();
+      for (let k = 0; k < placed.length; k++) if (placed[k] !== 0 && cleared[k] === 0) clearedSet.add(k);
+      setFlashCells(clearedSet);
+      flashAnim.setValue(0.9);
+      Animated.timing(flashAnim, { toValue: 0, duration: 380, easing: Easing.out(Easing.quad), useNativeDriver: false })
+        .start(() => setFlashCells(new Set()));
+    }
+    // Floating score pop.
+    if (gained > 0) setScorePop({ amount: gained, key: Date.now() });
 
-      // Remove the used piece; refill the tray when all three are gone.
-      let nextPieces = piecesRef.current.map((p, idx) => (idx === i ? null : p));
-      if (nextPieces.every((p) => p == null)) nextPieces = newTray(nextScore);
+    // Remove the used piece; refill the tray when all three are gone.
+    let nextPieces = piecesRef.current.map((p, idx) => (idx === i ? null : p));
+    if (nextPieces.every((p) => p == null)) nextPieces = newTray(nextScore);
 
-      setGrid(cleared);
-      setPieces(nextPieces);
-      setScore(nextScore);
-      setCombo(nextCombo);
+    setGrid(cleared);
+    setPieces(nextPieces);
+    setScore(nextScore);
+    setCombo(nextCombo);
 
-      if (!hasAnyMove(cleared, nextPieces)) finishGame(nextScore);
-      return null;
-    });
+    // Game over the moment no remaining piece fits anywhere.
+    if (!hasAnyMove(cleared, nextPieces)) finishGame(nextScore);
   }, [finishGame, flashAnim]);
 
   // Three stable gestures (indices are fixed).
@@ -190,6 +203,7 @@ export default function Blocks() {
     setCelebrate(false);
     setUnlocked([]);
     setNewBest(false);
+    dragRef.current = null;
     setDrag(null);
     setFlashCells(new Set());
     setScorePop(null);
@@ -269,19 +283,23 @@ export default function Blocks() {
 
         {/* Tray */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.xl, minHeight: 120 }}>
-          {pieces.map((p, i) => (
-            <View key={i} style={{ width: 100, height: 100, alignItems: 'center', justifyContent: 'center' }}>
-              {p && !over && (
-                <GestureDetector gesture={gestures[i]}>
-                  <View style={{ opacity: drag?.index === i ? 0.25 : 1 }}>
-                    <TrayPopIn key={p.id} index={i}>
-                      <PiecePreview piece={p} cell={TRAY_CELL} />
-                    </TrayPopIn>
-                  </View>
-                </GestureDetector>
-              )}
-            </View>
-          ))}
+          {pieces.map((p, i) => {
+            // A piece with no legal placement reads as clearly "stuck".
+            const stuck = p != null && !canPlaceAnywhere(grid, p.shape);
+            return (
+              <View key={i} style={{ width: 100, height: 100, alignItems: 'center', justifyContent: 'center' }}>
+                {p && !over && (
+                  <GestureDetector gesture={gestures[i]}>
+                    <View style={{ opacity: drag?.index === i ? 0.25 : stuck ? 0.3 : 1 }}>
+                      <TrayPopIn key={p.id} index={i}>
+                        <PiecePreview piece={p} cell={TRAY_CELL} />
+                      </TrayPopIn>
+                    </View>
+                  </GestureDetector>
+                )}
+              </View>
+            );
+          })}
         </View>
 
         {over && (
@@ -402,11 +420,7 @@ function ScoreFloat({ amount }: { amount: number }) {
         transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -44] }) }],
       }}
     >
-      <Text
-        variant="title1"
-        color={theme.color.primary}
-        style={{ fontVariant: ['tabular-nums'], textShadowColor: 'rgba(0,0,0,0.25)', textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } }}
-      >
+      <Text variant="title1" color={theme.color.primary} style={{ fontVariant: ['tabular-nums'] }}>
         +{amount.toLocaleString()}
       </Text>
     </Animated.View>
