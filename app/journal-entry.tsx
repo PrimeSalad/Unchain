@@ -11,6 +11,7 @@ import { useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -29,9 +30,9 @@ import { Pill } from '@/presentation/components/Pill';
 import { Slider } from '@/presentation/components/Slider';
 import { Card } from '@/presentation/components/Card';
 import { ProgressBar } from '@/presentation/components/ProgressBar';
-import { radius, spacing } from '@/presentation/theme/tokens';
+import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
-import { useStore, useProfile } from '@/application/store';
+import { useStore, useProfile, useTodayJournal } from '@/application/store';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step types
@@ -233,6 +234,82 @@ function SummaryRow({
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ConfirmModal — native iOS sheet style, no emoji
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ConfirmModal({
+  visible,
+  onConfirm,
+  onCancel,
+}: {
+  visible: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const theme  = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={onCancel}
+    >
+      {/* Scrim */}
+      <Pressable
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
+        onPress={onCancel}
+      >
+        {/* Sheet — stops tap propagation to scrim */}
+        <Pressable onPress={() => {}}>
+          <View
+            style={{
+              backgroundColor: theme.color.surface,
+              borderTopLeftRadius: radius.sheet,
+              borderTopRightRadius: radius.sheet,
+              paddingHorizontal: spacing.xl,
+              paddingTop: spacing.xl,
+              paddingBottom: Math.max(insets.bottom, spacing.xl),
+              gap: spacing.lg,
+              ...elevation.e2,
+            }}
+          >
+            {/* Pull handle */}
+            <View style={{
+              width: 36, height: 4, borderRadius: 2,
+              backgroundColor: theme.color.hairline,
+              alignSelf: 'center',
+              marginBottom: spacing.xs,
+            }} />
+
+            {/* Title */}
+            <Text variant="title2" style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+              Submit Journal Entry?
+            </Text>
+
+            {/* Description */}
+            <Text variant="callout" color={theme.color.textDim} style={{ lineHeight: 23 }}>
+              You can only submit one journal entry per day. After submission, this entry will become your official record for today and cannot be replaced or duplicated. Please verify your answers before continuing.
+            </Text>
+
+            {/* Divider */}
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.color.hairline }} />
+
+            {/* Actions */}
+            <View style={{ gap: spacing.sm }}>
+              <Button label="Submit Entry" onPress={onConfirm} full />
+              <Button label="Review Answers" onPress={onCancel} kind="secondary" full />
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main wizard
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -244,6 +321,16 @@ export default function JournalEntry() {
   const currency   = profile?.currency ?? '₱';
   const insets     = useSafeAreaInsets();
   const isGambling = profile?.addictionType === 'gambling';
+
+  // Block entry if user already submitted today
+  const todayJournal = useTodayJournal();
+  const alreadySubmitted = todayJournal != null;
+
+  // Confirmation modal state
+  const [confirmVisible, setConfirmVisible] = useState(false);
+
+  // Debounce: prevent double-tap from firing commit twice
+  const submitting = useRef(false);
 
   const [gambled,       setGambled]       = useState<boolean | null>(null);
   const [amountWagered, setAmountWagered] = useState('');
@@ -301,10 +388,29 @@ export default function JournalEntry() {
   function goBack() {
     if (stepIdx === 0) { router.back(); return; }
     Haptics.selectionAsync().catch(() => {});
+    // If we're on the step immediately after did_gamble, going back means
+    // the user wants to change their yes/no answer — unfreeze the step list
+    // so buildSteps runs fresh on the next Continue press.
+    const active = frozenSteps.current ?? steps;
+    const prevStep = active[stepIdx - 1];
+    if (prevStep === 'did_gamble') {
+      frozenSteps.current = null;
+    }
     slide('back', () => setStepIdx((i) => i - 1));
   }
 
-  function commit() {
+  // Show the confirmation modal instead of saving directly
+  function requestCommit() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setConfirmVisible(true);
+  }
+
+  // Called only after the user confirms in the modal — debounced against double-tap
+  function finalCommit() {
+    if (submitting.current) return;
+    submitting.current = true;
+    setConfirmVisible(false);
+
     const whyText = whyOption === 'Other' ? whyOther.trim() : (whyOption ?? undefined);
     addJournal({
       gambled: gambled === true,
@@ -319,6 +425,100 @@ export default function JournalEntry() {
   }
 
   const isLastStep = stepIdx === (frozenSteps.current ?? steps).length - 1;
+
+  // ── Already-submitted gate ────────────────────────────────────────────────
+  // Show a friendly "come back tomorrow" screen instead of the wizard when
+  // the user has already written today's entry. The journal list still shows
+  // every historical entry — this only blocks creating a second one today.
+  if (alreadySubmitted) {
+    const todayStr = new Date().toLocaleDateString('en-PH', {
+      weekday: 'long', month: 'long', day: 'numeric',
+    });
+    const timeStr = todayJournal
+      ? new Date(todayJournal.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+    const accent = todayJournal?.gambled === true
+      ? theme.color.danger
+      : todayJournal?.gambled === false
+        ? theme.color.success
+        : theme.color.primary;
+
+    return (
+      <Screen scroll={false}>
+        {/* Close button */}
+        <View style={{ flexDirection: 'row', marginTop: spacing.xs, marginBottom: spacing.xl }}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={({ pressed }) => ({
+              width: 40, height: 40,
+              borderRadius: radius.round,
+              backgroundColor: theme.color.surfaceAlt,
+              alignItems: 'center', justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Ionicons name="close" size={22} color={theme.color.primary} />
+          </Pressable>
+        </View>
+
+        {/* Centred illustration + message */}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl, paddingHorizontal: spacing.xl }}>
+          {/* Stacked rings */}
+          <View style={{ position: 'relative', width: 110, height: 110, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{
+              position: 'absolute', width: 110, height: 110, borderRadius: 55,
+              backgroundColor: accent + '08', borderWidth: 1, borderColor: accent + '20',
+            }} />
+            <View style={{
+              position: 'absolute', width: 80, height: 80, borderRadius: 40,
+              backgroundColor: accent + '12', borderWidth: 1, borderColor: accent + '30',
+            }} />
+            <View style={{
+              width: 56, height: 56, borderRadius: 28,
+              backgroundColor: accent + '25',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name="checkmark-circle" size={30} color={accent} />
+            </View>
+          </View>
+
+          <View style={{ alignItems: 'center', gap: spacing.sm }}>
+            <Text variant="title2" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+              Entry already written
+            </Text>
+            <Text variant="callout" dim center style={{ lineHeight: 22 }}>
+              You submitted today's journal at {timeStr}.{'\n'}
+              Come back tomorrow to write a new one.
+            </Text>
+            <View style={{
+              marginTop: spacing.sm,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.sm,
+              borderRadius: radius.chip,
+              backgroundColor: accent + '15',
+              borderWidth: 1,
+              borderColor: accent + '30',
+            }}>
+              <Text variant="footnote" color={accent} style={{ fontFamily: 'Nunito_700Bold' }}>
+                {todayStr}
+              </Text>
+            </View>
+          </View>
+
+          {/* Go back to see all entries */}
+          <Button
+            label="View all entries"
+            onPress={() => router.back()}
+            kind="secondary"
+            full
+          />
+        </View>
+      </Screen>
+    );
+  }
 
   // Shared input style — identical to onboarding
   const inputStyle = {
@@ -524,11 +724,19 @@ export default function JournalEntry() {
       <View style={{ paddingTop: spacing.sm }}>
         <Button
           label={isLastStep ? 'Save entry' : 'Continue'}
-          onPress={isLastStep ? commit : goNext}
+          onPress={isLastStep ? requestCommit : goNext}
           disabled={!canProceed()}
           full
         />
       </View>
+
+      {/* Confirmation modal — must live inside <Screen> so safe-area insets
+          are available and the sheet slides up over the wizard content. */}
+      <ConfirmModal
+        visible={confirmVisible}
+        onConfirm={finalCommit}
+        onCancel={() => setConfirmVisible(false)}
+      />
     </Screen>
   );
 }

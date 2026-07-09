@@ -299,21 +299,55 @@ export const useStore = create<RecoveryState>()(
         }),
 
       completeSetup: (profile) => {
-        // If the user last used on a past day, seed an initial RelapseEvent
-        // for that day so the calendar immediately marks it red and
-        // currentStreakStart() has a concrete anchor to work from.
+        // If the user last used on a past day, seed:
+        //   1. A RelapseEvent on that day (for streak math).
+        //   2. A JournalEntry(gambled=true) on that day → calendar shows red.
+        //   3. A JournalEntry(gambled=false) for every day BETWEEN the relapse
+        //      and today (exclusive) → calendar shows those days green.
+        //   Today itself is left blank — the user fills it in via the journal.
         const now = new Date();
         const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const isToday = profile.startedAt >= todayMid;
 
+        // Seed timestamp: 1ms after local midnight of the last-used day.
+        const seedAt = profile.startedAt + 1;
+
         const initialRelapses: RelapseEvent[] = isToday
           ? []
-          : [{ id: uid(), at: profile.startedAt + 1, whatHappened: 'Last use before recovery' }];
+          : [{ id: uid(), at: seedAt, whatHappened: 'Last use before recovery' }];
+
+        const initialJournal: import('@/domain/records').JournalEntry[] = [];
+
+        if (!isToday) {
+          // Red dot on the last-used day.
+          initialJournal.push({
+            id: uid(),
+            at: seedAt,
+            gambled: true,
+            text: 'Last use before recovery.',
+          });
+
+          // Green dots for every full calendar day after the relapse up to
+          // (but not including) today. Each entry is stamped at noon local
+          // time of that day so it looks natural in the journal list.
+          const MS_PER_DAY = 86_400_000;
+          let dayMid = profile.startedAt + MS_PER_DAY; // midnight of day after relapse
+          while (dayMid < todayMid) {
+            initialJournal.push({
+              id: uid(),
+              at: dayMid + 12 * 3_600_000, // noon of that day
+              gambled: false,
+              text: 'Clean day.',
+            });
+            dayMid += MS_PER_DAY;
+          }
+        }
 
         set({
           onboarded: true,
           profile,
           relapses: initialRelapses,
+          journal: initialJournal,
           timeline: [evt('start', 'Recovery started')],
         });
       },
@@ -412,6 +446,12 @@ export const useStore = create<RecoveryState>()(
       addJournal: (data) => {
         set((s) => {
           if (!s.profile) return s;
+
+          // ── One journal entry per calendar day ─────────────────────────
+          // If the user already submitted today, silently no-op so double-taps
+          // and navigation loops can never create duplicates.
+          if (s.journal.some((j) => sameDay(j.at, Date.now()))) return s;
+
           const entry: JournalEntry = { ...data, id: uid(), at: Date.now() };
 
           if (data.gambled) {
@@ -526,4 +566,9 @@ export function useProfile(): RecoveryProfile | null {
 /** Today's check-in, or undefined if none logged yet. */
 export function useTodayCheckIn(): DailyCheckIn | undefined {
   return useStore((s) => s.checkIns.find((c) => sameDay(c.at, Date.now())));
+}
+
+/** Today's journal entry, or undefined if none submitted yet today. */
+export function useTodayJournal(): import('@/domain/records').JournalEntry | undefined {
+  return useStore((s) => s.journal.find((j) => sameDay(j.at, Date.now())));
 }
