@@ -1,0 +1,134 @@
+/**
+ * App sounds — tiny synthesized WAVs (generated in-house, no third-party audio).
+ * Everything is fire-and-forget and failure-safe: if audio can't play we stay silent.
+ */
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+
+const SOURCES = {
+  tap: require('../../assets/sounds/tap.wav'),
+  flip: require('../../assets/sounds/flip.wav'),
+  place: require('../../assets/sounds/place.wav'),
+  capture: require('../../assets/sounds/capture.wav'),
+  clear: require('../../assets/sounds/clear.wav'),
+  win: require('../../assets/sounds/win.wav'),
+  lose: require('../../assets/sounds/lose.wav'),
+} as const;
+
+export type SoundName = keyof typeof SOURCES;
+
+let configured = false;
+async function ensureMode() {
+  if (configured) return;
+  configured = true;
+  try {
+    await setAudioModeAsync({ playsInSilentMode: true });
+  } catch {
+    /* keep silent */
+  }
+}
+
+const players = new Map<SoundName, AudioPlayer>();
+
+/** Play a short effect. Safe to call from anywhere, any number of times. */
+export function playSound(name: SoundName, volume = 1) {
+  try {
+    void ensureMode();
+    let p = players.get(name);
+    if (!p) {
+      p = createAudioPlayer(SOURCES[name]);
+      players.set(name, p);
+    }
+    p.volume = volume;
+    p.seekTo(0);
+    p.play();
+  } catch {
+    /* keep silent */
+  }
+}
+
+// ── Calming music (Mindful Pause) ──────────────────────────────────────────
+
+let music: AudioPlayer | null = null;
+let fadeTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Start the seamless ambient loop, fading in gently. */
+export function startCalmMusic() {
+  try {
+    void ensureMode();
+    stopFade();
+    if (!music) {
+      music = createAudioPlayer(require('../../assets/sounds/calm-loop.wav'));
+      music.loop = true;
+    }
+    music.volume = 0;
+    music.seekTo(0);
+    music.play();
+    fadeTo(0.6, 2000);
+  } catch {
+    /* keep silent */
+  }
+}
+
+export function setCalmMusicPaused(paused: boolean) {
+  try {
+    if (!music) return;
+    if (paused) music.pause();
+    else music.play();
+  } catch {
+    /* keep silent */
+  }
+}
+
+/** Fade out and release the music. */
+export function stopCalmMusic() {
+  const m = music;
+  if (!m) return;
+  music = null;
+  stopFade();
+  try {
+    const start = m.volume;
+    const steps = 12;
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      try {
+        m.volume = Math.max(0, start * (1 - i / steps));
+        if (i >= steps) {
+          clearInterval(id);
+          m.pause();
+          m.remove();
+        }
+      } catch {
+        clearInterval(id);
+      }
+    }, 90);
+  } catch {
+    /* keep silent */
+  }
+}
+
+function fadeTo(target: number, ms: number) {
+  const m = music;
+  if (!m) return;
+  stopFade();
+  const steps = Math.max(1, Math.round(ms / 90));
+  let i = 0;
+  const from = m.volume;
+  fadeTimer = setInterval(() => {
+    i++;
+    try {
+      m.volume = from + ((target - from) * i) / steps;
+    } catch {
+      stopFade();
+      return;
+    }
+    if (i >= steps) stopFade();
+  }, 90);
+}
+
+function stopFade() {
+  if (fadeTimer) {
+    clearInterval(fadeTimer);
+    fadeTimer = null;
+  }
+}

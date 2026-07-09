@@ -42,14 +42,17 @@ export default function RootLayout() {
             <Stack.Screen name="loading" options={{ animation: 'fade' }} />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="sos" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
-            <Stack.Screen name="delay" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
-            <Stack.Screen name="breathing" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+            <Stack.Screen
+              name="mindful-pause"
+              options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }}
+            />
             <Stack.Screen name="celebrate" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
             <Stack.Screen name="checkin" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="log-urge" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="reflection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="share" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="share-achievement" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>

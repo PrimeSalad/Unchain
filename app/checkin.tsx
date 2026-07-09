@@ -23,8 +23,12 @@ export default function CheckIn() {
   const profile = useProfile();
   const verb = profile ? addictionMeta(profile.addictionType).verb : 'gamble';
 
+  const setTodayMood = useStore((s) => s.setTodayMood);
   const [gambled, setGambled] = useState<boolean | null>(null);
   const [saved, setSaved] = useState(false);
+  const [editingMood, setEditingMood] = useState(false);
+  const [editMood, setEditMood] = useState(5);
+  const [moodSaved, setMoodSaved] = useState(false);
 
   // shared
   const [triggers, setTriggers] = useState<string[]>([]);
@@ -63,13 +67,47 @@ export default function CheckIn() {
   );
 
   if (already && !saved) {
+    const hasMood = already.mood != null;
     return (
       <Screen edges={['top', 'bottom']} scroll={false}>
         {Header}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Mascot state="happy" size={140} />
           <Text variant="title2" center style={{ marginTop: spacing.lg }}>You've checked in today</Text>
-          <Text variant="body" dim center style={{ marginTop: spacing.sm }}>Come back tomorrow — one day at a time.</Text>
+          <Text variant="body" dim center style={{ marginTop: spacing.sm }}>
+            {moodSaved
+              ? 'Mood saved. Come back tomorrow — one day at a time.'
+              : hasMood
+                ? `Today's mood: ${already.mood}/10`
+                : "You haven't recorded today's mood yet."}
+          </Text>
+
+          {editingMood ? (
+            <Card style={{ alignSelf: 'stretch', marginTop: spacing.xl }}>
+              <Slider label="How is your mood today?" value={editMood} onChange={setEditMood} />
+              <Button
+                label="Save mood"
+                onPress={() => {
+                  setTodayMood(editMood);
+                  setEditingMood(false);
+                  setMoodSaved(true);
+                }}
+                full
+                style={{ marginTop: spacing.md }}
+              />
+            </Card>
+          ) : (
+            <Button
+              label={hasMood ? 'Edit mood' : "Record today's mood"}
+              kind="secondary"
+              onPress={() => {
+                setEditMood(already.mood ?? 5);
+                setMoodSaved(false);
+                setEditingMood(true);
+              }}
+              style={{ marginTop: spacing.xl }}
+            />
+          )}
         </View>
         <Button label="Done" onPress={() => router.back()} full />
       </Screen>

@@ -46,7 +46,8 @@
         {
           "photosPermission": "Unchain uses a photo only as the background for the progress card you choose to share. Photos never leave your device otherwise."
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

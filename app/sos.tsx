@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/presentation/components/Text';
+import { Collapsible } from '@/presentation/components/Collapsible';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useProfile } from '@/application/store';
 import { recoveryTimer, moneySaved, formatMoney } from '@/domain/gambling';
@@ -13,17 +14,25 @@ export default function Sos() {
   const router = useRouter();
   const profile = useProfile();
   const [panel, setPanel] = useState<'alt' | 'motiv' | null>(null);
+  // Stable for the visit so the quote doesn't change on every re-render.
+  const motivation = useMemo(() => randomFrom(MOTIVATION), []);
 
   const timer = profile ? recoveryTimer(profile.startedAt) : { days: 0, hours: 0, minutes: 0 };
   const money = profile ? moneySaved(profile) : { today: 0, week: 0, month: 0, total: 0 };
   const currency = profile?.currency ?? '₱';
 
-  const tools: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }[] = [
-    { icon: 'leaf', label: 'Start Breathing', onPress: () => router.replace('/breathing') },
-    { icon: 'time', label: '10-Minute Delay', onPress: () => router.replace('/delay') },
+  const tools: {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    onPress: () => void;
+    /** Rows with a panel expand in place instead of navigating. */
+    panelKey?: 'alt' | 'motiv';
+  }[] = [
+    { icon: 'flower', label: 'Mindful Pause', onPress: () => router.replace('/mindful-pause' as Href) },
+    { icon: 'game-controller', label: 'Recreational Games', onPress: () => router.push('/games' as Href) },
     { icon: 'book', label: 'Read Journal', onPress: () => router.replace('/(tabs)/journal') },
-    { icon: 'walk', label: 'Healthy Alternatives', onPress: () => setPanel(panel === 'alt' ? null : 'alt') },
-    { icon: 'heart', label: 'Recovery Motivation', onPress: () => setPanel(panel === 'motiv' ? null : 'motiv') },
+    { icon: 'walk', label: 'Healthy Alternatives', panelKey: 'alt', onPress: () => setPanel(panel === 'alt' ? null : 'alt') },
+    { icon: 'heart', label: 'Recovery Motivation', panelKey: 'motiv', onPress: () => setPanel(panel === 'motiv' ? null : 'motiv') },
     { icon: 'create', label: 'Emergency Reflection', onPress: () => router.replace('/reflection') },
   ];
 
@@ -56,33 +65,51 @@ export default function Sos() {
           {/* Tools */}
           <Text variant="headline" color={palette.fog} style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>Recovery Tools</Text>
           <View style={{ gap: spacing.sm }}>
-            {tools.map((t) => (
-              <Pressable
-                key={t.label}
-                onPress={t.onPress}
-                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: palette.nightRaised, borderRadius: radius.button, padding: spacing.lg }}
-              >
-                <Ionicons name={t.icon} size={22} color={palette.grape300} />
-                <Text variant="headline" color={palette.fog} style={{ flex: 1, marginLeft: spacing.md }}>{t.label}</Text>
-                <Ionicons name="chevron-forward" size={18} color={palette.fogDim} />
-              </Pressable>
-            ))}
-          </View>
+            {tools.map((t) => {
+              const expanded = t.panelKey != null && panel === t.panelKey;
+              return (
+                <View key={t.label}>
+                  <Pressable
+                    onPress={t.onPress}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row', alignItems: 'center', backgroundColor: palette.nightRaised,
+                      borderRadius: radius.button, padding: spacing.lg, opacity: pressed ? 0.85 : 1,
+                    })}
+                  >
+                    <Ionicons name={t.icon} size={22} color={palette.grape300} />
+                    <Text variant="headline" color={palette.fog} style={{ flex: 1, marginLeft: spacing.md }}>{t.label}</Text>
+                    <Ionicons
+                      name={t.panelKey ? (expanded ? 'chevron-up' : 'chevron-down') : 'chevron-forward'}
+                      size={18}
+                      color={palette.fogDim}
+                    />
+                  </Pressable>
 
-          {panel === 'alt' && (
-            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
-              {HEALTHY_ALTERNATIVES.map((a) => (
-                <View key={a} style={{ backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg }}>
-                  <Text variant="body" color={palette.fog}>{a}</Text>
+                  {/* Expandable content lives directly beneath its own row. */}
+                  {t.panelKey === 'alt' && (
+                    <Collapsible open={expanded}>
+                      <View style={{ paddingTop: spacing.sm, gap: spacing.sm }}>
+                        {HEALTHY_ALTERNATIVES.map((a) => (
+                          <View key={a} style={{ backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg, marginLeft: spacing.lg }}>
+                            <Text variant="body" color={palette.fog}>{a}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </Collapsible>
+                  )}
+                  {t.panelKey === 'motiv' && (
+                    <Collapsible open={expanded}>
+                      <View style={{ paddingTop: spacing.sm }}>
+                        <View style={{ backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg, marginLeft: spacing.lg }}>
+                          <Text variant="body" color={palette.fog}>{motivation}</Text>
+                        </View>
+                      </View>
+                    </Collapsible>
+                  )}
                 </View>
-              ))}
-            </View>
-          )}
-          {panel === 'motiv' && (
-            <View style={{ marginTop: spacing.md, backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg }}>
-              <Text variant="body" color={palette.fog}>{randomFrom(MOTIVATION)}</Text>
-            </View>
-          )}
+              );
+            })}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </View>

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Modal,
-  Platform,
   Pressable,
   Share,
   TextInput,
@@ -10,14 +9,19 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
 import { Card } from '../components/Card';
 import { Pill } from '../components/Pill';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
-import { useStore, useProfile } from '@/application/store';
+import { useStore, useProfile, initialGames } from '@/application/store';
 import { streakDays, addictionMeta, TRIGGERS } from '@/domain/gambling';
+
+const BACKUP_MARKER = 'unchain-backup';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -59,6 +63,11 @@ export function ProfileScreen() {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState('');
   const nameRef = useRef<TextInput>(null);
+
+  // Reason edit state (mirrors the name editor)
+  const [editingReason, setEditingReason] = useState(false);
+  const [reasonValue, setReasonValue] = useState('');
+  const reasonRef = useRef<TextInput>(null);
 
   // Modal state
   const [modal, setModal] = useState<ModalConfig | null>(null);
@@ -119,6 +128,31 @@ export function ProfileScreen() {
     setEditingName(false);
   };
 
+  // ── Reason editing (mirrors the name editor) ─────────────────────────────
+
+  const startEditReason = () => {
+    setReasonValue(profile.reason ?? '');
+    setEditingReason(true);
+    setTimeout(() => reasonRef.current?.focus(), 50);
+  };
+
+  const commitReason = () => {
+    const trimmed = reasonValue.trim();
+    if (trimmed !== (profile.reason ?? '')) {
+      try {
+        update({ reason: trimmed });
+        showToast('Reason updated');
+      } catch {
+        showToast('Failed to update reason', 'error');
+      }
+    }
+    setEditingReason(false);
+  };
+
+  const cancelReason = () => {
+    setEditingReason(false);
+  };
+
   // ── Modals ────────────────────────────────────────────────────────────────
 
   const openResetRecoveryModal = () =>
@@ -155,44 +189,90 @@ export function ProfileScreen() {
 
   const exportData = async () => {
     try {
-      const snap = useStore.getState();
-      const data = {
-        profile: snap.profile,
-        checkIns: snap.checkIns,
-        urges: snap.urges,
-        relapses: snap.relapses,
-        journal: snap.journal,
-        reflections: snap.reflections,
-        timeline: snap.timeline,
-        points: snap.points,
-        longestStreak: snap.longestStreak,
-        goals: snap.goals,
-        celebratedBadges: snap.celebratedBadges,
+      const s = useStore.getState();
+      // A single self-describing backup file with every locally-stored slice.
+      const backup = {
+        app: BACKUP_MARKER,
+        version: 1,
+        exportedAt: Date.now(),
+        data: {
+          profile: s.profile,
+          checkIns: s.checkIns,
+          urges: s.urges,
+          relapses: s.relapses,
+          journal: s.journal,
+          reflections: s.reflections,
+          timeline: s.timeline,
+          points: s.points,
+          longestStreak: s.longestStreak,
+          goals: s.goals,
+          celebratedBadges: s.celebratedBadges,
+          games: s.games,
+          themePref: s.themePref,
+        },
       };
-      await Share.share({ message: JSON.stringify(data) });
-      showToast('Data exported');
+      const json = JSON.stringify(backup, null, 2);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? '';
+      const fileUri = `${dir}unchain-backup-${stamp}.json`;
+      await FileSystem.writeAsStringAsync(fileUri, json);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Save your Unchain backup',
+          UTI: 'public.json',
+        });
+      } else {
+        await Share.share({ message: json });
+      }
+      showToast('Backup file ready');
     } catch {
       showToast('Export cancelled or failed', 'error');
     }
   };
 
-  const importData = () => {
-    if (Platform.OS !== 'ios' || !('prompt' in Object.getPrototypeOf(Object))) {
-      // Alert.prompt is iOS-only; show a polite notice on other platforms
-      showToast('Import is only available on iOS', 'error');
-      return;
-    }
-    // @ts-ignore — Alert.prompt is typed in RN but not always visible
-    const { Alert } = require('react-native');
-    Alert.prompt('Import backup', 'Paste your exported backup data.', (text: string) => {
-      try {
-        const data = JSON.parse(text);
-        useStore.setState({ ...data, onboarded: true });
-        showToast('Backup restored successfully');
-      } catch {
-        showToast('Could not read that backup', 'error');
+  const importData = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', 'text/plain', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (res.canceled || !res.assets?.[0]) return;
+
+      const text = await FileSystem.readAsStringAsync(res.assets[0].uri);
+      const parsed = JSON.parse(text);
+      // Accept both the wrapped backup and a raw data object.
+      const data = parsed?.app === BACKUP_MARKER || parsed?.data ? parsed.data : parsed;
+
+      // Validate before touching the store, so a bad file can't corrupt state.
+      if (!data || typeof data !== 'object' || !data.profile || typeof data.profile.startedAt !== 'number') {
+        showToast('That file is not a valid Unchain backup', 'error');
+        return;
       }
-    });
+
+      const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+      // Replace state wholesale (no merge) so nothing duplicates.
+      useStore.setState({
+        onboarded: true,
+        profile: data.profile,
+        checkIns: arr(data.checkIns),
+        urges: arr(data.urges),
+        relapses: arr(data.relapses),
+        journal: arr(data.journal),
+        reflections: arr(data.reflections),
+        timeline: arr(data.timeline),
+        points: typeof data.points === 'number' ? data.points : 0,
+        longestStreak: typeof data.longestStreak === 'number' ? data.longestStreak : 0,
+        goals: arr(data.goals),
+        celebratedBadges: arr(data.celebratedBadges),
+        games: data.games && typeof data.games === 'object' ? { ...initialGames, ...data.games } : initialGames,
+        themePref: ['system', 'light', 'dark'].includes(data.themePref) ? data.themePref : 'system',
+      });
+      showToast('Backup restored successfully');
+    } catch {
+      showToast('Could not read that backup', 'error');
+    }
   };
 
   // ── Styles ────────────────────────────────────────────────────────────────
@@ -286,31 +366,59 @@ export function ProfileScreen() {
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
         Personal Recovery Reason
       </Text>
-      <TextInput
-        defaultValue={profile.reason}
-        onEndEditing={(e) => {
-          try {
-            update({ reason: e.nativeEvent.text });
-            showToast('Reason saved');
-          } catch {
-            showToast('Failed to save reason', 'error');
-          }
-        }}
-        multiline
-        placeholder="Your reason…"
-        placeholderTextColor={theme.color.textDim}
-        style={{
-          borderRadius: radius.input,
-          backgroundColor: theme.color.surface,
-          borderWidth: 1,
-          borderColor: theme.color.hairline,
-          minHeight: 90,
-          padding: spacing.lg,
-          color: theme.color.text,
-          fontSize: 16,
-          textAlignVertical: 'top',
-        }}
-      />
+      {editingReason ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+          <TextInput
+            ref={reasonRef}
+            value={reasonValue}
+            onChangeText={setReasonValue}
+            multiline
+            placeholder="Your reason…"
+            placeholderTextColor={theme.color.textDim}
+            style={{
+              ...inputStyle,
+              minHeight: 90,
+              padding: spacing.lg,
+              textAlignVertical: 'top',
+            }}
+          />
+          {/* Confirm */}
+          <Pressable
+            onPress={commitReason}
+            hitSlop={8}
+            style={{
+              width: 36, height: 36, borderRadius: radius.round,
+              backgroundColor: theme.color.success,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="checkmark" size={20} color="#fff" />
+          </Pressable>
+          {/* Cancel */}
+          <Pressable
+            onPress={cancelReason}
+            hitSlop={8}
+            style={{
+              width: 36, height: 36, borderRadius: radius.round,
+              backgroundColor: theme.color.surfaceAlt,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="close" size={20} color={theme.color.textDim} />
+          </Pressable>
+        </View>
+      ) : (
+        <Card>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text variant="callout" style={{ flex: 1 }} color={profile.reason ? theme.color.text : theme.color.textDim}>
+              {profile.reason || 'Add your reason…'}
+            </Text>
+            <Pressable onPress={startEditReason} hitSlop={8}>
+              <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
+            </Pressable>
+          </View>
+        </Card>
+      )}
 
       {/* Triggers */}
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>

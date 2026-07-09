@@ -4,6 +4,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RecoveryProfile } from '@/domain/gambling';
 import { streakDays } from '@/domain/gambling';
 import type { Badge, Goal, GoalKind } from '@/domain/achievements';
+import type { SudokuLevel } from '@/domain/games/sudoku';
+import type { Difficulty as CheckersDifficulty } from '@/domain/games/checkers';
+import {
+  GAME_ACHIEVEMENTS,
+  evaluateGameAchievements,
+  type GameAchievement,
+  type GameEvent,
+} from '@/domain/games/achievements';
 import {
   BADGES,
   computeStats,
@@ -29,6 +37,46 @@ import { sameDay } from '@/domain/records';
 
 type ThemePref = 'system' | 'light' | 'dark';
 
+/** Recreational-games progress. Flat shape keeps shallow merges simple. */
+export interface GamesState {
+  blocksBest: number;
+  blocksGames: number;
+  checkersWins: number;
+  checkersLosses: number;
+  sudokuSolved: number;
+  sudokuBestMs: Partial<Record<SudokuLevel, number>>;
+  clarityDay: number;
+  clarityGuesses: string[];
+  clarityStatus: 'playing' | 'won' | 'lost';
+  clarityStreak: number;
+  clarityBestStreak: number;
+  clarityPlayed: number;
+  clarityWon: number;
+  clarityPracticePlayed: number;
+  clarityPracticeWon: number;
+  /** Permanently unlocked game achievements: id → unlockedAt (ms). */
+  achievements: Record<string, number>;
+}
+
+export const initialGames: GamesState = {
+  blocksBest: 0,
+  blocksGames: 0,
+  checkersWins: 0,
+  checkersLosses: 0,
+  sudokuSolved: 0,
+  sudokuBestMs: {},
+  clarityDay: -1,
+  clarityGuesses: [],
+  clarityStatus: 'playing',
+  clarityStreak: 0,
+  clarityBestStreak: 0,
+  clarityPlayed: 0,
+  clarityWon: 0,
+  clarityPracticePlayed: 0,
+  clarityPracticeWon: 0,
+  achievements: {},
+};
+
 interface RecoveryState {
   onboarded: boolean;
   profile: RecoveryProfile | null;
@@ -43,7 +91,26 @@ interface RecoveryState {
   goals: Goal[];
   /** Badge ids already surfaced to the user (so we celebrate each only once). */
   celebratedBadges: string[];
+  games: GamesState;
   themePref: ThemePref;
+
+  // Recreational games — record actions return achievements newly unlocked
+  // by that result so screens can celebrate them.
+  recordCheckers: (
+    result: 'win' | 'loss',
+    ctx: { difficulty: CheckersDifficulty; piecesLeft: number },
+  ) => GameAchievement[];
+  recordSudoku: (
+    level: SudokuLevel,
+    ms: number,
+    ctx: { mistakes: number; hints: number },
+  ) => GameAchievement[];
+  recordBlocks: (score: number, ctx: { maxCombo: number; maxLines: number }) => GameAchievement[];
+  saveClarityProgress: (day: number, guesses: string[]) => void;
+  recordClarityResult: (day: number, guesses: string[], won: boolean) => GameAchievement[];
+  recordClarityPractice: (won: boolean, guessCount: number) => GameAchievement[];
+  /** Set (or intentionally edit) today's mood on today's check-in. No-op without one. */
+  setTodayMood: (mood: number) => void;
 
   completeSetup: (profile: RecoveryProfile) => void;
   addGoal: (kind: GoalKind, target: number) => void;
@@ -78,6 +145,37 @@ function evt(type: TimelineType, label: string): TimelineEvent {
 
 const PERSIST_KEY = 'unchained-gambling-v1';
 
+/**
+ * Merge a games-state update with achievement evaluation. Returns the state
+ * patch (games + timeline + points) and the achievements newly unlocked by
+ * this event. Unlocks are permanent and each awards a few points.
+ */
+function withGameEvent(
+  s: Pick<RecoveryState, 'points' | 'timeline'>,
+  games: GamesState,
+  ev: GameEvent,
+): { patch: { games: GamesState; points: number; timeline: TimelineEvent[] }; unlocked: GameAchievement[] } {
+  const ids = evaluateGameAchievements(games, ev).filter((id) => !games.achievements[id]);
+  const now = Date.now();
+  const unlocked = ids
+    .map((id) => GAME_ACHIEVEMENTS.find((a) => a.id === id))
+    .filter((a): a is GameAchievement => !!a);
+  const nextGames = ids.length
+    ? { ...games, achievements: { ...games.achievements, ...Object.fromEntries(ids.map((id) => [id, now])) } }
+    : games;
+  return {
+    patch: {
+      games: nextGames,
+      points: s.points + unlocked.length * 5,
+      timeline: [
+        ...unlocked.map((a) => evt('achievement', `Achievement unlocked — ${a.title}`)),
+        ...s.timeline,
+      ],
+    },
+    unlocked,
+  };
+}
+
 export const useStore = create<RecoveryState>()(
   persist(
     (set, get) => ({
@@ -93,7 +191,112 @@ export const useStore = create<RecoveryState>()(
       longestStreak: 0,
       goals: [],
       celebratedBadges: [],
+      games: initialGames,
       themePref: 'system',
+
+      recordCheckers: (result, ctx) => {
+        let unlocked: GameAchievement[] = [];
+        set((s) => {
+          const games: GamesState = {
+            ...s.games,
+            checkersWins: s.games.checkersWins + (result === 'win' ? 1 : 0),
+            checkersLosses: s.games.checkersLosses + (result === 'loss' ? 1 : 0),
+          };
+          const r = withGameEvent(s, games, { game: 'checkers', result, ...ctx });
+          unlocked = r.unlocked;
+          return r.patch;
+        });
+        return unlocked;
+      },
+
+      recordSudoku: (level, ms, ctx) => {
+        let unlocked: GameAchievement[] = [];
+        set((s) => {
+          const prev = s.games.sudokuBestMs[level];
+          const games: GamesState = {
+            ...s.games,
+            sudokuSolved: s.games.sudokuSolved + 1,
+            sudokuBestMs: { ...s.games.sudokuBestMs, [level]: prev == null ? ms : Math.min(prev, ms) },
+          };
+          const r = withGameEvent(s, games, { game: 'sudoku', level, ms, ...ctx });
+          unlocked = r.unlocked;
+          return r.patch;
+        });
+        return unlocked;
+      },
+
+      recordBlocks: (score, ctx) => {
+        let unlocked: GameAchievement[] = [];
+        set((s) => {
+          const games: GamesState = {
+            ...s.games,
+            blocksBest: Math.max(s.games.blocksBest, score),
+            blocksGames: s.games.blocksGames + 1,
+          };
+          const r = withGameEvent(s, games, { game: 'blocks', score, ...ctx });
+          unlocked = r.unlocked;
+          return r.patch;
+        });
+        return unlocked;
+      },
+
+      saveClarityProgress: (day, guesses) =>
+        set((s) => ({
+          games: { ...s.games, clarityDay: day, clarityGuesses: guesses, clarityStatus: 'playing' },
+        })),
+
+      recordClarityResult: (day, guesses, won) => {
+        let unlocked: GameAchievement[] = [];
+        set((s) => {
+          const g = s.games;
+          // Guard: only tally a given day once.
+          const alreadyDone = g.clarityDay === day && g.clarityStatus !== 'playing';
+          if (alreadyDone) {
+            return { games: { ...g, clarityGuesses: guesses } };
+          }
+          const streak = won ? g.clarityStreak + 1 : 0;
+          const games: GamesState = {
+            ...g,
+            clarityDay: day,
+            clarityGuesses: guesses,
+            clarityStatus: won ? 'won' : 'lost',
+            clarityPlayed: g.clarityPlayed + 1,
+            clarityWon: g.clarityWon + (won ? 1 : 0),
+            clarityStreak: streak,
+            clarityBestStreak: Math.max(g.clarityBestStreak, streak),
+          };
+          const r = withGameEvent(s, games, {
+            game: 'clarity', won, guessCount: guesses.length, daily: true,
+          });
+          unlocked = r.unlocked;
+          return r.patch;
+        });
+        return unlocked;
+      },
+
+      recordClarityPractice: (won, guessCount) => {
+        let unlocked: GameAchievement[] = [];
+        set((s) => {
+          const games: GamesState = {
+            ...s.games,
+            clarityPracticePlayed: s.games.clarityPracticePlayed + 1,
+            clarityPracticeWon: s.games.clarityPracticeWon + (won ? 1 : 0),
+          };
+          const r = withGameEvent(s, games, { game: 'clarity', won, guessCount, daily: false });
+          unlocked = r.unlocked;
+          return r.patch;
+        });
+        return unlocked;
+      },
+
+      setTodayMood: (mood) =>
+        set((s) => {
+          const today = s.checkIns.find((c) => sameDay(c.at, Date.now()));
+          if (!today) return s;
+          return {
+            checkIns: s.checkIns.map((c) => (c.id === today.id ? { ...c, mood } : c)),
+          };
+        }),
 
       completeSetup: (profile) => {
         set({
@@ -146,16 +349,26 @@ export const useStore = create<RecoveryState>()(
         set((s) => (s.profile ? { profile: { ...s.profile, ...patch } } : s)),
 
       submitCheckIn: (data) => {
-        const entry: DailyCheckIn = { ...data, id: uid(), at: Date.now() };
-        set((s) => ({
-          checkIns: [entry, ...s.checkIns],
-          points: s.points + 10,
-          timeline: [
-            evt('checkin', 'Completed daily check-in'),
-            ...(data.gambled ? [] : [evt('clean', 'Stayed clean today')]),
-            ...s.timeline,
-          ],
-        }));
+        set((s) => {
+          // One check-in per day: a second submit the same day edits the
+          // existing entry instead of duplicating it (no double points).
+          const existing = s.checkIns.find((c) => sameDay(c.at, Date.now()));
+          if (existing) {
+            return {
+              checkIns: s.checkIns.map((c) => (c.id === existing.id ? { ...c, ...data } : c)),
+            };
+          }
+          const entry: DailyCheckIn = { ...data, id: uid(), at: Date.now() };
+          return {
+            checkIns: [entry, ...s.checkIns],
+            points: s.points + 10,
+            timeline: [
+              evt('checkin', 'Completed daily check-in'),
+              ...(data.gambled ? [] : [evt('clean', 'Stayed clean today')]),
+              ...s.timeline,
+            ],
+          };
+        });
       },
 
       logUrge: (data) => {
@@ -238,6 +451,7 @@ export const useStore = create<RecoveryState>()(
           longestStreak: 0,
           goals: [],
           celebratedBadges: [],
+          games: initialGames,
           themePref: 'system',
         });
       },
@@ -245,6 +459,16 @@ export const useStore = create<RecoveryState>()(
     {
       name: PERSIST_KEY,
       storage: createJSONStorage(() => AsyncStorage),
+      // Deep-merge the games slice so users upgrading from an older build get
+      // defaults for fields that didn't exist when their state was saved.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<RecoveryState>;
+        return {
+          ...current,
+          ...p,
+          games: { ...initialGames, ...(p.games ?? {}) },
+        };
+      },
     },
   ),
 );

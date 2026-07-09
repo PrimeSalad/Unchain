@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
@@ -46,7 +46,7 @@ export default function LogUrge() {
               <Text variant="title1" center>Let's take the edge off.</Text>
               <Text variant="body" dim center style={{ marginTop: spacing.md, marginBottom: spacing.xl }}>Pick one — the urge will pass.</Text>
               <View style={{ gap: spacing.md }}>
-                <ActionBtn icon="leaf" label="Breathing exercise" onPress={() => router.replace('/breathing')} />
+                <ActionBtn icon="leaf" label="Take a Mindful Pause" onPress={() => router.replace('/mindful-pause' as Href)} />
                 <ActionBtn icon="book" label="Open Journal" onPress={() => router.replace('/(tabs)/journal')} />
                 {profile?.reason ? (
                   <Card tone="primarySoft"><Text variant="footnote" dim>Your reason</Text><Text variant="callout" style={{ marginTop: 4 }}>“{profile.reason}”</Text></Card>
@@ -60,7 +60,7 @@ export default function LogUrge() {
               <Text variant="body" dim center style={{ marginTop: spacing.md, marginBottom: spacing.xl }}>Don't decide anything yet. Do this first.</Text>
               <View style={{ gap: spacing.md }}>
                 <ActionBtn icon="warning" label="Open SOS now" accent onPress={() => router.replace('/sos')} />
-                <ActionBtn icon="time" label="Start a delay timer" onPress={() => router.replace('/delay')} />
+                <ActionBtn icon="time" label="Start a Mindful Pause" onPress={() => router.replace('/mindful-pause' as Href)} />
                 <ActionBtn icon="book" label="Journal it out" onPress={() => router.replace('/(tabs)/journal')} />
               </View>
               {profile?.reason ? (

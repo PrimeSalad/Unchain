@@ -84,11 +84,13 @@ export function HomeScreen() {
   if (!profile) return null;
 
   const activityToday =
-    urges.some((u) => sameDay(u.at, now)) || journal.some((j) => sameDay(j.at, now));
+    urges.some((u) => sameDay(u.at, now)) ||
+    journal.some((j) => sameDay(j.at, now)) ||
+    timeline.some((e) => e.type === 'breathing' && sameDay(e.at, now));
   const tasks = [
     { key: 'checkin', label: 'Complete daily check-in', done: !!todayCheckIn, go: () => router.push('/checkin') },
     { key: 'mood', label: "Record today's mood", done: todayCheckIn?.mood != null, go: () => router.push('/checkin') },
-    { key: 'activity', label: 'Finish one recovery activity', done: activityToday, go: () => router.push('/breathing') },
+    { key: 'activity', label: 'Finish one recovery activity', done: activityToday, go: () => router.push('/mindful-pause') },
   ];
 
   return (
@@ -177,8 +179,33 @@ export function HomeScreen() {
         <QuickAction icon="pulse"  label="Log Urge"  onPress={() => router.push('/log-urge')} />
         <QuickAction icon="book"   label="Journal"   onPress={() => router.push('/(tabs)/journal')} />
         <QuickAction icon="warning" label="SOS"      accent onPress={() => router.push('/sos')} />
-        <QuickAction icon="leaf"   label="Breathing" onPress={() => router.push('/breathing')} />
+        <QuickAction icon="flower" label="Pause"     onPress={() => router.push('/mindful-pause')} />
       </View>
+
+      {/* Recreational Games */}
+      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+        Recreational Games
+      </Text>
+      <Pressable
+        onPress={() => router.push('/games' as Href)}
+        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
+      >
+        <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{
+            width: 48, height: 48, borderRadius: radius.round,
+            backgroundColor: theme.color.primarySoft, alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons name="game-controller" size={24} color={theme.color.primary} />
+          </View>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text variant="callout">Play a game</Text>
+            <Text variant="footnote" dim style={{ marginTop: 2 }}>
+              Checkers, Clarity, Sudoku & Block Puzzle — all offline
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
+        </Card>
+      </Pressable>
 
       {/* Recovery Timeline */}
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
