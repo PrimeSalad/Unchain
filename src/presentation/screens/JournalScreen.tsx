@@ -49,14 +49,14 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 type Filter = 'all' | 'clean' | 'gambled';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mood emoji helper
+// Mood helpers — text only, no emoji
 // ─────────────────────────────────────────────────────────────────────────────
-function moodEmoji(mood: number): string {
-  if (mood <= 2) return '😔';
-  if (mood <= 4) return '😕';
-  if (mood <= 6) return '🙂';
-  if (mood <= 8) return '😄';
-  return '🤩';
+function moodLabel(mood: number): string {
+  if (mood <= 2) return 'Very low';
+  if (mood <= 4) return 'Low';
+  if (mood <= 6) return 'Okay';
+  if (mood <= 8) return 'Good';
+  return 'Great';
 }
 
 function moodColor(mood: number, danger: string, celebrate: string, honey: string, success: string): string {
@@ -234,16 +234,18 @@ function EntryCard({ entry, index }: { entry: JournalEntry; index: number }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 0 }}>
               {entry.mood != null && (
                 <View style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  backgroundColor: moodColor(entry.mood, theme.color.danger, theme.color.celebrate, palette.honey, theme.color.success) + '20',
-                  borderWidth: 1.5,
-                  borderColor: moodColor(entry.mood, theme.color.danger, theme.color.celebrate, palette.honey, theme.color.success) + '60',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: 3,
+                  borderRadius: radius.chip,
+                  backgroundColor: moodColor(entry.mood, theme.color.danger, theme.color.celebrate, palette.honey, theme.color.success) + '18',
                 }}>
-                  <Text style={{ fontSize: 16, lineHeight: 20 }}>{moodEmoji(entry.mood)}</Text>
+                  <Text
+                    variant="caption"
+                    color={moodColor(entry.mood, theme.color.danger, theme.color.celebrate, palette.honey, theme.color.success)}
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    {entry.mood}/10
+                  </Text>
                 </View>
               )}
               <Animated.View style={chevronStyle}>
@@ -280,7 +282,7 @@ function EntryCard({ entry, index }: { entry: JournalEntry; index: number }) {
               <View style={{ height: 1, backgroundColor: theme.color.hairline, marginBottom: spacing.sm }} />
 
               {entry.mood != null && (
-                <DetailRow icon="happy-outline" color={theme.color.primary} label="Mood" value={`${entry.mood}/10  ${moodEmoji(entry.mood)}`} />
+                <DetailRow icon="bar-chart-outline" color={theme.color.primary} label="Mood" value={`${entry.mood}/10 — ${moodLabel(entry.mood)}`} />
               )}
               {entry.gambled === true && entry.amountWagered != null && (
                 <DetailRow icon="cash-outline" color={theme.color.textDim} label="Wagered" value={`₱${entry.amountWagered.toLocaleString()}`} />
@@ -554,7 +556,7 @@ export function JournalScreen() {
           {(['all', 'clean', 'gambled'] as Filter[]).map((f) => (
             <Pill
               key={f}
-              label={f === 'all' ? 'All entries' : f === 'clean' ? '✅ Clean' : '⚠️ Gambled'}
+              label={f === 'all' ? 'All entries' : f === 'clean' ? 'Clean days' : 'Relapses'}
               active={filter === f}
               onPress={() => setFilter(f)}
             />
