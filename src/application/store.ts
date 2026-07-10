@@ -29,6 +29,10 @@ import type {
   UrgeLog,
 } from '@/domain/records';
 import { sameDay } from '@/domain/records';
+import type { AlternativeId } from '@/domain/alternatives';
+import { alternativeById } from '@/domain/alternatives';
+import type { FavoriteQuote } from '@/domain/quotes';
+import { QUOTES, QUOTE_HISTORY_SIZE, localDayKey, pickDailyQuoteIndex } from '@/domain/quotes';
 
 /**
  * Single local store for the recovery companion. Offline-first: no accounts,
@@ -94,6 +98,19 @@ interface RecoveryState {
   games: GamesState;
   themePref: ThemePref;
 
+  // ── Healthy Alternatives ────────────────────────────────────────────────
+  /** Last completion timestamp per activity. "Done today" = sameDay(ts, now),
+   *  so state resets automatically at local midnight without a scheduler. */
+  alternatives: Partial<Record<AlternativeId, number>>;
+
+  // ── Recovery Motivation ─────────────────────────────────────────────────
+  /** Quotes the user has hearted. Survive restarts/updates via persistence. */
+  favoriteQuotes: FavoriteQuote[];
+  /** Today's quote — same all day, rotates once per local calendar day. */
+  dailyQuote: { day: string; index: number } | null;
+  /** Recently shown quote indexes — avoids repeats until the pool cycles. */
+  recentQuotes: number[];
+
   // Recreational games — record actions return achievements newly unlocked
   // by that result so screens can celebrate them.
   recordCheckers: (
@@ -111,6 +128,16 @@ interface RecoveryState {
   recordClarityPractice: (won: boolean, guessCount: number) => GameAchievement[];
   /** Set (or intentionally edit) today's mood on today's check-in. No-op without one. */
   setTodayMood: (mood: number) => void;
+
+  /** Mark a Healthy Alternative complete for today (idempotent per day —
+   *  repeat sessions refresh the timestamp without double-awarding). */
+  completeAlternative: (id: AlternativeId) => void;
+  /** Heart / un-heart a quote. */
+  toggleFavoriteQuote: (q: { text: string; author?: string }) => void;
+  removeFavoriteQuote: (savedAt: number) => void;
+  /** Make sure today's quote is chosen; returns its index. Cheap no-op when
+   *  today's pick already exists. */
+  ensureDailyQuote: () => number;
 
   completeSetup: (profile: RecoveryProfile) => void;
   addGoal: (kind: GoalKind, target: number) => void;
@@ -193,6 +220,56 @@ export const useStore = create<RecoveryState>()(
       celebratedBadges: [],
       games: initialGames,
       themePref: 'system',
+      alternatives: {},
+      favoriteQuotes: [],
+      dailyQuote: null,
+      recentQuotes: [],
+
+      completeAlternative: (id) => {
+        set((s) => {
+          const prev = s.alternatives[id];
+          const already = prev != null && sameDay(prev, Date.now());
+          return {
+            alternatives: { ...s.alternatives, [id]: Date.now() },
+            // Award points + a timeline event only once per day per activity.
+            ...(already
+              ? {}
+              : {
+                  points: s.points + 5,
+                  timeline: [
+                    evt('activity', `Recovery activity — ${alternativeById(id).title}`),
+                    ...s.timeline,
+                  ],
+                }),
+          };
+        });
+      },
+
+      toggleFavoriteQuote: (q) => {
+        set((s) => {
+          const existing = s.favoriteQuotes.find((f) => f.text === q.text);
+          return {
+            favoriteQuotes: existing
+              ? s.favoriteQuotes.filter((f) => f.text !== q.text)
+              : [{ text: q.text, author: q.author, savedAt: Date.now() }, ...s.favoriteQuotes],
+          };
+        });
+      },
+
+      removeFavoriteQuote: (savedAt) =>
+        set((s) => ({ favoriteQuotes: s.favoriteQuotes.filter((f) => f.savedAt !== savedAt) })),
+
+      ensureDailyQuote: () => {
+        const s = get();
+        const day = localDayKey();
+        if (s.dailyQuote?.day === day) return s.dailyQuote.index;
+        const index = pickDailyQuoteIndex(s.recentQuotes, QUOTES.length);
+        set({
+          dailyQuote: { day, index },
+          recentQuotes: [...s.recentQuotes, index].slice(-QUOTE_HISTORY_SIZE),
+        });
+        return index;
+      },
 
       recordCheckers: (result, ctx) => {
         let unlocked: GameAchievement[] = [];
@@ -514,6 +591,7 @@ export const useStore = create<RecoveryState>()(
           longestStreak: 0,
           goals: [],
           celebratedBadges: [],
+          alternatives: {},
           // Restart the streak from right now, keeping all profile details.
           profile: s.profile ? { ...s.profile, startedAt: Date.now() } : null,
         })),
@@ -537,6 +615,10 @@ export const useStore = create<RecoveryState>()(
           celebratedBadges: [],
           games: initialGames,
           themePref: 'system',
+          alternatives: {},
+          favoriteQuotes: [],
+          dailyQuote: null,
+          recentQuotes: [],
         });
       },
     }),

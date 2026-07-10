@@ -82,6 +82,7 @@ export type TimelineType =
   | 'badge'
   | 'achievement'
   | 'breathing'
+  | 'activity'
   | 'start';
 
 export interface TimelineEvent {

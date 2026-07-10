@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, type Href } from 'expo-router';
@@ -8,14 +8,19 @@ import { Collapsible } from '@/presentation/components/Collapsible';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useProfile, useStore } from '@/application/store';
 import { recoveryTimer, moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
-import { HEALTHY_ALTERNATIVES, MOTIVATION, randomFrom } from '@/domain/content';
+import { QUOTES } from '@/domain/quotes';
 
 export default function Sos() {
   const router = useRouter();
   const profile = useProfile();
-  const [panel, setPanel] = useState<'alt' | 'motiv' | null>(null);
-  // Stable for the visit so the quote doesn't change on every re-render.
-  const motivation = useMemo(() => randomFrom(MOTIVATION), []);
+  const [panel, setPanel] = useState<'motiv' | null>(null);
+  // The same daily quote shown on Home — consistent all day, offline.
+  const dailyQuote = useStore((s) => s.dailyQuote);
+  const ensureDailyQuote = useStore((s) => s.ensureDailyQuote);
+  useEffect(() => {
+    ensureDailyQuote();
+  }, [ensureDailyQuote]);
+  const motivation = QUOTES[dailyQuote?.index ?? 0].text;
 
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
@@ -33,12 +38,12 @@ export default function Sos() {
     label: string;
     onPress: () => void;
     /** Rows with a panel expand in place instead of navigating. */
-    panelKey?: 'alt' | 'motiv';
+    panelKey?: 'motiv';
   }[] = [
     { icon: 'flower', label: 'Mindful Pause', onPress: () => router.replace('/mindful-pause' as Href) },
     { icon: 'game-controller', label: 'Recreational Games', onPress: () => router.push('/games' as Href) },
     { icon: 'book', label: 'Read Journal', onPress: () => router.replace('/(tabs)/journal') },
-    { icon: 'walk', label: 'Healthy Alternatives', panelKey: 'alt', onPress: () => setPanel(panel === 'alt' ? null : 'alt') },
+    { icon: 'walk', label: 'Healthy Alternatives', onPress: () => router.push('/alternatives' as Href) },
     { icon: 'heart', label: 'Recovery Motivation', panelKey: 'motiv', onPress: () => setPanel(panel === 'motiv' ? null : 'motiv') },
     { icon: 'create', label: 'Emergency Reflection', onPress: () => router.replace('/reflection') },
   ];
@@ -96,17 +101,6 @@ export default function Sos() {
                   </Pressable>
 
                   {/* Expandable content lives directly beneath its own row. */}
-                  {t.panelKey === 'alt' && (
-                    <Collapsible open={expanded}>
-                      <View style={{ paddingTop: spacing.sm, gap: spacing.sm }}>
-                        {HEALTHY_ALTERNATIVES.map((a) => (
-                          <View key={a} style={{ backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg, marginLeft: spacing.lg }}>
-                            <Text variant="body" color={palette.fog}>{a}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </Collapsible>
-                  )}
                   {t.panelKey === 'motiv' && (
                     <Collapsible open={expanded}>
                       <View style={{ paddingTop: spacing.sm }}>

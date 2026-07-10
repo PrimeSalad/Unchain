@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,9 +23,10 @@ import {
   milestoneCrossed,
   addictionMeta,
 } from '@/domain/gambling';
-import { quoteOfNow, randomFrom, MOTIVATION } from '@/domain/content';
+import { quoteOfNow } from '@/domain/content';
 import type { TimelineType } from '@/domain/records';
 import { sameDay } from '@/domain/records';
+import { DailyQuoteCard, FavoriteQuotesCarousel } from '../components/QuoteCards';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -45,6 +46,7 @@ const TIMELINE_ICON: Record<TimelineType, keyof typeof Ionicons.glyphMap> = {
   badge: 'medal',
   achievement: 'trophy',
   breathing: 'leaf',
+  activity: 'walk',
   start: 'flag',
 };
 
@@ -76,8 +78,6 @@ export function HomeScreen() {
   const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
 
-  const motivation = useMemo(() => randomFrom(MOTIVATION), []);
-
   useEffect(() => {
     if (!profile) return;
     const crossed = milestoneCrossed(days - 1, days);
@@ -98,11 +98,11 @@ export function HomeScreen() {
   const activityToday =
     urges.some((u) => sameDay(u.at, now)) ||
     journal.some((j) => sameDay(j.at, now)) ||
-    timeline.some((e) => e.type === 'breathing' && sameDay(e.at, now));
+    timeline.some((e) => (e.type === 'breathing' || e.type === 'activity') && sameDay(e.at, now));
   const tasks = [
     { key: 'checkin', label: 'Complete daily check-in', done: !!todayCheckIn, go: () => router.push('/checkin') },
     { key: 'mood', label: "Record today's mood", done: todayCheckIn?.mood != null, go: () => router.push('/checkin') },
-    { key: 'activity', label: 'Finish one recovery activity', done: activityToday, go: () => router.push('/mindful-pause') },
+    { key: 'activity', label: 'Finish one recovery activity', done: activityToday, go: () => router.push('/alternatives' as Href) },
   ];
 
   return (
@@ -281,11 +281,28 @@ export function HomeScreen() {
         )}
       </Card>
 
-      {/* Motivation */}
-      <Card tone="celebrateSoft" style={{ marginTop: spacing.xl }}>
-        <Text variant="callout" color={theme.color.celebrateText}>{motivation}</Text>
-      </Card>
+      {/* Recovery Motivation — one quote per day, heart to keep it */}
+      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+        Recovery Motivation
+      </Text>
+      <DailyQuoteCard />
+
+      {/* Favorite quotes carousel (hidden until the user hearts one) */}
+      <FavoritesSection />
     </Screen>
+  );
+}
+
+function FavoritesSection() {
+  const hasFavorites = useStore((s) => s.favoriteQuotes.length > 0);
+  if (!hasFavorites) return null;
+  return (
+    <>
+      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+        Your Favorite Quotes
+      </Text>
+      <FavoriteQuotesCarousel />
+    </>
   );
 }
 
