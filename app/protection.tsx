@@ -1,14 +1,16 @@
 /**
- * Focus Protection — a voluntary, consent-first website blocklist.
+ * Focus Protection — a permanent, consent-first website blocklist.
  *
- * The user builds their own list; nothing is ever added or blocked
- * automatically (suggestions require an explicit Add tap). No browsing data
- * is read or collected — the app only knows the list the user typed in, and
- * it never leaves the device.
+ * Blocking model: a website on the list is protected the moment it is added
+ * and stays protected indefinitely. There are no timers, no sessions, no
+ * expiry, and no pause switch — the ONLY way a site stops being protected is
+ * the user deleting it, behind a destructive confirmation. The user builds
+ * the whole list themselves; suggestions require an explicit Add tap. No
+ * browsing data is read or collected, and the list never leaves the device.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, Switch, TextInput, View } from 'react-native';
+import { Alert, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -24,17 +26,7 @@ import { useStore, useProfile, useTodayJournal } from '@/application/store';
 import { currentStreakStart, streakDays } from '@/domain/gambling';
 import { ALTERNATIVES } from '@/domain/alternatives';
 import { sameDay } from '@/domain/records';
-import {
-  MAX_CUSTOM_MINUTES,
-  SESSION_PRESETS,
-  SUGGESTED_SITES,
-  formatRemaining,
-  sessionActive,
-  sessionRemainingSec,
-  siteLabel,
-  siteStatus,
-  type BlockedSite,
-} from '@/domain/protection';
+import { SUGGESTED_SITES, siteLabel, type BlockedSite } from '@/domain/protection';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
 
@@ -45,19 +37,21 @@ function fmtDate(ts: number): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Add / Edit sheets
+// Shared domain/nickname fields
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DomainFields({
   domain,
   nickname,
   error,
+  autoFocus = true,
   onDomain,
   onNickname,
 }: {
   domain: string;
   nickname: string;
   error: string | null;
+  autoFocus?: boolean;
   onDomain: (v: string) => void;
   onNickname: (v: string) => void;
 }) {
@@ -84,7 +78,7 @@ function DomainFields({
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"
-        autoFocus
+        autoFocus={autoFocus}
         underlineColorAndroid="transparent"
         selectionColor={theme.color.primary}
         accessibilityLabel="Website URL"
@@ -108,15 +102,11 @@ function DomainFields({
   );
 }
 
-function AddSiteSheet({
-  visible,
-  initialDomain,
-  onClose,
-}: {
-  visible: boolean;
-  initialDomain?: string;
-  onClose: () => void;
-}) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Add sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AddSiteSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const addBlockedSite = useStore((s) => s.addBlockedSite);
   const [domain, setDomain] = useState('');
   const [nickname, setNickname] = useState('');
@@ -124,11 +114,11 @@ function AddSiteSheet({
 
   useEffect(() => {
     if (visible) {
-      setDomain(initialDomain ?? '');
+      setDomain('');
       setNickname('');
       setError(null);
     }
-  }, [visible, initialDomain]);
+  }, [visible]);
 
   const save = () => {
     const result = addBlockedSite(domain, nickname);
@@ -137,7 +127,7 @@ function AddSiteSheet({
       return;
     }
     if (result === 'duplicate') {
-      setError('This website is already in your blocklist.');
+      setError('This website is already protected.');
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -150,7 +140,7 @@ function AddSiteSheet({
         Add Website
       </Text>
       <Text variant="footnote" dim style={{ marginBottom: spacing.lg, lineHeight: 19 }}>
-        Only websites you add here are protected. The list stays on this device.
+        Protection starts the moment you add it and stays on until you remove it. The list never leaves this device.
       </Text>
       <DomainFields
         domain={domain}
@@ -160,39 +150,39 @@ function AddSiteSheet({
         onNickname={setNickname}
       />
       <View style={{ gap: spacing.sm, marginTop: spacing.xl }}>
-        <Button label="Add to Blocklist" onPress={save} disabled={!domain.trim()} full />
+        <Button label="Add & Protect" onPress={save} disabled={!domain.trim()} full />
         <Button label="Cancel" kind="secondary" onPress={onClose} full />
       </View>
     </ActionSheet>
   );
 }
 
-function EditSiteSheet({
-  site,
-  onClose,
-}: {
-  site: BlockedSite | null;
-  onClose: () => void;
-}) {
-  const theme = useTheme();
+// ─────────────────────────────────────────────────────────────────────────────
+// Edit sheet — subscribes to the live store entry by id (never a stale copy),
+// so every change is reflected instantly and deletion closes cleanly.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EditSiteSheet({ siteId, onClose }: { siteId: string | null; onClose: () => void }) {
   const updateBlockedSite = useStore((s) => s.updateBlockedSite);
-  const toggleBlockedSite = useStore((s) => s.toggleBlockedSite);
   const removeBlockedSite = useStore((s) => s.removeBlockedSite);
+  const site = useStore((s) => (siteId ? s.blockedSites.find((b) => b.id === siteId) : undefined));
+
   const [domain, setDomain] = useState('');
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (site) {
+    if (siteId && site) {
       setDomain(site.domain);
       setNickname(site.nickname ?? '');
       setError(null);
     }
-  }, [site]);
-
-  if (!site) return <ActionSheet visible={false} onClose={onClose}><View /></ActionSheet>;
+    // Re-seed the fields only when a different site is opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteId]);
 
   const save = () => {
+    if (!site) return;
     const result = updateBlockedSite(site.id, { domain, nickname });
     if (result === 'invalid') {
       setError('That does not look like a website address.');
@@ -207,15 +197,18 @@ function EditSiteSheet({
   };
 
   const confirmDelete = () => {
+    if (!site) return;
     Alert.alert(
       'Remove Blocked Website?',
-      'This website will no longer be protected during your recovery sessions.',
+      'This website will no longer be protected. This is the only way a blocked website becomes accessible again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove',
           style: 'destructive',
           onPress: () => {
+            // Removal is immediate: the store filter updates every subscribed
+            // screen in the same frame — no restart or refresh needed.
             removeBlockedSite(site.id);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
             onClose();
@@ -226,7 +219,7 @@ function EditSiteSheet({
   };
 
   return (
-    <ActionSheet visible={site != null} onClose={onClose}>
+    <ActionSheet visible={siteId != null && site != null} onClose={onClose}>
       <Text variant="title2" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.lg }}>
         Edit Website
       </Text>
@@ -234,41 +227,13 @@ function EditSiteSheet({
         domain={domain}
         nickname={nickname}
         error={error}
+        autoFocus={false}
         onDomain={(v) => { setDomain(v); setError(null); }}
         onNickname={setNickname}
       />
-
-      {/* Temporarily disable without deleting */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          marginTop: spacing.lg,
-          backgroundColor: theme.color.surfaceAlt,
-          borderRadius: radius.card,
-          padding: spacing.lg,
-        }}
-      >
-        <View style={{ flex: 1 }}>
-          <Text variant="callout">Protection</Text>
-          <Text variant="caption" dim style={{ marginTop: 1 }}>
-            {site.enabled ? 'On — included in recovery sessions' : 'Temporarily disabled'}
-          </Text>
-        </View>
-        <Switch
-          value={site.enabled}
-          onValueChange={() => {
-            Haptics.selectionAsync().catch(() => {});
-            toggleBlockedSite(site.id);
-          }}
-          trackColor={{ true: theme.color.primary }}
-          accessibilityLabel={`Protection for ${siteLabel(site)}`}
-        />
-      </View>
-
       <View style={{ gap: spacing.sm, marginTop: spacing.xl }}>
         <Button label="Save Changes" onPress={save} disabled={!domain.trim()} full />
-        <Button label="Delete Website" kind="destructive" onPress={confirmDelete} full />
+        <Button label="Remove from Blocklist" kind="destructive" onPress={confirmDelete} full />
         <Button label="Close" kind="secondary" onPress={onClose} full />
       </View>
     </ActionSheet>
@@ -276,101 +241,17 @@ function EditSiteSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Custom duration sheet
+// Site row — always Protected; tap to edit
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CustomDurationSheet({
-  visible,
-  onClose,
-  onStart,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onStart: (minutes: number) => void;
-}) {
+function SiteRow({ site, index, onEdit }: { site: BlockedSite; index: number; onEdit: () => void }) {
   const theme = useTheme();
-  const [minutes, setMinutes] = useState('');
-
-  useEffect(() => {
-    if (visible) setMinutes('');
-  }, [visible]);
-
-  const parsed = parseInt(minutes, 10);
-  const valid = Number.isFinite(parsed) && parsed >= 1 && parsed <= MAX_CUSTOM_MINUTES;
-
-  return (
-    <ActionSheet visible={visible} onClose={onClose}>
-      <Text variant="title2" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.xs }}>
-        Custom Duration
-      </Text>
-      <Text variant="footnote" dim style={{ marginBottom: spacing.lg }}>
-        How many minutes should this session last? Up to {MAX_CUSTOM_MINUTES / 60} hours.
-      </Text>
-      <TextInput
-        value={minutes}
-        onChangeText={(t) => setMinutes(t.replace(/[^0-9]/g, ''))}
-        placeholder="e.g. 45"
-        placeholderTextColor={theme.color.textDim}
-        keyboardType="number-pad"
-        autoFocus
-        underlineColorAndroid="transparent"
-        selectionColor={theme.color.primary}
-        accessibilityLabel="Session length in minutes"
-        style={{
-          borderRadius: radius.input,
-          backgroundColor: theme.color.surfaceAlt,
-          borderWidth: 1,
-          borderColor: theme.color.hairline,
-          padding: spacing.lg,
-          color: theme.color.text,
-          fontSize: 17,
-          fontFamily: 'Nunito_600SemiBold',
-        }}
-      />
-      <View style={{ gap: spacing.sm, marginTop: spacing.xl }}>
-        <Button
-          label="Start Protection"
-          onPress={() => { onStart(parsed); onClose(); }}
-          disabled={!valid}
-          full
-        />
-        <Button label="Cancel" kind="secondary" onPress={onClose} full />
-      </View>
-    </ActionSheet>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Site row
-// ─────────────────────────────────────────────────────────────────────────────
-
-function SiteRow({
-  site,
-  index,
-  active,
-  onEdit,
-}: {
-  site: BlockedSite;
-  index: number;
-  active: boolean;
-  onEdit: () => void;
-}) {
-  const theme = useTheme();
-  const toggleBlockedSite = useStore((s) => s.toggleBlockedSite);
-  const status = siteStatus(site, active);
-
-  const statusMeta = {
-    active:    { label: 'Currently Active',      color: theme.color.success,  icon: 'shield-checkmark' as const },
-    protected: { label: 'Protected',             color: theme.color.primary,  icon: 'shield-checkmark' as const },
-    disabled:  { label: 'Temporarily Disabled',  color: theme.color.textDim,  icon: 'shield-outline' as const },
-  }[status];
-
   return (
     <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 40).springify().damping(18)}>
       <Pressable
         onPress={() => { Haptics.selectionAsync().catch(() => {}); onEdit(); }}
         accessibilityRole="button"
-        accessibilityLabel={`${siteLabel(site)}, ${statusMeta.label}. Edit`}
+        accessibilityLabel={`${siteLabel(site)}, protected. Edit`}
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
@@ -388,12 +269,12 @@ function SiteRow({
             width: 42,
             height: 42,
             borderRadius: 21,
-            backgroundColor: statusMeta.color + '18',
+            backgroundColor: theme.color.success + '18',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Ionicons name={statusMeta.icon} size={20} color={statusMeta.color} />
+          <Ionicons name="shield-checkmark" size={20} color={theme.color.success} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="headline" numberOfLines={1}>{siteLabel(site)}</Text>
@@ -401,19 +282,12 @@ function SiteRow({
             <Text variant="caption" dim numberOfLines={1}>{site.domain}</Text>
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 }}>
-            <Text variant="caption" color={statusMeta.color}>{statusMeta.label}</Text>
+            <Ionicons name="checkmark-circle" size={12} color={theme.color.success} />
+            <Text variant="caption" color={theme.color.success}>Protected</Text>
             <Text variant="caption" dim>· Added {fmtDate(site.addedAt)}</Text>
           </View>
         </View>
-        <Switch
-          value={site.enabled}
-          onValueChange={() => {
-            Haptics.selectionAsync().catch(() => {});
-            toggleBlockedSite(site.id);
-          }}
-          trackColor={{ true: theme.color.primary }}
-          accessibilityLabel={`Protection for ${siteLabel(site)}`}
-        />
+        <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
       </Pressable>
     </Animated.View>
   );
@@ -428,37 +302,22 @@ export default function Protection() {
   const router = useRouter();
   const profile = useProfile();
   const blockedSites = useStore((s) => s.blockedSites);
-  const session = useStore((s) => s.protectionSession);
-  const startProtection = useStore((s) => s.startProtection);
-  const stopProtection = useStore((s) => s.stopProtection);
+  const addBlockedSite = useStore((s) => s.addBlockedSite);
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
   const completions = useStore((s) => s.alternatives);
-  const addBlockedSite = useStore((s) => s.addBlockedSite);
   const todayJournal = useTodayJournal();
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addPrefill, setAddPrefill] = useState<string | undefined>(undefined);
-  const [editing, setEditing] = useState<BlockedSite | null>(null);
-  const [customOpen, setCustomOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortMode>('az');
 
-  // 1-second tick while a session is running so the countdown stays live.
-  const [now, setNow] = useState(Date.now());
-  const active = sessionActive(session, now);
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [active]);
-
-  const enabledCount = blockedSites.filter((s) => s.enabled).length;
   const streak = profile ? streakDays(currentStreakStart(profile.startedAt, relapses, journal)) : 0;
   const activitiesToday = ALTERNATIVES.filter((a) =>
     a.id === 'journal'
       ? todayJournal != null
-      : completions[a.id] != null && sameDay(completions[a.id]!, now),
+      : completions[a.id] != null && sameDay(completions[a.id]!, Date.now()),
   ).length;
 
   const visibleSites = useMemo(() => {
@@ -477,27 +336,7 @@ export default function Protection() {
     (d) => !blockedSites.some((s) => s.domain === d),
   );
 
-  const start = (opts: { minutes?: number; untilTomorrow?: boolean }) => {
-    if (enabledCount === 0) {
-      Alert.alert(
-        'No websites to protect',
-        'Add at least one website to your blocklist first — only websites you choose are ever protected.',
-      );
-      return;
-    }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    startProtection({ ...opts, trigger: 'manual' });
-    setNow(Date.now());
-  };
-
-  const confirmStop = () => {
-    Alert.alert('End protection early?', 'Your blocked websites will no longer be in an active session.', [
-      { text: 'Keep Protecting', style: 'cancel' },
-      { text: 'End Session', style: 'destructive', onPress: () => stopProtection() },
-    ]);
-  };
-
-  const remaining = sessionRemainingSec(session, now);
+  const hasSites = blockedSites.length > 0;
 
   return (
     <Screen edges={['top', 'bottom']}>
@@ -506,7 +345,7 @@ export default function Protection() {
         <View style={{ flex: 1 }}>
           <Text variant="title1">Focus Protection</Text>
           <Text variant="footnote" dim style={{ marginTop: 2 }}>
-            You choose every website. Everything stays on this device.
+            Permanent by design — protection only ends when you remove a website.
           </Text>
         </View>
         <Pressable
@@ -526,104 +365,38 @@ export default function Protection() {
       </View>
 
       {/* Dashboard */}
-      <Card
-        tone={active ? 'successSoft' : 'surface'}
-        style={{ marginTop: spacing.lg, gap: spacing.md }}
-      >
+      <Card tone={hasSites ? 'successSoft' : 'surface'} style={{ marginTop: spacing.lg, gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <View
             style={{
               width: 46, height: 46, borderRadius: 23,
-              backgroundColor: (active ? theme.color.success : theme.color.primary) + '20',
+              backgroundColor: (hasSites ? theme.color.success : theme.color.primary) + '20',
               alignItems: 'center', justifyContent: 'center',
             }}
           >
             <Ionicons
-              name={active ? 'shield-checkmark' : 'shield-outline'}
+              name={hasSites ? 'shield-checkmark' : 'shield-outline'}
               size={24}
-              color={active ? theme.color.success : theme.color.primary}
+              color={hasSites ? theme.color.success : theme.color.primary}
             />
           </View>
           <View style={{ flex: 1 }}>
             <Text variant="headline">
-              {active ? 'Protection Active' : 'Protection on Standby'}
+              {hasSites ? 'Protection Always On' : 'No websites protected yet'}
             </Text>
             <Text variant="footnote" dim style={{ marginTop: 1 }}>
-              {active
-                ? `${formatRemaining(remaining)} remaining · ${enabledCount} website${enabledCount === 1 ? '' : 's'} protected`
-                : enabledCount > 0
-                  ? `${enabledCount} website${enabledCount === 1 ? '' : 's'} ready to protect`
-                  : 'Add websites below to get started'}
+              {hasSites
+                ? `${blockedSites.length} website${blockedSites.length === 1 ? '' : 's'} protected — no timers, no expiry`
+                : 'Add websites below to start protecting yourself'}
             </Text>
           </View>
         </View>
 
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <DashStat value={`${enabledCount}/${blockedSites.length}`} label="Websites" />
+          <DashStat value={`${blockedSites.length}`} label="Websites" />
           <DashStat value={`${streak}`} label="Day streak" />
           <DashStat value={`${activitiesToday}/${ALTERNATIVES.length}`} label="Activities today" />
         </View>
-
-        {active ? (
-          <Button label="End Protection Early" kind="destructive" onPress={confirmStop} full />
-        ) : (
-          <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {SESSION_PRESETS.map((m) => (
-                <Pressable
-                  key={m}
-                  onPress={() => start({ minutes: m })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Protect for ${m >= 60 ? `${m / 60} hour${m > 60 ? 's' : ''}` : `${m} minutes`}`}
-                  style={({ pressed }) => ({
-                    paddingHorizontal: spacing.lg,
-                    paddingVertical: spacing.md,
-                    borderRadius: radius.round,
-                    backgroundColor: theme.color.primarySoft,
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <Text variant="callout" color={theme.color.primary} style={{ fontFamily: 'Nunito_700Bold' }}>
-                    {m >= 60 ? `${m / 60} hr${m > 60 ? 's' : ''}` : `${m} min`}
-                  </Text>
-                </Pressable>
-              ))}
-              <Pressable
-                onPress={() => start({ untilTomorrow: true })}
-                accessibilityRole="button"
-                accessibilityLabel="Protect until tomorrow"
-                style={({ pressed }) => ({
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
-                  borderRadius: radius.round,
-                  backgroundColor: theme.color.primarySoft,
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Text variant="callout" color={theme.color.primary} style={{ fontFamily: 'Nunito_700Bold' }}>
-                  Until tomorrow
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setCustomOpen(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Custom duration"
-                style={({ pressed }) => ({
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
-                  borderRadius: radius.round,
-                  borderWidth: 1,
-                  borderColor: theme.color.primary,
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Text variant="callout" color={theme.color.primary} style={{ fontFamily: 'Nunito_700Bold' }}>
-                  Custom…
-                </Text>
-              </Pressable>
-            </View>
-          </>
-        )}
       </Card>
 
       {/* Blocklist */}
@@ -632,7 +405,7 @@ export default function Protection() {
           My Blocklist · {blockedSites.length}
         </Text>
         <Pressable
-          onPress={() => { setAddPrefill(undefined); setAddOpen(true); }}
+          onPress={() => setAddOpen(true)}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Add website"
@@ -647,7 +420,7 @@ export default function Protection() {
         </Pressable>
       </View>
 
-      {blockedSites.length > 0 && (
+      {hasSites && (
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
           {/* Search */}
           <View
@@ -695,14 +468,14 @@ export default function Protection() {
         </View>
       )}
 
-      {blockedSites.length === 0 ? (
+      {!hasSites ? (
         <Card tone="primarySoft" style={{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm }}>
           <Ionicons name="shield-outline" size={30} color={theme.color.primary} />
           <Text variant="callout" center>Your blocklist is empty</Text>
           <Text variant="footnote" dim center style={{ paddingHorizontal: spacing.lg, lineHeight: 19 }}>
-            Add the websites you want to keep at a distance. You are always in control — nothing is ever blocked without your say-so.
+            Add the websites you want out of your life. Once added, they stay protected until you remove them yourself.
           </Text>
-          <Button label="Add your first website" onPress={() => { setAddPrefill(undefined); setAddOpen(true); }} style={{ marginTop: spacing.sm }} />
+          <Button label="Add your first website" onPress={() => setAddOpen(true)} style={{ marginTop: spacing.sm }} />
         </Card>
       ) : visibleSites.length === 0 ? (
         <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
@@ -711,7 +484,7 @@ export default function Protection() {
       ) : (
         <View style={{ gap: spacing.sm }}>
           {visibleSites.map((s, i) => (
-            <SiteRow key={s.id} site={s} index={i} active={active} onEdit={() => setEditing(s)} />
+            <SiteRow key={s.id} site={s} index={i} onEdit={() => setEditingId(s.id)} />
           ))}
         </View>
       )}
@@ -767,13 +540,8 @@ export default function Protection() {
       </Card>
 
       {/* Sheets */}
-      <AddSiteSheet visible={addOpen} initialDomain={addPrefill} onClose={() => setAddOpen(false)} />
-      <EditSiteSheet site={editing} onClose={() => setEditing(null)} />
-      <CustomDurationSheet
-        visible={customOpen}
-        onClose={() => setCustomOpen(false)}
-        onStart={(m) => start({ minutes: m })}
-      />
+      <AddSiteSheet visible={addOpen} onClose={() => setAddOpen(false)} />
+      <EditSiteSheet siteId={editingId} onClose={() => setEditingId(null)} />
     </Screen>
   );
 }

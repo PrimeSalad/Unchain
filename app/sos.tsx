@@ -9,7 +9,6 @@ import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useProfile, useStore } from '@/application/store';
 import { recoveryTimer, moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
 import { QUOTES } from '@/domain/quotes';
-import { sessionActive, sessionRemainingSec, formatRemaining } from '@/domain/protection';
 
 export default function Sos() {
   const router = useRouter();
@@ -24,19 +23,9 @@ export default function Sos() {
   const motivation = QUOTES[dailyQuote?.index ?? 0].text;
 
   // ── Focus Protection ──────────────────────────────────────────────────────
-  // Opening SOS ("I'm having an urge") automatically starts a one-hour
-  // protection session — but ONLY for websites the user already chose to
-  // block. Nothing is ever added to the blocklist here.
-  const blockedSites = useStore((s) => s.blockedSites);
-  const protectionSession = useStore((s) => s.protectionSession);
-  const startProtection = useStore((s) => s.startProtection);
-  const protectedCount = blockedSites.filter((b) => b.enabled).length;
-  useEffect(() => {
-    if (protectedCount > 0) startProtection({ minutes: 60, trigger: 'sos' });
-    // Run once per SOS visit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const protectionOn = sessionActive(protectionSession);
+  // The blocklist is permanent — every website the user added is always
+  // protected, so in a moment of crisis this is simply a reassurance.
+  const protectedCount = useStore((s) => s.blockedSites.length);
 
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
@@ -84,11 +73,10 @@ export default function Sos() {
             <Anchor label="Recovery" value={`${timer.days}d ${timer.hours}h`} />
             <Anchor label="Money Saved" value={formatMoney(money.total, currency)} />
           </View>
-          {/* Focus Protection status — activated automatically for the sites
-              the user already chose; never adds anything by itself. */}
-          {protectionOn && protectedCount > 0 && (
+          {/* Focus Protection status — the user's permanent blocklist. */}
+          {protectedCount > 0 && (
             <View
-              accessibilityLabel={`Focus Protection active, ${protectedCount} websites protected`}
+              accessibilityLabel={`Focus Protection on, ${protectedCount} websites permanently protected`}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: spacing.md,
                 backgroundColor: palette.nightRaised, borderRadius: radius.card,
@@ -100,7 +88,7 @@ export default function Sos() {
               <View style={{ flex: 1 }}>
                 <Text variant="callout" color={palette.fog}>Focus Protection is on</Text>
                 <Text variant="caption" color={palette.fogDim} style={{ marginTop: 1 }}>
-                  {protectedCount} website{protectedCount === 1 ? '' : 's'} protected · {formatRemaining(sessionRemainingSec(protectionSession))} left
+                  {protectedCount} website{protectedCount === 1 ? '' : 's'} permanently protected
                 </Text>
               </View>
             </View>
