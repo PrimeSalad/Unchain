@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Image, ImageBackground, Pressable, Share, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Image, ImageBackground, Pressable, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,7 @@ import { Roadmap } from '@/presentation/components/Roadmap';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
-import { streakDays, moneySaved, formatMoney, addictionMeta } from '@/domain/gambling';
+import { streakDays, moneySaved, formatMoney, addictionMeta, currentStreakStart } from '@/domain/gambling';
 import { computeStats, badgeProgress } from '@/domain/achievements';
 
 export default function ShareCard() {
@@ -25,13 +25,17 @@ export default function ShareCard() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!profile) {
-    router.back();
-    return null;
-  }
+  // Navigation is a side effect — never call it during render.
+  useEffect(() => {
+    if (!profile) router.back();
+  }, [profile, router]);
+  if (!profile) return null;
 
-  const days = streakDays(profile.startedAt);
-  const money = moneySaved(profile);
+  // Streak + money count from the current clean window (event-derived, same
+  // as Home) so a shared card never overstates recovery after a relapse.
+  const streakStart = currentStreakStart(profile.startedAt, store.relapses, store.journal);
+  const days = streakDays(streakStart);
+  const money = moneySaved({ ...profile, startedAt: streakStart });
   const currency = profile.currency ?? '₱';
   const freeLabel = addictionMeta(profile.addictionType).freeLabel;
   const stats = computeStats({
@@ -55,7 +59,14 @@ export default function ShareCard() {
   const pickPhoto = async () => {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) return;
+      if (!perm.granted) {
+        // Explain instead of failing silently — the user tapped for a reason.
+        Alert.alert(
+          'Photo access needed',
+          'Allow photo access in Settings to use one of your pictures as the card background.',
+        );
+        return;
+      }
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
@@ -136,7 +147,7 @@ export default function ShareCard() {
         {/* Top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <Text variant="title2" style={{ flex: 1 }}>Share your progress</Text>
-          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
+          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
             <Ionicons name="close" size={26} color={theme.color.textDim} />
           </Pressable>
         </View>
@@ -179,6 +190,9 @@ export default function ShareCard() {
           <Pressable
             onPress={shareImage}
             disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="Share"
+            accessibilityState={{ disabled: busy, busy }}
             style={({ pressed }) => ({
               height: 54, borderRadius: radius.button, backgroundColor: theme.color.primary,
               alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.sm,
@@ -218,6 +232,8 @@ function ControlButton({ icon, label, onPress }: { icon: any; label: string; onP
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => ({
         flex: 1, height: 48, borderRadius: radius.button,
         backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center',

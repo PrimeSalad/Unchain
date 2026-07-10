@@ -7,7 +7,7 @@
  */
 
 import type { RecoveryProfile } from './gambling';
-import { streakDays, moneySaved, journalMoneyStats, MILESTONES } from './gambling';
+import { streakDays, currentStreakStart, moneySaved } from './gambling';
 import type {
   DailyCheckIn,
   JournalEntry,
@@ -51,7 +51,13 @@ export interface StatsInput {
 
 export function computeStats(i: StatsInput): RecoveryStats {
   const now = i.now ?? Date.now();
-  const currentStreak = streakDays(i.profile.startedAt, now);
+  // The current streak is derived from the event log (relapses + gambled
+  // journal entries), exactly like the Home and Progress screens — never from
+  // profile.startedAt alone, which would keep counting through a relapse.
+  const currentStreak = streakDays(
+    currentStreakStart(i.profile.startedAt, i.relapses, i.journal),
+    now,
+  );
   return {
     currentStreak,
     longestStreak: Math.max(i.longestStreak, currentStreak),
@@ -193,7 +199,6 @@ export function goalProgress(goal: Goal, stats: RecoveryStats): { value: number;
 }
 
 export function goalTitle(goal: Goal): string {
-  const m = GOAL_META[goal.kind];
   if (goal.kind === 'money') return `Save ₱${goal.target.toLocaleString('en-PH')}`;
   if (goal.kind === 'streak') return `Reach ${goal.target} days free`;
   return `Log ${goal.target} check-ins`;

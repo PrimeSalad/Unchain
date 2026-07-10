@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../components/Screen';
@@ -165,7 +165,7 @@ export function OnboardingScreen() {
 
       {/* ── Identity ────────────────────────────────────────────────────── */}
       {step === 'identity' && (
-        <View style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <Text variant="title1">What's your name?</Text>
           <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
             So Unchain can speak to you personally. This never leaves your device.
@@ -189,7 +189,7 @@ export function OnboardingScreen() {
           />
           <View style={{ flex: 1 }} />
           <Button label="Continue" onPress={next} disabled={!name.trim()} full />
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       {/* ── Type ────────────────────────────────────────────────────────── */}
@@ -206,6 +206,8 @@ export function OnboardingScreen() {
                 <Pressable
                   key={a.key}
                   onPress={() => { setAType(a.key); setDetail(''); }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
                   style={{
                     flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
                     borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.color.hairline,
@@ -236,6 +238,8 @@ export function OnboardingScreen() {
                   <Pressable
                     key={opt}
                     onPress={() => setDetail(opt)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
                     style={{
                       flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
                       borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.color.hairline,
@@ -293,7 +297,7 @@ export function OnboardingScreen() {
 
       {/* ── Expense ─────────────────────────────────────────────────────── */}
       {step === 'expense' && (
-        <View style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <Text variant="title1">How much did you spend?</Text>
           <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
             An estimate is fine — it powers your money-saved counter.
@@ -321,7 +325,7 @@ export function OnboardingScreen() {
           </View>
           <View style={{ flex: 1 }} />
           <Button label="Continue" onPress={next} disabled={!amount} full />
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       {/* ── Triggers ────────────────────────────────────────────────────── */}
@@ -347,7 +351,7 @@ export function OnboardingScreen() {
 
       {/* ── Reason ──────────────────────────────────────────────────────── */}
       {step === 'reason' && (
-        <View style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <Text variant="title1">Why do you want to quit?</Text>
           <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.lg }}>
             You'll see this whenever an urge hits. Make it personal.
@@ -362,7 +366,7 @@ export function OnboardingScreen() {
           />
           <View style={{ flex: 1 }} />
           <Button label="Continue" onPress={next} disabled={!reason.trim()} full />
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       {/* ── Start ───────────────────────────────────────────────────────── */}
@@ -384,22 +388,25 @@ export function OnboardingScreen() {
 
 function Stepper({ onDec, onInc }: { onDec: () => void; onInc: () => void }) {
   const theme = useTheme();
-  const btn = (icon: 'remove' | 'add', onPress: () => void) => (
+  const btn = (icon: 'remove' | 'add', onPress: () => void, label: string) => (
     <Pressable
       onPress={onPress}
-      style={{
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
         width: 44, height: 44, borderRadius: radius.round,
         backgroundColor: theme.color.surfaceAlt,
         alignItems: 'center', justifyContent: 'center',
-      }}
+        opacity: pressed ? 0.7 : 1,
+      })}
     >
       <Ionicons name={icon} size={20} color={theme.color.primary} />
     </Pressable>
   );
   return (
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-      {btn('remove', onDec)}
-      {btn('add', onInc)}
+      {btn('remove', onDec, 'One day fewer')}
+      {btn('add', onInc, 'One day more')}
     </View>
   );
 }

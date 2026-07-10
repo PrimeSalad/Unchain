@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/presentation/components/Screen';
@@ -29,10 +29,18 @@ export default function ReflectionScreen() {
     setText('');
   };
 
+  // Deleting a reflection is irreversible — always confirm with a native alert.
+  const confirmDelete = (id: string) => {
+    Alert.alert('Delete this reflection?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => remove(id) },
+    ]);
+  };
+
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm }}>
-        <Pressable onPress={() => router.back()} hitSlop={16} accessibilityLabel="Close">
+        <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
           <Ionicons name="close" size={26} color={theme.color.textDim} />
         </Pressable>
         <Text variant="headline">Emergency Reflection</Text>
@@ -63,7 +71,7 @@ export default function ReflectionScreen() {
                   <Text variant="footnote" dim style={{ flex: 1 }}>
                     {new Date(r.at).toLocaleDateString()} · {new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                  <Pressable onPress={() => remove(r.id)} hitSlop={10} accessibilityLabel="Delete reflection">
+                  <Pressable onPress={() => confirmDelete(r.id)} hitSlop={14} accessibilityRole="button" accessibilityLabel="Delete reflection">
                     <Ionicons name="trash-outline" size={18} color={theme.color.danger} />
                   </Pressable>
                 </View>

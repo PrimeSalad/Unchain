@@ -426,11 +426,13 @@ export default function JournalEntry() {
       lost: gambled === true ? lost === true : undefined,
       amountLost: gambled === true && lost === true && amountLost ? parseFloat(amountLost) || undefined : undefined,
       whyGambled: gambled === true ? whyText : undefined,
-      // moneyBalance is recorded for all gambling users regardless of whether
-      // they gambled today. It is a financial tracking field only and does not
-      // affect recovery status, streak, calendar, or achievements.
+      // moneyBalance stores the RAW answer to "How much money do you have
+      // today?" for all gambling users. Financial metrics read it through
+      // recoveryAdjustedBalance(): a loss today is subtracted, a win is never
+      // added. It does not affect recovery status, streak, or achievements.
       moneyBalance: moneyBalance.trim() ? parseFloat(moneyBalance) || undefined : undefined,
     });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     router.back();
   }
 
@@ -657,6 +659,12 @@ export default function JournalEntry() {
 
       case 'summary': {
         const whyLabel = whyOption === 'Other' ? whyOther : (whyOption ?? undefined);
+        // Recovery-adjusted balance preview: a gambling loss is subtracted
+        // from the entered balance; a win is never added.
+        const lossApplied = gambled === true && lost === true && amountLost !== '';
+        const adjustedBalance = lossApplied && moneyBalance !== ''
+          ? Math.max(0, (parseFloat(moneyBalance) || 0) - (parseFloat(amountLost) || 0))
+          : null;
         return (
           <>
             <StepHeading title="Review your entry" subtitle="Take a moment before saving." />
@@ -672,6 +680,14 @@ export default function JournalEntry() {
               )}
               {gambled === true && lost != null && (
                 <SummaryRow icon={lost ? 'trending-down-outline' : 'trending-up-outline'} iconColor={lost ? theme.color.danger : theme.color.success} label="Result" value={lost ? `Lost ${currency}${parseFloat(amountLost || '0').toLocaleString()}` : 'No net loss'} />
+              )}
+              {adjustedBalance != null && (
+                <SummaryRow
+                  icon="wallet-outline"
+                  iconColor={theme.color.danger}
+                  label="Tracked"
+                  value={`${currency}${adjustedBalance.toLocaleString()} after loss`}
+                />
               )}
               {gambled === true && whyLabel && (
                 <SummaryRow icon="flag-outline" iconColor={theme.color.textDim} label="Why" value={whyLabel} />

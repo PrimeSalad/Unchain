@@ -8,7 +8,7 @@ import { Text } from '@/presentation/components/Text';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useStore, useProfile } from '@/application/store';
 import { playSound, setCalmMusicPaused, startCalmMusic, stopCalmMusic } from '@/application/sound';
-import { moneySaved, formatMoney } from '@/domain/gambling';
+import { moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
 import { BREATHING_TIPS } from '@/domain/content';
 
 const DURATIONS = [5, 10, 15, 20, 30];
@@ -30,23 +30,31 @@ export default function MindfulPause() {
   const [tip, setTip] = useState(0);
   const [muted, setMuted] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  // Absolute end time — remaining is derived from the clock, not decremented,
+  // so backgrounding the app never stretches the session.
+  const endAtRef = useRef(0);
+
+  const relapses = useStore((s) => s.relapses);
+  const journal = useStore((s) => s.journal);
 
   const active = minutes != null && !finished;
-  const money = profile ? moneySaved(profile) : { total: 0 } as ReturnType<typeof moneySaved>;
+  // Money saved counts from the current streak window (event-derived, same as
+  // Home) so the completion screen never overstates progress after a relapse.
+  const money = profile
+    ? moneySaved({ ...profile, startedAt: currentStreakStart(profile.startedAt, relapses, journal) })
+    : ({ total: 0 } as ReturnType<typeof moneySaved>);
   const currency = profile?.currency ?? '₱';
 
-  // Countdown.
+  // Countdown — driven by the wall clock so time spent backgrounded counts.
   useEffect(() => {
     if (minutes == null || finished) return;
     timerRef.current = setInterval(() => {
-      setRemaining((r) => {
-        if (r <= 1) {
-          clearInterval(timerRef.current);
-          setFinished(true);
-          return 0;
-        }
-        return r - 1;
-      });
+      const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
+      setRemaining(left);
+      if (left <= 0) {
+        clearInterval(timerRef.current);
+        setFinished(true);
+      }
     }, 1000);
     return () => clearInterval(timerRef.current);
   }, [minutes, finished]);
@@ -78,6 +86,7 @@ export default function MindfulPause() {
   }, [active]);
 
   const start = (m: number) => {
+    endAtRef.current = Date.now() + m * 60_000;
     setMinutes(m);
     setRemaining(m * 60);
     setMuted(false);
@@ -100,12 +109,12 @@ export default function MindfulPause() {
         {/* Close is only available before the session starts; music toggle while active. */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: spacing.lg, minHeight: 44 }}>
           {minutes == null && (
-            <Pressable onPress={() => router.back()} hitSlop={16} accessibilityLabel="Close">
+            <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={26} color={palette.fogDim} />
             </Pressable>
           )}
           {active && (
-            <Pressable onPress={toggleMusic} hitSlop={16} accessibilityLabel={muted ? 'Unmute music' : 'Mute music'}>
+            <Pressable onPress={toggleMusic} hitSlop={16} accessibilityRole="button" accessibilityLabel={muted ? 'Unmute music' : 'Mute music'}>
               <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={24} color={palette.fogDim} />
             </Pressable>
           )}
@@ -123,6 +132,8 @@ export default function MindfulPause() {
                 <Pressable
                   key={m}
                   onPress={() => start(m)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Breathe for ${m} minutes`}
                   style={({ pressed }) => ({
                     height: 58, borderRadius: radius.button, backgroundColor: palette.nightRaised,
                     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
@@ -169,7 +180,9 @@ export default function MindfulPause() {
             </Text>
             <Pressable
               onPress={() => router.back()}
-              style={{ marginTop: spacing.xxxl, alignSelf: 'stretch', height: 52, borderRadius: radius.button, backgroundColor: palette.grape, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityRole="button"
+              accessibilityLabel="Done"
+              style={({ pressed }) => ({ marginTop: spacing.xxxl, alignSelf: 'stretch', height: 52, borderRadius: radius.button, backgroundColor: palette.grape, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}
             >
               <Text variant="headline" color="#FFFFFF">Done</Text>
             </Pressable>

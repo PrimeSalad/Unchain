@@ -52,11 +52,13 @@ export interface JournalEntry {
 
   // ── Financial tracking ────────────────────────────────────────────────────
   /**
-   * The user's current money balance as of this journal entry.
-   * Recorded independently from gambling outcome — a user can have more money
-   * on a relapse day (e.g. they won) or less on a clean day (e.g. spent on
-   * bills). Recovery status is NEVER inferred from this field; it is purely
-   * for financial trend tracking on the Home and Progress screens.
+   * The RAW answer to "How much money do you have today?" as entered by the
+   * user. Financial metrics never read this directly — they use the
+   * recovery-adjusted balance (`recoveryAdjustedBalance` in gambling.ts):
+   * a gambling loss that day is subtracted from this value, and a gambling
+   * win is never added, so wins can never improve any progress metric.
+   * Recovery status (streak, calendar, achievements) is NEVER inferred from
+   * this field.
    */
   moneyBalance?: number;
 }

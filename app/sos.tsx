@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/presentation/components/Text';
 import { Collapsible } from '@/presentation/components/Collapsible';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
-import { useProfile } from '@/application/store';
-import { recoveryTimer, moneySaved, formatMoney } from '@/domain/gambling';
+import { useProfile, useStore } from '@/application/store';
+import { recoveryTimer, moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
 import { HEALTHY_ALTERNATIVES, MOTIVATION, randomFrom } from '@/domain/content';
 
 export default function Sos() {
@@ -17,8 +17,15 @@ export default function Sos() {
   // Stable for the visit so the quote doesn't change on every re-render.
   const motivation = useMemo(() => randomFrom(MOTIVATION), []);
 
-  const timer = profile ? recoveryTimer(profile.startedAt) : { days: 0, hours: 0, minutes: 0 };
-  const money = profile ? moneySaved(profile) : { today: 0, week: 0, month: 0, total: 0 };
+  const relapses = useStore((s) => s.relapses);
+  const journal = useStore((s) => s.journal);
+  // Streak start comes from the event log (same as Home) so the anchors here
+  // never overstate recovery after a relapse — honesty matters most in crisis.
+  const streakStart = profile ? currentStreakStart(profile.startedAt, relapses, journal) : 0;
+  const timer = profile ? recoveryTimer(streakStart) : { days: 0, hours: 0, minutes: 0 };
+  const money = profile
+    ? moneySaved({ ...profile, startedAt: streakStart })
+    : { today: 0, week: 0, month: 0, total: 0 };
   const currency = profile?.currency ?? '₱';
 
   const tools: {
@@ -40,7 +47,7 @@ export default function Sos() {
     <View style={{ flex: 1, backgroundColor: palette.night }}>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: spacing.lg }}>
-          <Pressable onPress={() => router.back()} hitSlop={16} accessibilityLabel="Close">
+          <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
             <Ionicons name="close" size={26} color={palette.fogDim} />
           </Pressable>
         </View>
@@ -71,6 +78,9 @@ export default function Sos() {
                 <View key={t.label}>
                   <Pressable
                     onPress={t.onPress}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.label}
+                    accessibilityState={t.panelKey ? { expanded } : undefined}
                     style={({ pressed }) => ({
                       flexDirection: 'row', alignItems: 'center', backgroundColor: palette.nightRaised,
                       borderRadius: radius.button, padding: spacing.lg, opacity: pressed ? 0.85 : 1,

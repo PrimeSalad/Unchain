@@ -5,7 +5,6 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
-  interpolateColor,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { radius, spacing, motion } from '../theme/tokens';

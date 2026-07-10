@@ -39,6 +39,7 @@ import { Pill } from '../components/Pill';
 import { spacing, radius, palette, motion } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
+import { recoveryAdjustedBalance } from '@/domain/gambling';
 import type { JournalEntry } from '@/domain/records';
 
 // Enable layout animation on Android
@@ -113,7 +114,7 @@ function StatCard({
 // ─────────────────────────────────────────────────────────────────────────────
 // Entry card — animated expand, accent stroke, mood emoji badge
 // ─────────────────────────────────────────────────────────────────────────────
-function EntryCard({ entry, index }: { entry: JournalEntry; index: number }) {
+function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: number; currency: string }) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
   const chevronRot = useSharedValue(0);
@@ -158,15 +159,22 @@ function EntryCard({ entry, index }: { entry: JournalEntry; index: number }) {
     entry.text !== 'Gambling relapse recorded.' &&
     entry.text !== 'Clean day recorded.';
 
+  // The recovery-adjusted balance: raw balance minus any gambling loss that
+  // day (wins are never added). This is the figure the app tracks everywhere.
+  const adjusted = recoveryAdjustedBalance(entry);
+
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 50).springify().damping(18)}
+      // Cap the stagger so long histories don't keep animating far down the list.
+      entering={FadeInDown.delay(Math.min(index, 8) * 50).springify().damping(18)}
     >
       <Pressable
         onPress={toggle}
         onPressIn={() => { press.value = 1; }}
         onPressOut={() => { press.value = 0; }}
         accessibilityRole="button"
+        accessibilityLabel={`${statusLabel}, ${dateStr}`}
+        accessibilityState={{ expanded }}
       >
         <Animated.View style={[{
           backgroundColor: theme.color.surface,
@@ -220,7 +228,7 @@ function EntryCard({ entry, index }: { entry: JournalEntry; index: number }) {
                     backgroundColor: theme.color.danger + '20',
                   }}>
                     <Text variant="caption" color={theme.color.danger} style={{ fontFamily: 'Nunito_700Bold' }}>
-                      ₱{entry.amountWagered.toLocaleString()}
+                      {currency}{entry.amountWagered.toLocaleString()}
                     </Text>
                   </View>
                 )}
@@ -285,14 +293,26 @@ function EntryCard({ entry, index }: { entry: JournalEntry; index: number }) {
                 <DetailRow icon="bar-chart-outline" color={theme.color.primary} label="Mood" value={`${entry.mood}/10 — ${moodLabel(entry.mood)}`} />
               )}
               {entry.gambled === true && entry.amountWagered != null && (
-                <DetailRow icon="cash-outline" color={theme.color.textDim} label="Wagered" value={`₱${entry.amountWagered.toLocaleString()}`} />
+                <DetailRow icon="cash-outline" color={theme.color.textDim} label="Wagered" value={`${currency}${entry.amountWagered.toLocaleString()}`} />
               )}
               {entry.gambled === true && entry.lost != null && (
                 <DetailRow
                   icon={entry.lost ? 'trending-down' : 'trending-up'}
                   color={entry.lost ? theme.color.danger : theme.color.success}
                   label="Result"
-                  value={entry.lost ? `Lost ₱${(entry.amountLost ?? 0).toLocaleString()}` : 'No loss'}
+                  value={entry.lost ? `Lost ${currency}${(entry.amountLost ?? 0).toLocaleString()}` : 'No loss'}
+                />
+              )}
+              {entry.moneyBalance != null && (
+                <DetailRow
+                  icon="wallet-outline"
+                  color={theme.color.primary}
+                  label="Balance"
+                  value={
+                    adjusted != null && adjusted !== entry.moneyBalance
+                      ? `${currency}${entry.moneyBalance.toLocaleString()} → ${currency}${adjusted.toLocaleString()} after loss`
+                      : `${currency}${entry.moneyBalance.toLocaleString()}`
+                  }
                 />
               )}
               {(entry.whyGambled ?? entry.trigger) && (
@@ -314,7 +334,6 @@ function EntryCard({ entry, index }: { entry: JournalEntry; index: number }) {
 function DetailRow({ icon, color, label, value }: {
   icon: string; color: string; label: string; value: string;
 }) {
-  const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
       <Ionicons name={icon as any} size={14} color={color} style={{ marginTop: 2 }} />
@@ -371,7 +390,7 @@ function SearchBar({ query, onChange }: { query: string; onChange: (s: string) =
         }}
       />
       {query.length > 0 && (
-        <Pressable onPress={() => onChange('')} hitSlop={10}>
+        <Pressable onPress={() => onChange('')} hitSlop={14} accessibilityRole="button" accessibilityLabel="Clear search">
           <Ionicons name="close-circle" size={16} color={theme.color.textDim} />
         </Pressable>
       )}
@@ -643,7 +662,7 @@ export function JournalScreen() {
         /* ── Entry list ── */
         <View style={{ gap: spacing.md }}>
           {filtered.map((e, i) => (
-            <EntryCard key={e.id} entry={e} index={i} />
+            <EntryCard key={e.id} entry={e} index={i} currency={profile?.currency ?? '₱'} />
           ))}
           <View style={{ height: spacing.xl }} />
         </View>

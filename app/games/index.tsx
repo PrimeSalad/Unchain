@@ -72,6 +72,8 @@ export default function GamesHub() {
             <EnterFade key={g.route} index={i}>
               <Pressable
                 onPress={() => router.push(g.route as Href)}
+                accessibilityRole="button"
+                accessibilityLabel={`${g.title} — ${g.desc}`}
                 style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
               >
                 <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>

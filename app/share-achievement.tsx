@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -22,10 +22,12 @@ export default function ShareAchievement() {
   const [busy, setBusy] = useState(false);
 
   const achievement = id ? achievementById(id) : undefined;
-  if (!achievement) {
-    router.back();
-    return null;
-  }
+
+  // Navigation is a side effect — never call it during render.
+  useEffect(() => {
+    if (!achievement) router.back();
+  }, [achievement, router]);
+  if (!achievement) return null;
 
   const unlockedAt = games.achievements[achievement.id] ?? Date.now();
   const date = new Date(unlockedAt).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -96,7 +98,7 @@ export default function ShareAchievement() {
         {/* Top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <Text variant="title2" style={{ flex: 1 }}>Share achievement</Text>
-          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
+          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
             <Ionicons name="close" size={26} color={theme.color.textDim} />
           </Pressable>
         </View>
@@ -176,6 +178,9 @@ export default function ShareAchievement() {
           <Pressable
             onPress={shareImage}
             disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="Share"
+            accessibilityState={{ disabled: busy, busy }}
             style={({ pressed }) => ({
               height: 54, borderRadius: radius.button, backgroundColor: theme.color.primary,
               alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.sm,

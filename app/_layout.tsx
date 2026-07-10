@@ -14,6 +14,10 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider } from '@/presentation/theme/ThemeProvider';
 
+// Any uncaught render error anywhere in the app lands on a friendly recovery
+// screen instead of a crash (App Review: no unhandled exceptions).
+export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
+
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {

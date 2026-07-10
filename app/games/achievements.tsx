@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/presentation/components/Text';
 import { Card } from '@/presentation/components/Card';
 import { BackButton } from '@/presentation/components/BackButton';
-import { radius, spacing } from '@/presentation/theme/tokens';
+import { spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import {
@@ -77,6 +77,8 @@ function AchievementItem({ a, first, unlockedAt }: { a: GameAchievement; first: 
     <Pressable
       disabled={!unlocked}
       onPress={() => router.push({ pathname: '/share-achievement', params: { id: a.id } })}
+      accessibilityRole="button"
+      accessibilityLabel={hidden ? 'Secret achievement, locked' : `${a.title}${unlocked ? ', unlocked. Share' : ', locked'}`}
       style={({ pressed }) => ({
         flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg,
         borderTopWidth: first ? 0 : 1, borderTopColor: theme.color.hairline,
@@ -107,7 +109,7 @@ function AchievementItem({ a, first, unlockedAt }: { a: GameAchievement; first: 
           <View style={{ marginTop: spacing.sm, height: 5, borderRadius: 3, backgroundColor: theme.color.surfaceAlt, overflow: 'hidden' }}>
             <View
               style={{
-                width: `${Math.round((prog.current / prog.target) * 100)}%`,
+                width: `${Math.min(100, Math.max(0, Math.round((prog.current / prog.target) * 100)))}%`,
                 height: '100%', borderRadius: 3, backgroundColor: theme.color.primary,
               }}
             />

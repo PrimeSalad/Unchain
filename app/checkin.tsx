@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
 import { Card } from '@/presentation/components/Card';
@@ -46,6 +47,8 @@ export default function CheckIn() {
   const input = {
     borderRadius: radius.input,
     backgroundColor: theme.color.surface,
+    borderWidth: 1,
+    borderColor: theme.color.hairline,
     padding: spacing.lg,
     color: theme.color.text,
     fontSize: 16,
@@ -59,12 +62,13 @@ export default function CheckIn() {
     } else {
       submit({ gambled: false, mood, urgeStrength: urge, triggers, notes: notes.trim() || undefined });
     }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setSaved(true);
   };
 
   const Header = (
     <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.sm }}>
-      <Pressable onPress={() => router.back()} hitSlop={16} accessibilityLabel="Close">
+      <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
         <Ionicons name="close" size={26} color={theme.color.textDim} />
       </Pressable>
     </View>
@@ -166,7 +170,7 @@ export default function CheckIn() {
           <Text variant="body" dim>Thank you for being honest. This is data, not failure.</Text>
           <View>
             <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>How much did you spend?</Text>
-            <TextInput value={amount} onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))} placeholder="₱0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad" style={input} />
+            <TextInput value={amount} onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))} placeholder={`${profile?.currency ?? '₱'}0`} placeholderTextColor={theme.color.textDim} keyboardType="number-pad" style={input} />
           </View>
           <TextInput value={what} onChangeText={setWhat} placeholder="What happened?" placeholderTextColor={theme.color.textDim} multiline style={[input, { minHeight: 70 }]} />
           <View>
@@ -187,7 +191,12 @@ function Choice({ label, active, onPress, good }: { label: string; active: boole
   const theme = useTheme();
   const activeColor = good ? theme.color.success : theme.color.accent;
   return (
-    <Pressable onPress={onPress} style={{ flex: 1 }}>
+    <Pressable
+      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={{ flex: 1 }}
+    >
       <Card style={{ alignItems: 'center', paddingVertical: spacing.lg, borderWidth: 2, borderColor: active ? activeColor : 'transparent' }}>
         <Text variant="headline" color={active ? activeColor : theme.color.text}>{label}</Text>
       </Card>

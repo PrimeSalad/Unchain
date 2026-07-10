@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
   Modal,
   Pressable,
@@ -19,7 +20,7 @@ import { Pill } from '../components/Pill';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile, initialGames } from '@/application/store';
-import { streakDays, addictionMeta, TRIGGERS } from '@/domain/gambling';
+import { streakDays, addictionMeta, TRIGGERS, currentStreakStart } from '@/domain/gambling';
 
 const BACKUP_MARKER = 'unchain-backup';
 
@@ -58,6 +59,8 @@ export function ProfileScreen() {
   const setTheme = useStore((s) => s.setTheme);
   const resetRecovery = useStore((s) => s.resetRecovery);
   const resetAll = useStore((s) => s.resetAll);
+  const relapses = useStore((s) => s.relapses);
+  const journal = useStore((s) => s.journal);
 
   // Name edit state
   const [editingName, setEditingName] = useState(false);
@@ -79,7 +82,8 @@ export function ProfileScreen() {
 
   if (!profile) return null;
 
-  const days = streakDays(profile.startedAt);
+  // Same event-derived streak as Home/Progress — never counts through a relapse.
+  const days = streakDays(currentStreakStart(profile.startedAt, relapses, journal));
   const typeLabel = addictionMeta(profile.addictionType).label;
 
   // ── Toast ────────────────────────────────────────────────────────────────
@@ -87,6 +91,8 @@ export function ProfileScreen() {
   const showToast = (message: string, type: ToastConfig['type'] = 'success') => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ message, type });
+    // Screen readers can't see the transient toast — announce it.
+    AccessibilityInfo.announceForAccessibility(message);
     toastAnim.setValue(0);
     Animated.spring(toastAnim, {
       toValue: 1,
@@ -317,8 +323,10 @@ export function ProfileScreen() {
               <Pressable
                 onPress={commitName}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Save name"
                 style={{
-                  width: 36, height: 36, borderRadius: radius.round,
+                  width: 44, height: 44, borderRadius: radius.round,
                   backgroundColor: theme.color.success,
                   alignItems: 'center', justifyContent: 'center',
                 }}
@@ -329,8 +337,10 @@ export function ProfileScreen() {
               <Pressable
                 onPress={cancelName}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel editing name"
                 style={{
-                  width: 36, height: 36, borderRadius: radius.round,
+                  width: 44, height: 44, borderRadius: radius.round,
                   backgroundColor: theme.color.surfaceAlt,
                   alignItems: 'center', justifyContent: 'center',
                 }}
@@ -343,7 +353,7 @@ export function ProfileScreen() {
               <Text variant="callout" style={{ flex: 1 }} color={theme.color.text}>
                 {profile.name}
               </Text>
-              <Pressable onPress={startEditName} hitSlop={8}>
+              <Pressable onPress={startEditName} hitSlop={14} accessibilityRole="button" accessibilityLabel="Edit name">
                 <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
               </Pressable>
             </View>
@@ -386,8 +396,10 @@ export function ProfileScreen() {
           <Pressable
             onPress={commitReason}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Save reason"
             style={{
-              width: 36, height: 36, borderRadius: radius.round,
+              width: 44, height: 44, borderRadius: radius.round,
               backgroundColor: theme.color.success,
               alignItems: 'center', justifyContent: 'center',
             }}
@@ -398,8 +410,10 @@ export function ProfileScreen() {
           <Pressable
             onPress={cancelReason}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel editing reason"
             style={{
-              width: 36, height: 36, borderRadius: radius.round,
+              width: 44, height: 44, borderRadius: radius.round,
               backgroundColor: theme.color.surfaceAlt,
               alignItems: 'center', justifyContent: 'center',
             }}
@@ -413,7 +427,7 @@ export function ProfileScreen() {
             <Text variant="callout" style={{ flex: 1 }} color={profile.reason ? theme.color.text : theme.color.textDim}>
               {profile.reason || 'Add your reason…'}
             </Text>
-            <Pressable onPress={startEditReason} hitSlop={8}>
+            <Pressable onPress={startEditReason} hitSlop={14} accessibilityRole="button" accessibilityLabel="Edit reason">
               <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
             </Pressable>
           </View>
@@ -529,6 +543,7 @@ export function ProfileScreen() {
 
             {/* Confirm (destructive) */}
             <Pressable
+              accessibilityRole="button"
               onPress={() => {
                 const fn = modal?.onConfirm;
                 setModal(null);
@@ -549,6 +564,7 @@ export function ProfileScreen() {
 
             {/* Cancel */}
             <Pressable
+              accessibilityRole="button"
               onPress={() => setModal(null)}
               style={{
                 backgroundColor: theme.color.surfaceAlt,
@@ -639,6 +655,8 @@ function ActionRow({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

@@ -186,13 +186,48 @@ export function formatMoney(amount: number, currency = '₱'): string {
 // ---------------------------------------------------------------------------
 // Journal-based financial stats
 //
-// These are INDEPENDENT of recovery metrics. A user can have more money on a
-// relapse day (gambling win) or less on a clean day (regular bills). The
-// financial system NEVER influences streak, calendar, or achievement logic.
+// Recovery-adjusted money rule:
+//   - The journal asks "How much money do you have today?" — that answer is
+//     the day's raw balance.
+//   - If the user gambled AND lost, the amount lost is SUBTRACTED from that
+//     raw balance. The adjusted value is what every financial metric in the
+//     app (Home tiles, Progress tracker, trends) is computed from.
+//   - If the user gambled and WON, winnings are NEVER added. This app tracks
+//     addiction recovery, not gambling performance — a win must not improve
+//     any metric, progress figure, or trend.
+//   - Financial data never influences streak, calendar, or achievement logic.
 // ---------------------------------------------------------------------------
 
+/** The journal fields the financial system reads. */
+export interface FinancialJournalEntry {
+  at: number;
+  moneyBalance?: number;
+  gambled?: boolean;
+  lost?: boolean;
+  amountLost?: number;
+}
+
+/**
+ * The recovery-adjusted balance for a single journal entry.
+ *
+ *   - No `moneyBalance` recorded → null (entry is ignored by financial stats).
+ *   - Gambled and lost → `moneyBalance - amountLost`, floored at 0.
+ *   - Gambled and won  → `moneyBalance` unchanged; winnings are never added.
+ *   - Did not gamble   → `moneyBalance` unchanged.
+ */
+export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null {
+  if (e.moneyBalance == null) return null;
+  if (e.gambled === true && e.lost === true && e.amountLost != null) {
+    return Math.max(0, e.moneyBalance - e.amountLost);
+  }
+  return e.moneyBalance;
+}
+
 export interface JournalMoneyStats {
-  /** Most recent balance recorded in a journal entry. null if no entry has a balance. */
+  /**
+   * Most recent recovery-adjusted balance (raw balance minus any gambling
+   * loss that day). null if no entry has a balance.
+   */
   current: number | null;
   /**
    * Change between the two most recent journal entries that have a balance.
@@ -215,39 +250,40 @@ export interface JournalMoneyStats {
 }
 
 /**
- * Compute financial metrics purely from journal `moneyBalance` entries.
+ * Compute financial metrics from journal entries using the recovery-adjusted
+ * balance (see `recoveryAdjustedBalance`).
  *
  * Rules:
  *  - Only journal entries with a `moneyBalance` value are considered.
+ *  - Each entry's balance is adjusted first: gambling losses are subtracted,
+ *    gambling winnings are never added.
  *  - Entries are sorted oldest-first for trend math.
- *  - Recovery metrics (streak, relapses, gambled) are NOT consulted here.
- *  - A gambling win that increases the balance is reflected as positive change;
- *    this does NOT affect recovery status anywhere in the app — it is financial
- *    data only.
+ *  - The adjusted figures feed every financial display in the app; they never
+ *    influence streak, calendar, or achievement logic.
  */
-export function journalMoneyStats(
-  journal: Array<{ at: number; moneyBalance?: number }>,
-): JournalMoneyStats {
-  // Keep only entries that have a recorded balance, sorted oldest → newest.
+export function journalMoneyStats(journal: FinancialJournalEntry[]): JournalMoneyStats {
+  // Keep only entries with a recorded balance, adjusted for gambling losses,
+  // sorted oldest → newest.
   const entries = journal
-    .filter((j): j is typeof j & { moneyBalance: number } => j.moneyBalance != null)
+    .map((j) => ({ at: j.at, balance: recoveryAdjustedBalance(j) }))
+    .filter((j): j is { at: number; balance: number } => j.balance != null)
     .sort((a, b) => a.at - b.at);
 
   if (entries.length === 0) {
     return { current: null, change: null, weeklyTrend: null, monthlyTrend: null };
   }
 
-  const current = entries[entries.length - 1].moneyBalance;
+  const current = entries[entries.length - 1].balance;
   const change =
     entries.length >= 2
-      ? entries[entries.length - 1].moneyBalance - entries[entries.length - 2].moneyBalance
+      ? entries[entries.length - 1].balance - entries[entries.length - 2].balance
       : null;
 
   function windowTrend(windowMs: number): number | null {
     const cutoff = Date.now() - windowMs;
     const window = entries.filter((e) => e.at >= cutoff);
     if (window.length < 2) return null;
-    const delta = window[window.length - 1].moneyBalance - window[0].moneyBalance;
+    const delta = window[window.length - 1].balance - window[0].balance;
     const days = Math.max(1, (window[window.length - 1].at - window[0].at) / MS_PER_DAY);
     return Math.round(delta / days);
   }

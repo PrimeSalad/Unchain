@@ -12,7 +12,7 @@ import { Pill } from '../components/Pill';
 import { elevation, spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
-import { streakDays, currentStreakStart, journalMoneyStats, formatMoney } from '@/domain/gambling';
+import { streakDays, currentStreakStart, journalMoneyStats, formatMoney, nextMilestone } from '@/domain/gambling';
 import { sameDay } from '@/domain/records';
 import {
   computeStats,
@@ -70,9 +70,10 @@ export function ProgressScreen() {
     ? streakDays(currentStreakStart(profile.startedAt, relapses, journal))
     : 0;
   const best = Math.max(longestStreak, current);
-  // Financial stats derived from journal moneyBalance entries only.
-  // Independent of recovery metrics — gambling wins do not improve these
-  // figures in any way that affects achievements or streak.
+  // Financial stats use the recovery-adjusted balance from journal entries:
+  // gambling losses are subtracted from the entered balance, gambling wins
+  // are never added — a win can never improve these figures, achievements,
+  // or the streak.
   const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
   const resisted = urges.filter((u) => u.resisted).length;
@@ -232,7 +233,7 @@ export function ProgressScreen() {
       <Text variant="footnote" dim style={{ marginBottom: spacing.md }}>
         {current >= 365
           ? 'A full year free. You built this.'
-          : `${current} days in — next stop is day ${nextStop(current)}.`}
+          : `${current} days in — next stop is day ${nextMilestone(current)}.`}
       </Text>
       <Card>
         <Roadmap days={current} />
@@ -241,7 +242,7 @@ export function ProgressScreen() {
       {/* Goals */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.md }}>
         <Text variant="headline" style={{ flex: 1 }}>My Goals</Text>
-        <Pressable onPress={() => setGoalModal(true)} hitSlop={10} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
+        <Pressable onPress={() => setGoalModal(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Add goal" style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
           <Ionicons name="add-circle" size={20} color={theme.color.primary} />
           <Text variant="footnote" color={theme.color.primary}>Add goal</Text>
         </Pressable>
@@ -272,7 +273,7 @@ export function ProgressScreen() {
       <Card style={{ marginTop: spacing.xl }}>
         <Text variant="headline" style={{ marginBottom: spacing.md }}>Financial Tracker</Text>
         <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-          Based on your daily balance entries in the journal. Financial changes do not affect your recovery streak or achievements.
+          Based on your daily balance entries in the journal. Gambling losses are subtracted from your balance; winnings are never counted — recovery comes first. Financial changes do not affect your streak or achievements.
         </Text>
         <Row
           label="Current balance"
@@ -380,12 +381,6 @@ export function ProgressScreen() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function nextStop(days: number): number {
-  const stops = [1, 3, 7, 14, 21, 30, 45, 60, 90, 120, 180, 270, 365];
-  for (const s of stops) if (days < s) return s;
-  return Math.ceil((days + 1) / 365) * 365;
-}
-
 function GoalCard({
   goal, stats, onRemove, currency,
 }: {
@@ -405,7 +400,7 @@ function GoalCard({
           <Ionicons name={(p.done ? 'checkmark' : meta.icon) as any} size={18} color={p.done ? theme.color.success : theme.color.primary} />
         </View>
         <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }}>{goalTitle(goal)}</Text>
-        <Pressable onPress={onRemove} hitSlop={10}>
+        <Pressable onPress={onRemove} hitSlop={14} accessibilityRole="button" accessibilityLabel={`Remove goal: ${goalTitle(goal)}`}>
           <Ionicons name="close" size={18} color={theme.color.textDim} />
         </Pressable>
       </View>
@@ -456,6 +451,9 @@ function BadgesPager({ badges }: { badges: ReturnType<typeof badgeProgress> }) {
             <Pressable
               key={g.key}
               onPress={() => setCat(g.key)}
+              accessibilityRole="tab"
+              accessibilityLabel={`${g.label} badges, ${earned} of ${g.items.length} earned`}
+              accessibilityState={{ selected: on }}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 6,
                 paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 1,
@@ -564,6 +562,9 @@ function AddGoalModal({
                   key={`${g.kind}-${g.target}`}
                   disabled={taken}
                   onPress={() => onAdd(g.kind, g.target)}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ disabled: taken }}
                   style={{
                     paddingHorizontal: spacing.lg, paddingVertical: spacing.sm + 2,
                     borderRadius: radius.round,
@@ -601,6 +602,8 @@ function AddGoalModal({
             <Pressable
               disabled={!custom || parseInt(custom, 10) <= 0}
               onPress={() => { onAdd(kind, parseInt(custom, 10)); setCustom(''); }}
+              accessibilityRole="button"
+              accessibilityLabel="Add custom goal"
               style={{
                 paddingHorizontal: spacing.xl, height: 48, borderRadius: radius.button,
                 backgroundColor: theme.color.primary, alignItems: 'center', justifyContent: 'center',

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
 import { Card } from '@/presentation/components/Card';
@@ -28,6 +29,7 @@ export default function LogUrge() {
 
   const save = () => {
     logUrge({ intensity, trigger, notes: notes.trim() || undefined, resisted: true });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setSaved(true);
   };
 
@@ -77,7 +79,7 @@ export default function LogUrge() {
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.sm }}>
-        <Pressable onPress={() => router.back()} hitSlop={16} accessibilityLabel="Close">
+        <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
           <Ionicons name="close" size={26} color={theme.color.textDim} />
         </Pressable>
       </View>
@@ -106,7 +108,7 @@ export default function LogUrge() {
 function ActionBtn({ icon, label, onPress, accent }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; accent?: boolean }) {
   const theme = useTheme();
   return (
-    <Pressable onPress={onPress}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
       <Card tone={accent ? 'accentSoft' : 'surface'} style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Ionicons name={icon} size={22} color={accent ? theme.color.accentText : theme.color.primary} />
         <Text variant="headline" style={{ flex: 1, marginLeft: spacing.md }} color={accent ? theme.color.accentText : theme.color.text}>{label}</Text>

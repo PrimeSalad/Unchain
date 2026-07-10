@@ -11,6 +11,7 @@ import { Mascot } from '../components/Mascot';
 import { spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useNow } from '../hooks/useNow';
+import { useResponsive } from '../hooks/useResponsive';
 import { useStore, useProfile, useTodayCheckIn } from '@/application/store';
 import {
   streakDays,
@@ -52,6 +53,7 @@ export function HomeScreen() {
   const router = useRouter();
   const now = useNow();
   const profile = useProfile();
+  const { ringSize } = useResponsive();
 
   const timeline = useStore((s) => s.timeline);
   const urges = useStore((s) => s.urges);
@@ -68,10 +70,9 @@ export function HomeScreen() {
   const days = streakStart ? streakDays(streakStart, now) : 0;
   const timer = streakStart ? recoveryTimer(streakStart, now) : { days: 0, hours: 0, minutes: 0 };
   const target = nextMilestone(days);
-  // Financial stats come exclusively from journal moneyBalance entries.
-  // These are independent of recovery status — a relapse day with a gambling
-  // win will show more money, a clean day with unexpected expenses will show
-  // less. Neither fact changes the streak or calendar.
+  // Financial stats use the recovery-adjusted balance from journal entries:
+  // gambling losses are subtracted from the entered balance, gambling wins
+  // are never added. Neither fact changes the streak or calendar.
   const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
 
@@ -117,7 +118,7 @@ export function HomeScreen() {
 
       {/* Recovery Dashboard — flat, sits directly on the page */}
       <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
-        <RecoveryRing current={days} target={target} size={190} caption={`of ${target} days`} />
+        <RecoveryRing current={days} target={target} size={ringSize} caption={`of ${target} days`} />
         <Text variant="title2" style={{ marginTop: spacing.md }}>
           {days} Day{days === 1 ? '' : 's'} {addictionMeta(profile.addictionType).freeLabel}
         </Text>
@@ -165,6 +166,8 @@ export function HomeScreen() {
       {/* Share progress */}
       <Pressable
         onPress={() => router.push('/share' as Href)}
+        accessibilityRole="button"
+        accessibilityLabel="Share your progress"
         style={({ pressed }) => ({ marginTop: spacing.md, opacity: pressed ? 0.85 : 1 })}
       >
         <Card tone="primarySoft" style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -185,10 +188,14 @@ export function HomeScreen() {
           <Pressable
             key={t.key}
             onPress={t.go}
-            style={{
+            accessibilityRole="button"
+            accessibilityLabel={t.label}
+            accessibilityState={{ checked: t.done }}
+            style={({ pressed }) => ({
               flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
               borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.color.hairline,
-            }}
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
             <Ionicons
               name={t.done ? 'checkmark-circle' : 'ellipse-outline'}
@@ -224,6 +231,8 @@ export function HomeScreen() {
       </Text>
       <Pressable
         onPress={() => router.push('/games' as Href)}
+        accessibilityRole="button"
+        accessibilityLabel="Play a game"
         style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
       >
         <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -248,19 +257,28 @@ export function HomeScreen() {
         Recovery Timeline
       </Text>
       <Card padding={0}>
-        {timeline.slice(0, 8).map((e, i) => (
-          <View
-            key={e.id}
-            style={{
-              flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
-              borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.color.hairline,
-            }}
-          >
-            <Ionicons name={TIMELINE_ICON[e.type]} size={20} color={theme.color.primary} />
-            <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }}>{e.label}</Text>
-            <Text variant="caption" dim>{relTime(e.at, now)}</Text>
+        {timeline.length === 0 ? (
+          <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.sm }}>
+            <Ionicons name="footsteps-outline" size={26} color={theme.color.textDim} />
+            <Text variant="callout" dim center>
+              Your recovery events will appear here as you check in, journal, and grow.
+            </Text>
           </View>
-        ))}
+        ) : (
+          timeline.slice(0, 8).map((e, i) => (
+            <View
+              key={e.id}
+              style={{
+                flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
+                borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.color.hairline,
+              }}
+            >
+              <Ionicons name={TIMELINE_ICON[e.type]} size={20} color={theme.color.primary} />
+              <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }}>{e.label}</Text>
+              <Text variant="caption" dim>{relTime(e.at, now)}</Text>
+            </View>
+          ))
+        )}
       </Card>
 
       {/* Motivation */}
@@ -291,6 +309,8 @@ function QuickAction({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => ({ flexBasis: '40%', flexGrow: 1, minWidth: 130, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
     >
       <Card style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.sm }}>
