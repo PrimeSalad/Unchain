@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -15,8 +15,14 @@ interface ActionSheetProps {
 
 /**
  * iOS-style bottom sheet built on a transparent Modal — pull handle, sheet
- * radius, safe-area bottom padding, scrim tap to dismiss. Matches the pattern
- * used by the journal-entry confirmation sheet so all sheets feel identical.
+ * radius, safe-area bottom padding, scrim tap to dismiss.
+ *
+ * Layout note: the scrim and the sheet are SIBLINGS, not parent/child. The
+ * scrim is an absolutely-filled Pressable behind the sheet; the sheet is a
+ * plain View stacked above it. Wrapping the sheet in a Pressable (the old
+ * pattern) nests every button inside another button, which is invalid HTML
+ * on react-native-web ("<button> cannot contain a nested <button>") and
+ * confuses screen readers everywhere.
  */
 export function ActionSheet({ visible, onClose, dismissable = true, children }: ActionSheetProps) {
   const theme = useTheme();
@@ -33,41 +39,42 @@ export function ActionSheet({ visible, onClose, dismissable = true, children }: 
       statusBarTranslucent
       onRequestClose={requestClose}
     >
-      {/* Scrim */}
-      <Pressable
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
-        onPress={requestClose}
-        accessibilityRole={dismissable ? 'button' : undefined}
-        accessibilityLabel={dismissable ? 'Dismiss' : undefined}
-      >
-        {/* Sheet — stops tap propagation to the scrim */}
-        <Pressable onPress={() => {}}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        {/* Scrim — a sibling BEHIND the sheet. Taps on the sheet never reach
+            it, so no tap-swallowing wrapper is needed around the content. */}
+        <Pressable
+          onPress={requestClose}
+          accessibilityRole={dismissable ? 'button' : undefined}
+          accessibilityLabel={dismissable ? 'Dismiss' : undefined}
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+        />
+
+        {/* Sheet */}
+        <View
+          style={{
+            backgroundColor: theme.color.surface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            paddingHorizontal: spacing.xl,
+            paddingTop: spacing.lg,
+            paddingBottom: Math.max(insets.bottom, spacing.xl),
+            ...elevation.e2,
+          }}
+        >
+          {/* Pull handle */}
           <View
             style={{
-              backgroundColor: theme.color.surface,
-              borderTopLeftRadius: radius.sheet,
-              borderTopRightRadius: radius.sheet,
-              paddingHorizontal: spacing.xl,
-              paddingTop: spacing.lg,
-              paddingBottom: Math.max(insets.bottom, spacing.xl),
-              ...elevation.e2,
+              width: 36,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: theme.color.hairline,
+              alignSelf: 'center',
+              marginBottom: spacing.lg,
             }}
-          >
-            {/* Pull handle */}
-            <View
-              style={{
-                width: 36,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: theme.color.hairline,
-                alignSelf: 'center',
-                marginBottom: spacing.lg,
-              }}
-            />
-            {children}
-          </View>
-        </Pressable>
-      </Pressable>
+          />
+          {children}
+        </View>
+      </View>
     </Modal>
   );
 }

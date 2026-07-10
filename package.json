@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsc src/domain/protection.ts --ignoreConfig --outDir .test-build --module commonjs --target es2020 --skipLibCheck && node --test tests/protection.test.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/nunito": "^0.4.1",

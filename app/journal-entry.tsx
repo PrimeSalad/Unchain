@@ -261,13 +261,18 @@ function ConfirmModal({
       statusBarTranslucent
       onRequestClose={onCancel}
     >
-      {/* Scrim */}
-      <Pressable
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
-        onPress={onCancel}
-      >
-        {/* Sheet — stops tap propagation to scrim */}
-        <Pressable onPress={() => {}}>
+      {/* Scrim and sheet are siblings — nesting the sheet inside a Pressable
+          would nest every button inside a button (invalid on web, confusing
+          for screen readers). */}
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+          onPress={onCancel}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+        />
+        {/* Sheet */}
+        <View>
           <View
             style={{
               backgroundColor: theme.color.surface,
@@ -307,8 +312,8 @@ function ConfirmModal({
               <Button label="Review Answers" onPress={onCancel} kind="secondary" full />
             </View>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

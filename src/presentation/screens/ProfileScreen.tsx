@@ -5,6 +5,7 @@ import {
   Modal,
   Pressable,
   Share,
+  StyleSheet,
   TextInput,
   View,
 } from 'react-native';
@@ -512,18 +513,23 @@ export function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setModal(null)}
       >
-        <Pressable
+        {/* Scrim and dialog are siblings — nesting the dialog inside a
+            Pressable nests buttons inside a button (invalid on web). */}
+        <View
           style={{
             flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.55)',
             alignItems: 'center',
             justifyContent: 'center',
             padding: spacing.xl,
           }}
-          onPress={() => setModal(null)}
         >
-          {/* Stop tap-through to the backdrop */}
           <Pressable
+            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]}
+            onPress={() => setModal(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          />
+          <View
             style={{
               backgroundColor: theme.color.surface,
               borderRadius: radius.sheet,
@@ -532,7 +538,6 @@ export function ProfileScreen() {
               maxWidth: 380,
               ...elevation.e2,
             }}
-            onPress={() => {/* noop — prevent backdrop close */}}
           >
             <Text variant="title2" style={{ marginBottom: spacing.md }}>
               {modal?.title}
@@ -577,8 +582,8 @@ export function ProfileScreen() {
                 Cancel
               </Text>
             </Pressable>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
 
       {/* ── Toast ─────────────────────────────────────────────────────── */}
