@@ -29,6 +29,7 @@ export default function Sudoku() {
   const router = useRouter();
   const games = useStore((s) => s.games);
   const recordSudoku = useStore((s) => s.recordSudoku);
+  const completeMission = useStore((s) => s.completeMission);
 
   const [level, setLevel] = useState<SudokuLevel>('easy');
   const [{ puzzle, solution }, setPuzzle] = useState(() => generate('easy'));
@@ -86,6 +87,7 @@ export default function Sudoku() {
       recorded.current = true;
       const newly = recordSudoku(level, seconds * 1000, { mistakes, hints });
       setUnlocked(newly);
+      completeMission('play_game');
       playSound('win', 0.8);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setTimeout(() => setCelebrate(true), 500);

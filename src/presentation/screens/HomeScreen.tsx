@@ -8,11 +8,12 @@ import { Card } from '../components/Card';
 import { RecoveryRing } from '../components/RecoveryRing';
 import { StatTile } from '../components/StatTile';
 import { Mascot } from '../components/Mascot';
+import { DailyMissions } from '../components/DailyMissions';
 import { spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useNow } from '../hooks/useNow';
 import { useResponsive } from '../hooks/useResponsive';
-import { useStore, useProfile, useTodayCheckIn } from '@/application/store';
+import { useStore, useProfile } from '@/application/store';
 import {
   streakDays,
   currentStreakStart,
@@ -59,11 +60,10 @@ export function HomeScreen() {
   const { ringSize } = useResponsive();
 
   const timeline = useStore((s) => s.timeline);
-  const urges = useStore((s) => s.urges);
   const journal = useStore((s) => s.journal);
   const relapses = useStore((s) => s.relapses);
   const pushTimeline = useStore((s) => s.pushTimeline);
-  const todayCheckIn = useTodayCheckIn();
+  const completeMission = useStore((s) => s.completeMission);
 
   // Derive the current streak start from the event log — never from startedAt
   // directly — so a relapse only marks today red without wiping history.
@@ -78,6 +78,18 @@ export function HomeScreen() {
   // are never added. Neither fact changes the streak or calendar.
   const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
+
+  // Auto-complete the daily_log mission the moment a journal entry exists
+  // for today. Derived directly from the store (not from the ticking `now`)
+  // so this effect only fires when the journal array actually changes.
+  const hasTodayJournal = useStore((s) =>
+    s.journal.some((j) => sameDay(j.at, Date.now())),
+  );
+  useEffect(() => {
+    if (hasTodayJournal) {
+      completeMission('daily_log');
+    }
+  }, [hasTodayJournal, completeMission]);
 
   useEffect(() => {
     if (!profile) return;
@@ -95,16 +107,6 @@ export function HomeScreen() {
   }, [days, profile, timeline, pushTimeline, router]);
 
   if (!profile) return null;
-
-  const activityToday =
-    urges.some((u) => sameDay(u.at, now)) ||
-    journal.some((j) => sameDay(j.at, now)) ||
-    timeline.some((e) => (e.type === 'breathing' || e.type === 'activity') && sameDay(e.at, now));
-  const tasks = [
-    { key: 'checkin', label: 'Complete daily check-in', done: !!todayCheckIn, go: () => router.push('/checkin') },
-    { key: 'mood', label: "Record today's mood", done: todayCheckIn?.mood != null, go: () => router.push('/checkin') },
-    { key: 'activity', label: 'Finish one recovery activity', done: activityToday, go: () => router.push('/alternatives' as Href) },
-  ];
 
   return (
     <Screen tabPadding>
@@ -187,40 +189,10 @@ export function HomeScreen() {
         </Card>
       </Pressable>
 
-      {/* Today's Recovery */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Today's Recovery
-      </Text>
-      <Card padding={0}>
-        {tasks.map((t, i) => (
-          <Pressable
-            key={t.key}
-            onPress={t.go}
-            accessibilityRole="button"
-            accessibilityLabel={t.label}
-            accessibilityState={{ checked: t.done }}
-            style={({ pressed }) => ({
-              flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
-              borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.color.hairline,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Ionicons
-              name={t.done ? 'checkmark-circle' : 'ellipse-outline'}
-              size={22}
-              color={t.done ? theme.color.success : theme.color.textDim}
-            />
-            <Text
-              variant="callout"
-              style={{ flex: 1, marginLeft: spacing.md }}
-              color={t.done ? theme.color.textDim : theme.color.text}
-            >
-              {t.label}
-            </Text>
-            {!t.done && <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />}
-          </Pressable>
-        ))}
-      </Card>
+      {/* Daily Missions */}
+      <View style={{ marginTop: spacing.xl }}>
+        <DailyMissions />
+      </View>
 
       {/* Quick Actions */}
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>

@@ -23,6 +23,7 @@ export default function MindfulPause() {
   const profile = useProfile();
   const pushTimeline = useStore((s) => s.pushTimeline);
   const addPoints = useStore((s) => s.addPoints);
+  const completeMission = useStore((s) => s.completeMission);
 
   const [minutes, setMinutes] = useState<number | null>(null);
   const [remaining, setRemaining] = useState(0);
@@ -71,6 +72,9 @@ export default function MindfulPause() {
     if (finished && minutes != null) {
       pushTimeline('breathing', `Completed a ${minutes}-minute Mindful Pause`);
       addPoints(minutes >= 15 ? 15 : 10);
+      // Auto-complete both breathing and mindful_pause daily missions.
+      completeMission('mindful_pause');
+      completeMission('breathing');
       stopCalmMusic();
       playSound('win', 0.7);
     }

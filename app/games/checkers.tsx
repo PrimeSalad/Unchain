@@ -50,6 +50,7 @@ export default function Checkers() {
   const router = useRouter();
   const games = useStore((s) => s.games);
   const recordCheckers = useStore((s) => s.recordCheckers);
+  const completeMission = useStore((s) => s.completeMission);
 
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [board, setBoard] = useState<Board>(() => initialBoard());
@@ -130,6 +131,7 @@ export default function Checkers() {
       const piecesLeft = finalBoard.filter((p) => p?.player === 'r').length;
       const newly = recordCheckers(w === 'r' ? 'win' : 'loss', { difficulty, piecesLeft });
       setUnlocked(newly);
+      completeMission('play_game');
       playSound(w === 'r' ? 'win' : 'lose', 0.8);
       Haptics.notificationAsync(
         w === 'r' ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,

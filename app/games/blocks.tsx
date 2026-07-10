@@ -47,6 +47,7 @@ export default function Blocks() {
   const router = useRouter();
   const games = useStore((s) => s.games);
   const recordBlocks = useStore((s) => s.recordBlocks);
+  const completeMission = useStore((s) => s.completeMission);
   const best = useStore((s) => s.games.blocksBest);
 
   const [grid, setGrid] = useState<Grid>(() => emptyGrid());
@@ -126,12 +127,13 @@ export default function Blocks() {
       maxLines: maxLinesRef.current,
     });
     setUnlocked(newly);
+    completeMission('play_game');
     playSound(wasBest ? 'win' : 'lose', wasBest ? 0.8 : 0.5);
     Haptics.notificationAsync(
       wasBest ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,
     ).catch(() => {});
     setTimeout(() => setCelebrate(true), 550);
-  }, [recordBlocks]);
+  }, [recordBlocks, completeMission]);
 
   const dropDrag = useCallback((i: number) => {
     // Claim the drag synchronously: onEnd AND onFinalize both call this, and

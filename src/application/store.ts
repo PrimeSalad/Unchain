@@ -40,6 +40,8 @@ import type { FavoriteQuote } from '@/domain/quotes';
 import { QUOTES, QUOTE_HISTORY_SIZE, localDayKey, pickDailyQuoteIndex } from '@/domain/quotes';
 import type { BlockedSite } from '@/domain/protection';
 import { normalizeDomain } from '@/domain/protection';
+import type { DailyMissionState, MissionId } from '@/domain/missions';
+import { missionById, missionDayKey } from '@/domain/missions';
 
 /**
  * Single local store for the recovery companion. Offline-first: no accounts,
@@ -121,6 +123,13 @@ interface RecoveryState {
    *  only; never uploaded, never auto-populated. */
   blockedSites: BlockedSite[];
 
+  // ── Daily Missions ───────────────────────────────────────────────────────
+  /** Today's mission completion state. Resets automatically on a new local
+   *  calendar day (checked on every completeMission call and on hydration). */
+  dailyMissions: DailyMissionState;
+  /** Lifetime XP accumulated from missions. Powers the level system. */
+  missionXp: number;
+
   // ── Recovery Motivation ─────────────────────────────────────────────────
   /** Quotes the user has hearted. Survive restarts/updates via persistence. */
   favoriteQuotes: FavoriteQuote[];
@@ -161,6 +170,12 @@ interface RecoveryState {
   ) => 'updated' | 'duplicate' | 'invalid';
   /** The ONLY way a site stops being protected — explicit manual removal. */
   removeBlockedSite: (id: string) => void;
+
+  /** Complete a daily mission for today. Idempotent — repeating the same
+   *  mission ID in the same day is a no-op. Returns the XP awarded (0 if
+   *  already completed or on error). Resets stale state if a new local day
+   *  has started. */
+  completeMission: (id: MissionId) => number;
 
   /** Heart / un-heart a quote. */
   toggleFavoriteQuote: (q: { text: string; author?: string }) => void;
@@ -281,6 +296,8 @@ export const useStore = create<RecoveryState>()(
       altAchievements: {},
       blockedSites: [],
       favoriteQuotes: [],
+      dailyMissions: { day: '', completed: [] },
+      missionXp: 0,
       dailyQuote: null,
       recentQuotes: [],
 
@@ -327,6 +344,43 @@ export const useStore = create<RecoveryState>()(
 
       removeBlockedSite: (id) =>
         set((s) => ({ blockedSites: s.blockedSites.filter((b) => b.id !== id) })),
+
+      completeMission: (id) => {
+        let awarded = 0;
+        set((s) => {
+          const today = missionDayKey();
+          // Normalise: if the stored day is stale, reset to a clean slate for
+          // today. This is the only place daily reset happens so that the
+          // selector can return `s.dailyMissions` as a stable reference.
+          const missions: DailyMissionState =
+            s.dailyMissions.day === today
+              ? s.dailyMissions
+              : { day: today, completed: [] };
+
+          // Idempotent: don't double-award the same mission on the same day.
+          if (missions.completed.includes(id)) {
+            // Still normalise the day even when there's nothing to award.
+            return missions === s.dailyMissions ? {} : { dailyMissions: missions };
+          }
+
+          const mission = missionById(id);
+          awarded = mission.xp;
+          const nextMissions: DailyMissionState = {
+            day: today,
+            completed: [...missions.completed, id],
+          };
+          return {
+            dailyMissions: nextMissions,
+            missionXp: s.missionXp + awarded,
+            points: s.points + awarded,
+            timeline: [
+              evt('activity', `Daily Mission complete — ${mission.title}`),
+              ...s.timeline,
+            ],
+          };
+        });
+        return awarded;
+      },
 
       completeAlternative: (id) => {
         let unlocked: AltAchievement[] = [];
@@ -763,6 +817,8 @@ export const useStore = create<RecoveryState>()(
           favoriteQuotes: [],
           dailyQuote: null,
           recentQuotes: [],
+          dailyMissions: { day: '', completed: [] },
+          missionXp: 0,
         });
       },
     }),
@@ -771,12 +827,22 @@ export const useStore = create<RecoveryState>()(
       storage: createJSONStorage(() => AsyncStorage),
       // Deep-merge the games slice so users upgrading from an older build get
       // defaults for fields that didn't exist when their state was saved.
+      // Also normalise dailyMissions to today so the selector never has to
+      // construct a new object — eliminating the getSnapshot infinite-loop.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<RecoveryState>;
+        const today = missionDayKey();
+        const storedMissions = p.dailyMissions;
+        const dailyMissions: DailyMissionState =
+          storedMissions?.day === today
+            ? storedMissions
+            : { day: today, completed: [] };
         return {
           ...current,
           ...p,
           games: { ...initialGames, ...(p.games ?? {}) },
+          dailyMissions,
+          missionXp: p.missionXp ?? 0,
         };
       },
     },
@@ -797,4 +863,21 @@ export function useTodayCheckIn(): DailyCheckIn | undefined {
 /** Today's journal entry, or undefined if none submitted yet today. */
 export function useTodayJournal(): import('@/domain/records').JournalEntry | undefined {
   return useStore((s) => s.journal.find((j) => sameDay(j.at, Date.now())));
+}
+
+/**
+ * Today's daily mission state.
+ *
+ * The selector returns `s.dailyMissions` directly — always a stable reference
+ * from the store — so Zustand never sees a new object and the
+ * "getSnapshot should be cached" infinite-loop warning cannot fire.
+ *
+ * Daily reset is handled in two places so the selector stays trivial:
+ *  1. `completeMission` normalises to today before every mutation.
+ *  2. The persist `merge` resets stale state on cold launch.
+ * This means `s.dailyMissions` is always the correct day's state by the time
+ * any component reads it.
+ */
+export function useDailyMissions(): DailyMissionState {
+  return useStore((s) => s.dailyMissions);
 }

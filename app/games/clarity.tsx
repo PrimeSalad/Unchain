@@ -90,6 +90,7 @@ export default function Clarity() {
   const saveProgress = useStore((s) => s.saveClarityProgress);
   const recordResult = useStore((s) => s.recordClarityResult);
   const recordPractice = useStore((s) => s.recordClarityPractice);
+  const completeMission = useStore((s) => s.completeMission);
   const layout = useClarityLayout();
 
   const [mode, setMode] = useState<'daily' | 'practice'>('daily');
@@ -191,10 +192,12 @@ export default function Clarity() {
       if ((didWin || didLose) && !recorded.current) {
         recorded.current = true;
         newly = recordResult(daily.day, next, didWin);
+        completeMission('play_game');
       }
     } else if ((didWin || didLose) && !recorded.current) {
       recorded.current = true;
       newly = recordPractice(didWin, next.length);
+      completeMission('play_game');
     }
     if (newly.length) setUnlocked(newly);
 
