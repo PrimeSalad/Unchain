@@ -159,7 +159,7 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
     entry.text !== 'Gambling relapse recorded.' &&
     entry.text !== 'Clean day recorded.';
 
-  // The recovery-adjusted balance: raw balance minus any gambling loss that
+  // The recovery-adjusted balance: raw balance minus the wager on a losing
   // day (wins are never added). This is the figure the app tracks everywhere.
   const adjusted = recoveryAdjustedBalance(entry);
 
@@ -310,7 +310,7 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
                   label="Balance"
                   value={
                     adjusted != null && adjusted !== entry.moneyBalance
-                      ? `${currency}${entry.moneyBalance.toLocaleString()} → ${currency}${adjusted.toLocaleString()} after loss`
+                      ? `${currency}${entry.moneyBalance.toLocaleString()} → ${currency}${adjusted.toLocaleString()} after lost wager`
                       : `${currency}${entry.moneyBalance.toLocaleString()}`
                   }
                 />

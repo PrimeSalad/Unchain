@@ -428,8 +428,9 @@ export default function JournalEntry() {
       whyGambled: gambled === true ? whyText : undefined,
       // moneyBalance stores the RAW answer to "How much money do you have
       // today?" for all gambling users. Financial metrics read it through
-      // recoveryAdjustedBalance(): a loss today is subtracted, a win is never
-      // added. It does not affect recovery status, streak, or achievements.
+      // recoveryAdjustedBalance(): on a losing day the wager is subtracted
+      // (remaining = moneyToday - wagerAmount), a win is never added. It does
+      // not affect recovery status, streak, or achievements.
       moneyBalance: moneyBalance.trim() ? parseFloat(moneyBalance) || undefined : undefined,
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -659,11 +660,12 @@ export default function JournalEntry() {
 
       case 'summary': {
         const whyLabel = whyOption === 'Other' ? whyOther : (whyOption ?? undefined);
-        // Recovery-adjusted balance preview: a gambling loss is subtracted
-        // from the entered balance; a win is never added.
-        const lossApplied = gambled === true && lost === true && amountLost !== '';
+        // Recovery-adjusted balance preview: a lost wager is subtracted from
+        // the entered balance (remaining = moneyToday - wagerAmount); a win
+        // never adds anything.
+        const lossApplied = gambled === true && lost === true && amountWagered !== '';
         const adjustedBalance = lossApplied && moneyBalance !== ''
-          ? Math.max(0, (parseFloat(moneyBalance) || 0) - (parseFloat(amountLost) || 0))
+          ? Math.max(0, (parseFloat(moneyBalance) || 0) - (parseFloat(amountWagered) || 0))
           : null;
         return (
           <>
@@ -686,7 +688,7 @@ export default function JournalEntry() {
                   icon="wallet-outline"
                   iconColor={theme.color.danger}
                   label="Tracked"
-                  value={`${currency}${adjustedBalance.toLocaleString()} after loss`}
+                  value={`${currency}${adjustedBalance.toLocaleString()} after lost wager`}
                 />
               )}
               {gambled === true && whyLabel && (

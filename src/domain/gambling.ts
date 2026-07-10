@@ -186,15 +186,17 @@ export function formatMoney(amount: number, currency = '₱'): string {
 // ---------------------------------------------------------------------------
 // Journal-based financial stats
 //
-// Recovery-adjusted money rule:
+// Recovery-adjusted money rule (single source of truth for the app's balance):
 //   - The journal asks "How much money do you have today?" — that answer is
-//     the day's raw balance.
-//   - If the user gambled AND lost, the amount lost is SUBTRACTED from that
-//     raw balance. The adjusted value is what every financial metric in the
-//     app (Home tiles, Progress tracker, trends) is computed from.
-//   - If the user gambled and WON, winnings are NEVER added. This app tracks
-//     addiction recovery, not gambling performance — a win must not improve
-//     any metric, progress figure, or trend.
+//     the day's raw balance (moneyToday).
+//   - If the user gambled AND lost the wager, the WAGER AMOUNT is subtracted:
+//         remainingMoney = moneyToday - wagerAmount
+//     The adjusted value is what every financial metric in the app (Home
+//     tiles, Progress tracker, trends) is computed from.
+//   - If the user gambled and WON, nothing is added:
+//         remainingMoney = moneyToday
+//     This app tracks addiction recovery, not gambling performance — a win
+//     must never improve any metric, progress figure, or trend.
 //   - Financial data never influences streak, calendar, or achievement logic.
 // ---------------------------------------------------------------------------
 
@@ -204,6 +206,7 @@ export interface FinancialJournalEntry {
   moneyBalance?: number;
   gambled?: boolean;
   lost?: boolean;
+  amountWagered?: number;
   amountLost?: number;
 }
 
@@ -211,22 +214,25 @@ export interface FinancialJournalEntry {
  * The recovery-adjusted balance for a single journal entry.
  *
  *   - No `moneyBalance` recorded → null (entry is ignored by financial stats).
- *   - Gambled and lost → `moneyBalance - amountLost`, floored at 0.
+ *   - Gambled and lost → `moneyBalance - amountWagered`, floored at 0.
+ *     (Falls back to `amountLost` for older entries saved before the wager
+ *     rule, so historical trends stay correct.)
  *   - Gambled and won  → `moneyBalance` unchanged; winnings are never added.
  *   - Did not gamble   → `moneyBalance` unchanged.
  */
 export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null {
   if (e.moneyBalance == null) return null;
-  if (e.gambled === true && e.lost === true && e.amountLost != null) {
-    return Math.max(0, e.moneyBalance - e.amountLost);
+  if (e.gambled === true && e.lost === true) {
+    const deduction = e.amountWagered ?? e.amountLost;
+    if (deduction != null) return Math.max(0, e.moneyBalance - deduction);
   }
   return e.moneyBalance;
 }
 
 export interface JournalMoneyStats {
   /**
-   * Most recent recovery-adjusted balance (raw balance minus any gambling
-   * loss that day). null if no entry has a balance.
+   * Most recent recovery-adjusted balance (raw balance minus the wager on a
+   * losing day). null if no entry has a balance.
    */
   current: number | null;
   /**
@@ -255,7 +261,7 @@ export interface JournalMoneyStats {
  *
  * Rules:
  *  - Only journal entries with a `moneyBalance` value are considered.
- *  - Each entry's balance is adjusted first: gambling losses are subtracted,
+ *  - Each entry's balance is adjusted first: a lost wager is subtracted,
  *    gambling winnings are never added.
  *  - Entries are sorted oldest-first for trend math.
  *  - The adjusted figures feed every financial display in the app; they never

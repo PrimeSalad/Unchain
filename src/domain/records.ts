@@ -55,10 +55,10 @@ export interface JournalEntry {
    * The RAW answer to "How much money do you have today?" as entered by the
    * user. Financial metrics never read this directly — they use the
    * recovery-adjusted balance (`recoveryAdjustedBalance` in gambling.ts):
-   * a gambling loss that day is subtracted from this value, and a gambling
-   * win is never added, so wins can never improve any progress metric.
-   * Recovery status (streak, calendar, achievements) is NEVER inferred from
-   * this field.
+   * on a day the user gambled and lost, the wager is subtracted
+   * (remaining = moneyToday - wagerAmount); a gambling win is never added,
+   * so wins can never improve any progress metric. Recovery status (streak,
+   * calendar, achievements) is NEVER inferred from this field.
    */
   moneyBalance?: number;
 }

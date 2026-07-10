@@ -273,7 +273,7 @@ export function ProgressScreen() {
       <Card style={{ marginTop: spacing.xl }}>
         <Text variant="headline" style={{ marginBottom: spacing.md }}>Financial Tracker</Text>
         <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-          Based on your daily balance entries in the journal. Gambling losses are subtracted from your balance; winnings are never counted — recovery comes first. Financial changes do not affect your streak or achievements.
+          Based on your daily balance entries in the journal. A lost wager is subtracted from your balance; winnings are never counted — recovery comes first. Financial changes do not affect your streak or achievements.
         </Text>
         <Row
           label="Current balance"
