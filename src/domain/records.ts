@@ -49,6 +49,16 @@ export interface JournalEntry {
   amountLost?: number;
   /** Why they gambled — selected option or free-text when "Other" chosen. */
   whyGambled?: string;
+
+  // ── Financial tracking ────────────────────────────────────────────────────
+  /**
+   * The user's current money balance as of this journal entry.
+   * Recorded independently from gambling outcome — a user can have more money
+   * on a relapse day (e.g. they won) or less on a clean day (e.g. spent on
+   * bills). Recovery status is NEVER inferred from this field; it is purely
+   * for financial trend tracking on the Home and Progress screens.
+   */
+  moneyBalance?: number;
 }
 
 /** Emergency Reflection — captured during a crisis (SOS). Stored separately

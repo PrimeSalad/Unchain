@@ -17,7 +17,7 @@ import {
   currentStreakStart,
   recoveryTimer,
   nextMilestone,
-  moneySaved,
+  journalMoneyStats,
   formatMoney,
   milestoneCrossed,
   addictionMeta,
@@ -68,7 +68,11 @@ export function HomeScreen() {
   const days = streakStart ? streakDays(streakStart, now) : 0;
   const timer = streakStart ? recoveryTimer(streakStart, now) : { days: 0, hours: 0, minutes: 0 };
   const target = nextMilestone(days);
-  const money = profile ? moneySaved(profile, now) : { today: 0, week: 0, month: 0, total: 0 };
+  // Financial stats come exclusively from journal moneyBalance entries.
+  // These are independent of recovery status — a relapse day with a gambling
+  // win will show more money, a clean day with unexpected expenses will show
+  // less. Neither fact changes the streak or calendar.
+  const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
 
   const motivation = useMemo(() => randomFrom(MOTIVATION), []);
@@ -123,12 +127,37 @@ export function HomeScreen() {
 
         <View style={{ alignSelf: 'stretch', marginTop: spacing.xl, gap: spacing.md }}>
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <StatTile value={formatMoney(money.today, currency)} label="Today" />
-            <StatTile value={formatMoney(money.week, currency)} label="This Week" />
+            <StatTile
+              value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '—'}
+              label="Current Balance"
+            />
+            <StatTile
+              value={
+                moneyStats.change != null
+                  ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
+                  : '—'
+              }
+              label="Since Last Entry"
+            />
           </View>
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <StatTile value={formatMoney(money.month, currency)} label="This Month" />
-            <StatTile value={formatMoney(money.total, currency)} label="Total" tone="primarySoft" />
+            <StatTile
+              value={
+                moneyStats.weeklyTrend != null
+                  ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency) + '/day'
+                  : '—'
+              }
+              label="Weekly Trend"
+            />
+            <StatTile
+              value={
+                moneyStats.monthlyTrend != null
+                  ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency) + '/day'
+                  : '—'
+              }
+              label="Monthly Trend"
+              tone="primarySoft"
+            />
           </View>
         </View>
       </View>

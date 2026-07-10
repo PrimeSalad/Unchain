@@ -184,6 +184,83 @@ export function formatMoney(amount: number, currency = '₱'): string {
 }
 
 // ---------------------------------------------------------------------------
+// Journal-based financial stats
+//
+// These are INDEPENDENT of recovery metrics. A user can have more money on a
+// relapse day (gambling win) or less on a clean day (regular bills). The
+// financial system NEVER influences streak, calendar, or achievement logic.
+// ---------------------------------------------------------------------------
+
+export interface JournalMoneyStats {
+  /** Most recent balance recorded in a journal entry. null if no entry has a balance. */
+  current: number | null;
+  /**
+   * Change between the two most recent journal entries that have a balance.
+   * Positive = gained money, negative = lost money. null if fewer than 2
+   * balance entries exist.
+   */
+  change: number | null;
+  /**
+   * Average daily balance change over the last 7 calendar days that have a
+   * journal balance recorded. null if fewer than 2 balance entries exist in
+   * that window.
+   */
+  weeklyTrend: number | null;
+  /**
+   * Average daily balance change over the last 30 calendar days that have a
+   * journal balance recorded. null if fewer than 2 balance entries exist in
+   * that window.
+   */
+  monthlyTrend: number | null;
+}
+
+/**
+ * Compute financial metrics purely from journal `moneyBalance` entries.
+ *
+ * Rules:
+ *  - Only journal entries with a `moneyBalance` value are considered.
+ *  - Entries are sorted oldest-first for trend math.
+ *  - Recovery metrics (streak, relapses, gambled) are NOT consulted here.
+ *  - A gambling win that increases the balance is reflected as positive change;
+ *    this does NOT affect recovery status anywhere in the app — it is financial
+ *    data only.
+ */
+export function journalMoneyStats(
+  journal: Array<{ at: number; moneyBalance?: number }>,
+): JournalMoneyStats {
+  // Keep only entries that have a recorded balance, sorted oldest → newest.
+  const entries = journal
+    .filter((j): j is typeof j & { moneyBalance: number } => j.moneyBalance != null)
+    .sort((a, b) => a.at - b.at);
+
+  if (entries.length === 0) {
+    return { current: null, change: null, weeklyTrend: null, monthlyTrend: null };
+  }
+
+  const current = entries[entries.length - 1].moneyBalance;
+  const change =
+    entries.length >= 2
+      ? entries[entries.length - 1].moneyBalance - entries[entries.length - 2].moneyBalance
+      : null;
+
+  function windowTrend(windowMs: number): number | null {
+    const cutoff = Date.now() - windowMs;
+    const window = entries.filter((e) => e.at >= cutoff);
+    if (window.length < 2) return null;
+    const delta = window[window.length - 1].moneyBalance - window[0].moneyBalance;
+    const days = Math.max(1, (window[window.length - 1].at - window[0].at) / MS_PER_DAY);
+    return Math.round(delta / days);
+  }
+
+  return {
+    current,
+    change,
+    weeklyTrend: windowTrend(7 * MS_PER_DAY),
+    monthlyTrend: windowTrend(30 * MS_PER_DAY),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Milestones
 // ---------------------------------------------------------------------------
 

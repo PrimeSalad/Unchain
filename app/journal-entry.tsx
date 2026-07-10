@@ -40,6 +40,7 @@ import { useStore, useProfile, useTodayJournal } from '@/application/store';
 
 type StepId =
   | 'did_gamble'
+  | 'money_balance'
   | 'amount_wagered'
   | 'did_lose'
   | 'amount_lost'
@@ -52,6 +53,9 @@ function buildSteps(isGambling: boolean, gambled: boolean, lost: boolean | null)
   const s: StepId[] = [];
   if (isGambling) {
     s.push('did_gamble');
+    // money_balance always follows did_gamble, regardless of whether the user
+    // gambled. Financial tracking is independent of recovery status.
+    s.push('money_balance');
     if (gambled) {
       s.push('amount_wagered', 'did_lose');
       if (lost === true) s.push('amount_lost');
@@ -333,6 +337,7 @@ export default function JournalEntry() {
   const submitting = useRef(false);
 
   const [gambled,       setGambled]       = useState<boolean | null>(null);
+  const [moneyBalance,  setMoneyBalance]  = useState('');
   const [amountWagered, setAmountWagered] = useState('');
   const [lost,          setLost]          = useState<boolean | null>(null);
   const [amountLost,    setAmountLost]    = useState('');
@@ -360,6 +365,7 @@ export default function JournalEntry() {
   function canProceed(): boolean {
     switch (currentStep) {
       case 'did_gamble':     return gambled !== null;
+      case 'money_balance':  return moneyBalance.trim() !== '';
       case 'amount_wagered': return amountWagered.trim() !== '';
       case 'did_lose':       return lost !== null;
       case 'amount_lost':    return amountLost.trim() !== '';
@@ -420,6 +426,10 @@ export default function JournalEntry() {
       lost: gambled === true ? lost === true : undefined,
       amountLost: gambled === true && lost === true && amountLost ? parseFloat(amountLost) || undefined : undefined,
       whyGambled: gambled === true ? whyText : undefined,
+      // moneyBalance is recorded for all gambling users regardless of whether
+      // they gambled today. It is a financial tracking field only and does not
+      // affect recovery status, streak, calendar, or achievements.
+      moneyBalance: moneyBalance.trim() ? parseFloat(moneyBalance) || undefined : undefined,
     });
     router.back();
   }
@@ -556,6 +566,17 @@ export default function JournalEntry() {
           </>
         );
 
+      case 'money_balance':
+        return (
+          <>
+            <StepHeading
+              title="How much money do you have today?"
+              subtitle="Enter your current balance. This is for financial tracking only and does not affect your recovery progress."
+            />
+            <AmountInput value={moneyBalance} onChange={setMoneyBalance} currency={currency} />
+          </>
+        );
+
       case 'amount_wagered':
         return (
           <>
@@ -642,6 +663,9 @@ export default function JournalEntry() {
             <View style={{ backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm }}>
               {gambled != null && (
                 <SummaryRow icon={gambled ? 'alert-circle-outline' : 'checkmark-circle-outline'} iconColor={gambled ? theme.color.danger : theme.color.success} label="Today" value={gambled ? 'Relapse' : 'Clean day'} />
+              )}
+              {moneyBalance !== '' && (
+                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={`${currency}${parseFloat(moneyBalance).toLocaleString()}`} />
               )}
               {gambled === true && amountWagered !== '' && (
                 <SummaryRow icon="card-outline" iconColor={theme.color.textDim} label="Wagered" value={`${currency}${parseFloat(amountWagered).toLocaleString()}`} />

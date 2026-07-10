@@ -12,7 +12,7 @@ import { Pill } from '../components/Pill';
 import { elevation, spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
-import { streakDays, currentStreakStart, moneySaved, formatMoney } from '@/domain/gambling';
+import { streakDays, currentStreakStart, journalMoneyStats, formatMoney } from '@/domain/gambling';
 import { sameDay } from '@/domain/records';
 import {
   computeStats,
@@ -70,7 +70,10 @@ export function ProgressScreen() {
     ? streakDays(currentStreakStart(profile.startedAt, relapses, journal))
     : 0;
   const best = Math.max(longestStreak, current);
-  const money = profile ? moneySaved(profile) : { today: 0, week: 0, month: 0, total: 0 };
+  // Financial stats derived from journal moneyBalance entries only.
+  // Independent of recovery metrics — gambling wins do not improve these
+  // figures in any way that affects achievements or streak.
+  const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
   const resisted = urges.filter((u) => u.resisted).length;
 
@@ -88,7 +91,7 @@ export function ProgressScreen() {
   // Award any newly-earned badges / completed goals (logs them to the timeline).
   useEffect(() => {
     syncAchievements();
-  }, [current, money.total, checkIns.length, urges.length, journal.length, goals.length, syncAchievements]);
+  }, [current, checkIns.length, urges.length, journal.length, goals.length, syncAchievements]);
 
   // ---------------------------------------------------------------------------
   // Calendar
@@ -267,10 +270,39 @@ export function ProgressScreen() {
 
       {/* Money */}
       <Card style={{ marginTop: spacing.xl }}>
-        <Text variant="headline" style={{ marginBottom: spacing.md }}>Money Saved</Text>
-        <Row label="This week" value={formatMoney(money.week, currency)} />
-        <Row label="This month" value={formatMoney(money.month, currency)} />
-        <Row label="Overall" value={formatMoney(money.total, currency)} bold />
+        <Text variant="headline" style={{ marginBottom: spacing.md }}>Financial Tracker</Text>
+        <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
+          Based on your daily balance entries in the journal. Financial changes do not affect your recovery streak or achievements.
+        </Text>
+        <Row
+          label="Current balance"
+          value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '—'}
+          bold
+        />
+        <Row
+          label="Since last entry"
+          value={
+            moneyStats.change != null
+              ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
+              : '—'
+          }
+        />
+        <Row
+          label="Weekly trend (avg/day)"
+          value={
+            moneyStats.weeklyTrend != null
+              ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency)
+              : '—'
+          }
+        />
+        <Row
+          label="Monthly trend (avg/day)"
+          value={
+            moneyStats.monthlyTrend != null
+              ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency)
+              : '—'
+          }
+        />
       </Card>
 
       {/* Calendar */}

@@ -7,7 +7,7 @@
  */
 
 import type { RecoveryProfile } from './gambling';
-import { streakDays, moneySaved, MILESTONES } from './gambling';
+import { streakDays, moneySaved, journalMoneyStats, MILESTONES } from './gambling';
 import type {
   DailyCheckIn,
   JournalEntry,
@@ -55,6 +55,15 @@ export function computeStats(i: StatsInput): RecoveryStats {
   return {
     currentStreak,
     longestStreak: Math.max(i.longestStreak, currentStreak),
+    // moneyTotal is used exclusively for the "money saved" achievement badges.
+    // It is computed as (daily expense rate × streak days) — i.e. money the
+    // user did NOT spend on their addiction by staying abstinent.
+    //
+    // This is a RECOVERY metric, not a financial tracking metric. It must
+    // never be influenced by gambling winnings or the journal moneyBalance
+    // field. Financial tracking (actual wallet balance, trends) is handled
+    // separately by journalMoneyStats() in gambling.ts and displayed on the
+    // Home and Progress screens without affecting achievements.
     moneyTotal: moneySaved(i.profile, now).total,
     checkIns: i.checkIns.length,
     cleanCheckIns: i.checkIns.filter((c) => !c.gambled).length,
