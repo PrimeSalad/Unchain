@@ -47,6 +47,7 @@ const TIMELINE_ICON: Record<TimelineType, keyof typeof Ionicons.glyphMap> = {
   achievement: 'trophy',
   breathing: 'leaf',
   activity: 'walk',
+  shield: 'shield-checkmark',
   start: 'flag',
 };
 
@@ -230,6 +231,8 @@ export function HomeScreen() {
         <QuickAction icon="book"   label="Journal"   onPress={() => router.push('/(tabs)/journal')} />
         <QuickAction icon="warning" label="SOS"      accent onPress={() => router.push('/sos')} />
         <QuickAction icon="flower" label="Pause"     onPress={() => router.push('/mindful-pause')} />
+        <QuickAction icon="shield-checkmark" label="Protect" onPress={() => router.push('/protection' as Href)} />
+        <QuickAction icon="walk"   label="Habits"    onPress={() => router.push('/alternatives' as Href)} />
       </View>
 
       {/* Recreational Games */}

@@ -38,6 +38,8 @@ import {
 } from '@/domain/alternatives';
 import type { FavoriteQuote } from '@/domain/quotes';
 import { QUOTES, QUOTE_HISTORY_SIZE, localDayKey, pickDailyQuoteIndex } from '@/domain/quotes';
+import type { BlockedSite, ProtectionSession } from '@/domain/protection';
+import { formatRemaining, nextLocalMidnight, normalizeDomain, sessionActive } from '@/domain/protection';
 
 /**
  * Single local store for the recovery companion. Offline-first: no accounts,
@@ -113,6 +115,14 @@ interface RecoveryState {
   /** Permanently unlocked habit achievements: id → unlockedAt (ms). */
   altAchievements: Record<string, number>;
 
+  // ── Focus Protection ────────────────────────────────────────────────────
+  /** The user's personal blocklist — every entry added explicitly by them.
+   *  Stored locally only; never uploaded, never auto-populated. */
+  blockedSites: BlockedSite[];
+  /** The currently (or last) running protection session. Expiry is derived
+   *  from endsAt, so no scheduler is needed. */
+  protectionSession: ProtectionSession | null;
+
   // ── Recovery Motivation ─────────────────────────────────────────────────
   /** Quotes the user has hearted. Survive restarts/updates via persistence. */
   favoriteQuotes: FavoriteQuote[];
@@ -143,6 +153,23 @@ interface RecoveryState {
    *  repeat sessions refresh the timestamp without double-awarding). Returns
    *  any habit achievements newly unlocked by this completion. */
   completeAlternative: (id: AlternativeId) => AltAchievement[];
+  /** Add a website to the personal blocklist. Validates + de-duplicates. */
+  addBlockedSite: (domainInput: string, nickname?: string) => 'added' | 'duplicate' | 'invalid';
+  /** Edit domain and/or nickname. Validates + de-duplicates against others. */
+  updateBlockedSite: (
+    id: string,
+    patch: { domain?: string; nickname?: string },
+  ) => 'updated' | 'duplicate' | 'invalid';
+  /** Enable/disable protection for one site without deleting it. */
+  toggleBlockedSite: (id: string) => void;
+  removeBlockedSite: (id: string) => void;
+  /** Start a protection session. `minutes` XOR `untilTomorrow`. Replaces any
+   *  running session when started manually; the SOS trigger never shortens an
+   *  already-running session. */
+  startProtection: (opts: { minutes?: number; untilTomorrow?: boolean; trigger: 'manual' | 'sos' }) => void;
+  /** End the session early — the user is always in control. */
+  stopProtection: () => void;
+
   /** Heart / un-heart a quote. */
   toggleFavoriteQuote: (q: { text: string; author?: string }) => void;
   removeFavoriteQuote: (savedAt: number) => void;
@@ -260,9 +287,77 @@ export const useStore = create<RecoveryState>()(
       alternatives: {},
       altCounts: {},
       altAchievements: {},
+      blockedSites: [],
+      protectionSession: null,
       favoriteQuotes: [],
       dailyQuote: null,
       recentQuotes: [],
+
+      addBlockedSite: (domainInput, nickname) => {
+        const domain = normalizeDomain(domainInput);
+        if (!domain) return 'invalid';
+        if (get().blockedSites.some((s) => s.domain === domain)) return 'duplicate';
+        const site: BlockedSite = {
+          id: uid(),
+          domain,
+          nickname: nickname?.trim() || undefined,
+          addedAt: Date.now(),
+          enabled: true,
+        };
+        set((s) => ({ blockedSites: [site, ...s.blockedSites] }));
+        return 'added';
+      },
+
+      updateBlockedSite: (id, patch) => {
+        let domain: string | undefined;
+        if (patch.domain != null) {
+          const normalized = normalizeDomain(patch.domain);
+          if (!normalized) return 'invalid';
+          if (get().blockedSites.some((s) => s.id !== id && s.domain === normalized)) {
+            return 'duplicate';
+          }
+          domain = normalized;
+        }
+        set((s) => ({
+          blockedSites: s.blockedSites.map((b) =>
+            b.id === id
+              ? {
+                  ...b,
+                  ...(domain != null ? { domain } : {}),
+                  ...(patch.nickname != null ? { nickname: patch.nickname.trim() || undefined } : {}),
+                }
+              : b,
+          ),
+        }));
+        return 'updated';
+      },
+
+      toggleBlockedSite: (id) =>
+        set((s) => ({
+          blockedSites: s.blockedSites.map((b) => (b.id === id ? { ...b, enabled: !b.enabled } : b)),
+        })),
+
+      removeBlockedSite: (id) =>
+        set((s) => ({ blockedSites: s.blockedSites.filter((b) => b.id !== id) })),
+
+      startProtection: ({ minutes, untilTomorrow, trigger }) => {
+        const now = Date.now();
+        const endsAt = untilTomorrow ? nextLocalMidnight(now) : now + Math.max(1, minutes ?? 60) * 60_000;
+        set((s) => {
+          // The SOS trigger only ever lengthens protection — if a session is
+          // already running past this end time, leave it untouched.
+          if (trigger === 'sos' && sessionActive(s.protectionSession, now) && s.protectionSession!.endsAt >= endsAt) {
+            return s;
+          }
+          const label = untilTomorrow ? 'until tomorrow' : `for ${formatRemaining((endsAt - now) / 1000)}`;
+          return {
+            protectionSession: { startedAt: now, endsAt, trigger },
+            timeline: [evt('shield', `Focus Protection on ${label}`), ...s.timeline],
+          };
+        });
+      },
+
+      stopProtection: () => set({ protectionSession: null }),
 
       completeAlternative: (id) => {
         let unlocked: AltAchievement[] = [];
@@ -695,6 +790,8 @@ export const useStore = create<RecoveryState>()(
           alternatives: {},
           altCounts: {},
           altAchievements: {},
+          blockedSites: [],
+          protectionSession: null,
           favoriteQuotes: [],
           dailyQuote: null,
           recentQuotes: [],

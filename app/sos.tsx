@@ -9,6 +9,7 @@ import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useProfile, useStore } from '@/application/store';
 import { recoveryTimer, moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
 import { QUOTES } from '@/domain/quotes';
+import { sessionActive, sessionRemainingSec, formatRemaining } from '@/domain/protection';
 
 export default function Sos() {
   const router = useRouter();
@@ -21,6 +22,21 @@ export default function Sos() {
     ensureDailyQuote();
   }, [ensureDailyQuote]);
   const motivation = QUOTES[dailyQuote?.index ?? 0].text;
+
+  // ── Focus Protection ──────────────────────────────────────────────────────
+  // Opening SOS ("I'm having an urge") automatically starts a one-hour
+  // protection session — but ONLY for websites the user already chose to
+  // block. Nothing is ever added to the blocklist here.
+  const blockedSites = useStore((s) => s.blockedSites);
+  const protectionSession = useStore((s) => s.protectionSession);
+  const startProtection = useStore((s) => s.startProtection);
+  const protectedCount = blockedSites.filter((b) => b.enabled).length;
+  useEffect(() => {
+    if (protectedCount > 0) startProtection({ minutes: 60, trigger: 'sos' });
+    // Run once per SOS visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const protectionOn = sessionActive(protectionSession);
 
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
@@ -44,6 +60,7 @@ export default function Sos() {
     { icon: 'game-controller', label: 'Recreational Games', onPress: () => router.push('/games' as Href) },
     { icon: 'book', label: 'Read Journal', onPress: () => router.replace('/(tabs)/journal') },
     { icon: 'walk', label: 'Healthy Alternatives', onPress: () => router.push('/alternatives' as Href) },
+    { icon: 'shield-checkmark', label: 'Focus Protection', onPress: () => router.push('/protection' as Href) },
     { icon: 'heart', label: 'Recovery Motivation', panelKey: 'motiv', onPress: () => setPanel(panel === 'motiv' ? null : 'motiv') },
     { icon: 'create', label: 'Emergency Reflection', onPress: () => router.replace('/reflection') },
   ];
@@ -67,6 +84,27 @@ export default function Sos() {
             <Anchor label="Recovery" value={`${timer.days}d ${timer.hours}h`} />
             <Anchor label="Money Saved" value={formatMoney(money.total, currency)} />
           </View>
+          {/* Focus Protection status — activated automatically for the sites
+              the user already chose; never adds anything by itself. */}
+          {protectionOn && protectedCount > 0 && (
+            <View
+              accessibilityLabel={`Focus Protection active, ${protectedCount} websites protected`}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                backgroundColor: palette.nightRaised, borderRadius: radius.card,
+                padding: spacing.lg, marginTop: spacing.md,
+                borderLeftWidth: 3, borderLeftColor: '#77B58A',
+              }}
+            >
+              <Ionicons name="shield-checkmark" size={20} color="#77B58A" />
+              <View style={{ flex: 1 }}>
+                <Text variant="callout" color={palette.fog}>Focus Protection is on</Text>
+                <Text variant="caption" color={palette.fogDim} style={{ marginTop: 1 }}>
+                  {protectedCount} website{protectedCount === 1 ? '' : 's'} protected · {formatRemaining(sessionRemainingSec(protectionSession))} left
+                </Text>
+              </View>
+            </View>
+          )}
           {profile?.reason ? (
             <View style={{ backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg, marginTop: spacing.md }}>
               <Text variant="footnote" color={palette.fogDim}>Your reason for quitting</Text>
