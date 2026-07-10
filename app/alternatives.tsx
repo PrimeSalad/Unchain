@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Share, View } from 'react-native';
+import { Modal, Pressable, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -21,16 +21,20 @@ import { ActionSheet } from '@/presentation/components/ActionSheet';
 import { TimerRing } from '@/presentation/components/TimerRing';
 import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { BreathingOrb } from '@/presentation/components/BreathingOrb';
+import { GameCelebration } from '@/presentation/components/games/GameCelebration';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore, useTodayJournal } from '@/application/store';
 import { startCalmMusic, stopCalmMusic } from '@/application/sound';
 import {
+  ALT_ACHIEVEMENTS,
   ALTERNATIVES,
   BREATHE_MINUTES,
   MUSIC_GOAL_SECONDS,
   STRETCH_STEPS,
   WALK_SECONDS,
+  type AltAchievement,
+  type AltCounts,
   type Alternative,
   type AlternativeId,
 } from '@/domain/alternatives';
@@ -158,6 +162,10 @@ function WalkSheet({
   onClose: () => void;
   onComplete: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  // Ring shrinks gracefully on compact devices (iPhone SE) so the sheet's
+  // controls always stay on screen.
+  const ringSize = Math.max(160, Math.min(210, width - 120));
   const [phase, setPhase] = useState<WalkPhase>('idle');
   const [remaining, setRemaining] = useState(WALK_SECONDS);
   // Wall-clock deadline — backgrounding or locking the device never stretches
@@ -239,7 +247,7 @@ function WalkSheet({
       ) : (
         <View style={{ alignItems: 'center', gap: spacing.lg }}>
           <SheetHeading title="Take a 10-Minute Walk" subtitle={status} />
-          <TimerRing progress={remaining / WALK_SECONDS} size={210}>
+          <TimerRing progress={remaining / WALK_SECONDS} size={ringSize}>
             <Text
               variant="display"
               style={{ fontSize: 44, lineHeight: 50, fontVariant: ['tabular-nums'] }}
@@ -588,72 +596,6 @@ function BreatheSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. Message someone — share sheet, then gentle confirmation
-// ─────────────────────────────────────────────────────────────────────────────
-
-type MessagePhase = 'idle' | 'confirm' | 'done';
-
-function MessageSheet({
-  visible,
-  onClose,
-  onComplete,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onComplete: () => void;
-}) {
-  const [phase, setPhase] = useState<MessagePhase>('idle');
-  useEffect(() => {
-    if (visible) setPhase('idle');
-  }, [visible]);
-
-  const reachOut = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    try {
-      await Share.share({
-        message: "Hey — I'm working on my recovery and could use a quick chat. Do you have a minute?",
-      });
-    } catch {
-      /* the confirmation below still lets them mark it honestly */
-    }
-    setPhase('confirm');
-  };
-
-  const yes = () => {
-    successHaptic();
-    onComplete();
-    setPhase('done');
-  };
-
-  return (
-    <ActionSheet visible={visible} onClose={onClose}>
-      {phase === 'done' ? (
-        <SheetDone
-          title="That took courage."
-          message="Connection is one of the strongest recovery tools there is."
-          onClose={onClose}
-        />
-      ) : phase === 'confirm' ? (
-        <View style={{ gap: spacing.md }}>
-          <SheetHeading title="Were you able to reach out?" />
-          <Button label="Yes" onPress={yes} full />
-          <Button label="Not Yet" kind="secondary" onPress={onClose} full />
-        </View>
-      ) : (
-        <View style={{ gap: spacing.md }}>
-          <SheetHeading
-            title="Message Someone You Trust"
-            subtitle="Reach out to someone who supports your recovery. Even one message helps."
-          />
-          <Button label="Open Messages" onPress={reachOut} full />
-          <Button label="Cancel" kind="tertiary" onPress={onClose} full />
-        </View>
-      )}
-    </ActionSheet>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // 7. Calming music — built-in audio; completes after a meaningful session
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -944,10 +886,33 @@ export default function Alternatives() {
   const router = useRouter();
   const completions = useStore((s) => s.alternatives);
   const completeAlternative = useStore((s) => s.completeAlternative);
+  const altCounts = useStore((s) => s.altCounts);
+  const altAchievements = useStore((s) => s.altAchievements);
+  const journalCount = useStore((s) => s.journal.length);
   const todayJournal = useTodayJournal();
 
   const [sheet, setSheet] = useState<AlternativeId | null>(null);
-  const close = () => setSheet(null);
+  // Achievements unlocked mid-sheet are celebrated after the sheet closes —
+  // a RN Modal always paints above sibling overlays, so the confetti card
+  // has to wait its turn.
+  const pendingUnlocks = useRef<AltAchievement[]>([]);
+  const [celebrating, setCelebrating] = useState<AltAchievement[] | null>(null);
+
+  const close = () => {
+    setSheet(null);
+    if (pendingUnlocks.current.length > 0) {
+      setCelebrating(pendingUnlocks.current);
+      pendingUnlocks.current = [];
+    }
+  };
+
+  const handleComplete = (id: AlternativeId) => {
+    const unlocked = completeAlternative(id);
+    if (unlocked.length > 0) pendingUnlocks.current = unlocked;
+  };
+
+  /** Counts including the derived journal total, for progress displays. */
+  const counts: AltCounts = { ...altCounts, journal: journalCount };
 
   const isDone = (id: AlternativeId): boolean =>
     id === 'journal'
@@ -1006,7 +971,7 @@ export default function Alternatives() {
       </View>
 
       {/* Activity cards */}
-      <View style={{ gap: spacing.md, paddingBottom: spacing.xl }}>
+      <View style={{ gap: spacing.md }}>
         {ALTERNATIVES.map((alt, i) => (
           <ActivityCard
             key={alt.id}
@@ -1019,13 +984,37 @@ export default function Alternatives() {
         ))}
       </View>
 
+      {/* Habit achievements */}
+      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+        Achievements · {Object.keys(altAchievements).length}/{ALT_ACHIEVEMENTS.length}
+      </Text>
+      <View
+        style={{
+          backgroundColor: theme.color.surface,
+          borderRadius: radius.card,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
+          marginBottom: spacing.xl,
+        }}
+      >
+        {ALT_ACHIEVEMENTS.map((a, i) => (
+          <AchievementRow
+            key={a.id}
+            a={a}
+            first={i === 0}
+            counts={counts}
+            unlockedAt={altAchievements[a.id]}
+            onShare={() => router.push({ pathname: '/share-achievement', params: { id: a.id } })}
+          />
+        ))}
+      </View>
+
       {/* Activity sheets */}
-      <WalkSheet visible={sheet === 'walk'} onClose={close} onComplete={() => completeAlternative('walk')} />
-      <WaterSheet visible={sheet === 'water'} onClose={close} onComplete={() => completeAlternative('water')} />
-      <StretchSheet visible={sheet === 'stretch'} onClose={close} onComplete={() => completeAlternative('stretch')} />
-      <BreatheSheet visible={sheet === 'breathe'} onClose={close} onComplete={() => completeAlternative('breathe')} />
-      <MessageSheet visible={sheet === 'message'} onClose={close} onComplete={() => completeAlternative('message')} />
-      <MusicSheet visible={sheet === 'music'} onClose={close} onComplete={() => completeAlternative('music')} />
+      <WalkSheet visible={sheet === 'walk'} onClose={close} onComplete={() => handleComplete('walk')} />
+      <WaterSheet visible={sheet === 'water'} onClose={close} onComplete={() => handleComplete('water')} />
+      <StretchSheet visible={sheet === 'stretch'} onClose={close} onComplete={() => handleComplete('stretch')} />
+      <BreatheSheet visible={sheet === 'breathe'} onClose={close} onComplete={() => handleComplete('breathe')} />
+      <MusicSheet visible={sheet === 'music'} onClose={close} onComplete={() => handleComplete('music')} />
       <JournalDoneSheet
         visible={sheet === 'journal'}
         onClose={close}
@@ -1035,6 +1024,119 @@ export default function Alternatives() {
           router.push('/(tabs)/journal');
         }}
       />
+
+      {/* Achievement unlock celebration — same confetti card as the games.
+          Hosted in a Modal so it overlays the whole viewport (this screen
+          scrolls; an absolute overlay would scroll with the content). */}
+      <Modal
+        visible={celebrating != null}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setCelebrating(null)}
+      >
+        <GameCelebration
+          visible={celebrating != null}
+          tone="win"
+          title="Achievement unlocked"
+          subtitle="Your healthy habits are stacking up."
+          unlocked={celebrating ?? []}
+          primary={{ label: 'Keep going', onPress: () => setCelebrating(null) }}
+          onShareAchievement={(a) => {
+            setCelebrating(null);
+            router.push({ pathname: '/share-achievement', params: { id: a.id } });
+          }}
+        />
+      </Modal>
     </Screen>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Achievement row — progress while locked, share when unlocked
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AchievementRow({
+  a,
+  first,
+  counts,
+  unlockedAt,
+  onShare,
+}: {
+  a: AltAchievement;
+  first: boolean;
+  counts: AltCounts;
+  unlockedAt?: number;
+  onShare: () => void;
+}) {
+  const theme = useTheme();
+  const unlocked = unlockedAt != null;
+  const prog = !unlocked && a.progress ? a.progress(counts) : null;
+
+  return (
+    <Pressable
+      disabled={!unlocked}
+      onPress={onShare}
+      accessibilityRole="button"
+      accessibilityLabel={`${a.title}${unlocked ? ', unlocked. Share' : ', locked'}`}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        padding: spacing.lg,
+        borderTopWidth: first ? 0 : 1,
+        borderTopColor: theme.color.hairline,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <View
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: unlocked ? '#E3B34C' : theme.color.surfaceAlt,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons
+          name={a.icon as keyof typeof Ionicons.glyphMap}
+          size={22}
+          color={unlocked ? '#FFFFFF' : theme.color.textDim}
+        />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text variant="callout" color={unlocked ? theme.color.text : theme.color.textDim}>
+          {a.title}
+        </Text>
+        <Text variant="caption" dim style={{ marginTop: 2 }}>{a.desc}</Text>
+        {prog && (
+          <View
+            style={{
+              marginTop: spacing.sm,
+              height: 5,
+              borderRadius: 3,
+              backgroundColor: theme.color.surfaceAlt,
+              overflow: 'hidden',
+            }}
+          >
+            <View
+              style={{
+                width: `${Math.min(100, Math.max(0, Math.round((prog.current / prog.target) * 100)))}%`,
+                height: '100%',
+                borderRadius: 3,
+                backgroundColor: theme.color.primary,
+              }}
+            />
+          </View>
+        )}
+        {unlocked && (
+          <Text variant="caption" color={theme.color.primary} style={{ marginTop: 2 }}>
+            {new Date(unlockedAt).toLocaleDateString()}
+          </Text>
+        )}
+      </View>
+      {unlocked && <Ionicons name="share-outline" size={18} color={theme.color.primary} />}
+    </Pressable>
   );
 }

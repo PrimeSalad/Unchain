@@ -1,17 +1,28 @@
 /**
- * Recovery Motivation — daily quote card + favorite-quotes carousel.
+ * Recovery Motivation — a single quote feed.
  *
- * The daily quote rotates once per local calendar day (no repeats until the
- * bundled pool has reasonably cycled) and is identical everywhere in the app
- * for that day. Favorites persist offline through the store.
+ * One carousel: today's quote always first, permanently saved favorites after
+ * it (a favorite that IS today's quote is not duplicated). Hearting today's
+ * quote saves it with a gentle confirmation toast; today's quote can never be
+ * removed while it is the active daily quote — removal (with a destructive
+ * confirmation) applies to favorites from previous days only.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, LayoutAnimation, Pressable, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AccessibilityInfo,
+  Alert,
+  FlatList,
+  LayoutAnimation,
+  Pressable,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Animated, {
+  FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -25,21 +36,15 @@ import { useTheme } from '../theme/ThemeProvider';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Text } from './Text';
 import { useStore } from '@/application/store';
-import { QUOTES, type FavoriteQuote } from '@/domain/quotes';
+import { QUOTES, type FavoriteQuote, type Quote } from '@/domain/quotes';
+
+const GAP = spacing.md;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Heart button — Apple-style favorite spring
 // ─────────────────────────────────────────────────────────────────────────────
 
-function HeartButton({
-  active,
-  onToggle,
-  color = '#FFFFFF',
-}: {
-  active: boolean;
-  onToggle: () => void;
-  color?: string;
-}) {
+function HeartButton({ active, onToggle }: { active: boolean; onToggle: () => void }) {
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -59,39 +64,68 @@ function HeartButton({
       accessibilityRole="button"
       accessibilityLabel={active ? 'Remove from favorite quotes' : 'Add to favorite quotes'}
       accessibilityState={{ selected: active }}
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
     >
       <Animated.View style={anim}>
-        <Ionicons name={active ? 'heart' : 'heart-outline'} size={24} color={color} />
+        <Ionicons name={active ? 'heart' : 'heart-outline'} size={24} color="#FFFFFF" />
       </Animated.View>
     </Pressable>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Daily quote card
+// Feed
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function DailyQuoteCard() {
+type FeedItem =
+  | { key: string; kind: 'today'; quote: Quote; favorited: boolean }
+  | { key: string; kind: 'favorite'; fav: FavoriteQuote };
+
+export function QuoteFeed() {
+  const theme = useTheme();
   const reduce = useReducedMotion();
   const dailyQuote = useStore((s) => s.dailyQuote);
   const ensureDailyQuote = useStore((s) => s.ensureDailyQuote);
   const favorites = useStore((s) => s.favoriteQuotes);
   const toggleFavorite = useStore((s) => s.toggleFavoriteQuote);
+  const removeFavorite = useStore((s) => s.removeFavoriteQuote);
 
-  // Pick today's quote on mount and re-check every minute so the card rolls
+  const [width, setWidth] = useState(0);
+  const [page, setPage] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Pick today's quote on mount and re-check every minute so the feed rolls
   // over naturally if the app stays open across midnight.
   useEffect(() => {
     ensureDailyQuote();
     const id = setInterval(ensureDailyQuote, 60_000);
     return () => clearInterval(id);
   }, [ensureDailyQuote]);
+
+  // Auto-hide the confirmation toast.
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2200);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const today = QUOTES[dailyQuote?.index ?? 0];
+
+  // Today's quote first; saved favorites after it (today's never duplicated).
+  const feed = useMemo<FeedItem[]>(
+    () => [
+      {
+        key: 'today',
+        kind: 'today',
+        quote: today,
+        favorited: favorites.some((f) => f.text === today.text),
+      },
+      ...favorites
+        .filter((f) => f.text !== today.text)
+        .map((f): FeedItem => ({ key: String(f.savedAt), kind: 'favorite', fav: f })),
+    ],
+    [today, favorites],
+  );
 
   // Gentle floating animation — disabled under Reduce Motion.
   const float = useSharedValue(0);
@@ -111,90 +145,25 @@ export function DailyQuoteCard() {
   }, [float, reduce]);
   const floatStyle = useAnimatedStyle(() => ({ transform: [{ translateY: float.value * -3 }] }));
 
-  const quote = QUOTES[dailyQuote?.index ?? 0];
-  const isFavorite = favorites.some((f) => f.text === quote.text);
+  const heartToday = () => {
+    if (!feed[0] || feed[0].kind !== 'today') return;
+    if (!feed[0].favorited) {
+      toggleFavorite(today);
+      setToast('Quote added to favorites.');
+      AccessibilityInfo.announceForAccessibility('Quote added to favorites.');
+    } else {
+      // The active daily quote is protected — removable starting tomorrow.
+      Alert.alert(
+        "Today's quote is protected",
+        'This is your recovery message for today. You can remove it from your favorites starting tomorrow.',
+      );
+    }
+  };
 
-  return (
-    <Animated.View style={floatStyle}>
-      <View
-        accessibilityLabel={`Daily recovery quote: ${quote.text}`}
-        style={{
-          borderRadius: radius.card,
-          overflow: 'hidden',
-          shadowColor: palette.grapeDeep,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.25,
-          shadowRadius: 18,
-          elevation: 6,
-        }}
-      >
-        <LinearGradient
-          colors={[palette.grape, palette.grapeDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ padding: spacing.xl, minHeight: 150 }}
-        >
-          {/* Header row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text
-              variant="caption"
-              color="rgba(255,255,255,0.75)"
-              style={{ flex: 1, letterSpacing: 1.5, textTransform: 'uppercase' }}
-            >
-              Daily Recovery Quote
-            </Text>
-            <HeartButton active={isFavorite} onToggle={() => toggleFavorite(quote)} />
-          </View>
-
-          {/* Oversized quotation mark */}
-          <Text
-            color="rgba(255,255,255,0.22)"
-            style={{ fontSize: 64, lineHeight: 64, fontFamily: 'Nunito_900Black', marginTop: -6 }}
-            importantForAccessibility="no"
-            accessibilityElementsHidden
-          >
-            “
-          </Text>
-
-          <Text
-            variant="title2"
-            color={palette.white}
-            style={{ marginTop: -30, lineHeight: 30, fontFamily: 'Nunito_700Bold' }}
-          >
-            {quote.text}
-          </Text>
-          {quote.author ? (
-            <Text variant="footnote" color="rgba(255,255,255,0.75)" style={{ marginTop: spacing.sm }}>
-              — {quote.author}
-            </Text>
-          ) : null}
-        </LinearGradient>
-      </View>
-    </Animated.View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Favorites carousel — native paging, snap scrolling, page indicator
-// ─────────────────────────────────────────────────────────────────────────────
-
-const GAP = spacing.md;
-
-export function FavoriteQuotesCarousel() {
-  const theme = useTheme();
-  const favorites = useStore((s) => s.favoriteQuotes);
-  const remove = useStore((s) => s.removeFavoriteQuote);
-
-  const [width, setWidth] = useState(0);
-  const [page, setPage] = useState(0);
-  const listRef = useRef<FlatList<FavoriteQuote>>(null);
-
-  if (favorites.length === 0) return null;
-
-  const confirmRemove = (f: FavoriteQuote) => {
+  const unheartFavorite = (fav: FavoriteQuote) => {
     Alert.alert(
       'Remove Favorite Quote?',
-      'Are you sure you want to remove this quote from your favorites?\n\nYou may not see this quote again for some time.',
+      'Are you sure you want to remove this quote from your favorites?\n\nYou may not see this quote again in the future.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -206,20 +175,97 @@ export function FavoriteQuotesCarousel() {
             } catch {
               /* layout animation is decorative */
             }
-            remove(f.savedAt);
+            removeFavorite(fav.savedAt);
+            setPage((p) => Math.max(0, Math.min(p, feed.length - 2)));
           },
         },
       ],
     );
   };
 
+  const renderCard = (item: FeedItem) => {
+    const isToday = item.kind === 'today';
+    const text = isToday ? item.quote.text : item.fav.text;
+    const author = isToday ? item.quote.author : item.fav.author;
+    const chip = isToday
+      ? 'Today'
+      : `Saved ${new Date(item.fav.savedAt).toLocaleDateString()}`;
+    const hearted = isToday ? item.favorited : true;
+
+    return (
+      <View
+        style={{
+          width,
+          borderRadius: radius.card,
+          overflow: 'hidden',
+          shadowColor: palette.grapeDeep,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.25,
+          shadowRadius: 18,
+          elevation: 6,
+        }}
+        accessibilityLabel={`${isToday ? 'Daily recovery quote' : 'Favorite quote'}: ${text}`}
+      >
+        <LinearGradient
+          colors={[palette.grape, palette.grapeDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ padding: spacing.xl, minHeight: 170 }}
+        >
+          {/* Header row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.16)',
+                borderRadius: radius.round,
+                paddingHorizontal: spacing.md,
+                paddingVertical: 3,
+              }}
+            >
+              <Text variant="caption" color={palette.white} style={{ letterSpacing: 0.5 }}>
+                {chip}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }} />
+            <HeartButton
+              active={hearted}
+              onToggle={() => (isToday ? heartToday() : unheartFavorite(item.fav))}
+            />
+          </View>
+
+          {/* Oversized quotation mark */}
+          <Text
+            color="rgba(255,255,255,0.22)"
+            style={{ fontSize: 64, lineHeight: 64, fontFamily: 'Nunito_900Black', marginTop: -4 }}
+            importantForAccessibility="no"
+            accessibilityElementsHidden
+          >
+            “
+          </Text>
+
+          <Text
+            variant="title2"
+            color={palette.white}
+            style={{ marginTop: -30, lineHeight: 30, fontFamily: 'Nunito_700Bold' }}
+          >
+            {text}
+          </Text>
+          {author ? (
+            <Text variant="footnote" color="rgba(255,255,255,0.75)" style={{ marginTop: spacing.sm }}>
+              — {author}
+            </Text>
+          ) : null}
+        </LinearGradient>
+      </View>
+    );
+  };
+
   return (
-    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+    <Animated.View style={floatStyle} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {width > 0 && (
         <FlatList
-          ref={listRef}
-          data={favorites}
-          keyExtractor={(f) => String(f.savedAt)}
+          data={feed}
+          keyExtractor={(item) => item.key}
           horizontal
           showsHorizontalScrollIndicator={false}
           snapToInterval={width + GAP}
@@ -228,57 +274,22 @@ export function FavoriteQuotesCarousel() {
           ItemSeparatorComponent={() => <View style={{ width: GAP }} />}
           onMomentumScrollEnd={(e) => {
             const p = Math.round(e.nativeEvent.contentOffset.x / (width + GAP));
-            setPage(Math.max(0, Math.min(favorites.length - 1, p)));
+            setPage(Math.max(0, Math.min(feed.length - 1, p)));
           }}
-          renderItem={({ item }) => (
-            <View
-              style={{
-                width,
-                backgroundColor: theme.color.surface,
-                borderRadius: radius.card,
-                borderWidth: 1,
-                borderColor: theme.color.hairline,
-                padding: spacing.lg,
-              }}
-              accessibilityLabel={`Favorite quote: ${item.text}`}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-                <Ionicons name="heart" size={16} color={theme.color.accent} />
-                <Text variant="caption" dim style={{ flex: 1, marginLeft: spacing.sm }}>
-                  Saved {new Date(item.savedAt).toLocaleDateString()}
-                </Text>
-                <Pressable
-                  onPress={() => confirmRemove(item)}
-                  hitSlop={12}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove this favorite quote"
-                >
-                  <Ionicons name="close-circle" size={20} color={theme.color.textDim} />
-                </Pressable>
-              </View>
-              <Text variant="callout" style={{ lineHeight: 23 }} numberOfLines={5}>
-                “{item.text}”
-              </Text>
-              {item.author ? (
-                <Text variant="footnote" dim style={{ marginTop: spacing.sm }}>
-                  — {item.author}
-                </Text>
-              ) : null}
-            </View>
-          )}
+          renderItem={({ item }) => renderCard(item)}
         />
       )}
 
       {/* Page indicator — dots for small sets, a counter for large ones */}
-      {favorites.length > 1 && (
+      {feed.length > 1 && (
         <View
           style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.md, gap: 6 }}
-          accessibilityLabel={`Quote ${page + 1} of ${favorites.length}`}
+          accessibilityLabel={`Quote ${page + 1} of ${feed.length}`}
         >
-          {favorites.length <= 8 ? (
-            favorites.map((f, i) => (
+          {feed.length <= 8 ? (
+            feed.map((item, i) => (
               <View
-                key={f.savedAt}
+                key={item.key}
                 style={{
                   width: i === page ? 18 : 7,
                   height: 7,
@@ -289,11 +300,35 @@ export function FavoriteQuotesCarousel() {
             ))
           ) : (
             <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'] }}>
-              {page + 1} / {favorites.length}
+              {page + 1} / {feed.length}
             </Text>
           )}
         </View>
       )}
-    </View>
+
+      {/* Confirmation toast */}
+      {toast && (
+        <Animated.View
+          entering={FadeIn.duration(180)}
+          exiting={FadeOut.duration(220)}
+          style={{
+            alignSelf: 'center',
+            marginTop: spacing.sm,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            backgroundColor: theme.color.successSoft,
+            borderRadius: radius.round,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.sm,
+          }}
+        >
+          <Ionicons name="heart" size={14} color={theme.color.success} />
+          <Text variant="footnote" color={theme.color.success}>
+            {toast}
+          </Text>
+        </Animated.View>
+      )}
+    </Animated.View>
   );
 }

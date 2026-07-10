@@ -8,7 +8,16 @@ import { elevation, radius, spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeProvider';
 import { ConfettiBurst } from './Confetti';
 import { playSound } from '@/application/sound';
-import type { GameAchievement } from '@/domain/games/achievements';
+
+/** Minimal shape a celebrated achievement needs — structurally satisfied by
+ *  both GameAchievement and AltAchievement, so games and healthy habits share
+ *  this popup. */
+export interface UnlockedAchievement {
+  id: string;
+  title: string;
+  /** Ionicons glyph name. */
+  icon: string;
+}
 
 export interface CelebrationStat {
   label: string;
@@ -24,12 +33,12 @@ interface Props {
   score?: { label: string; value: number };
   stats?: CelebrationStat[];
   /** Achievements unlocked by this result — revealed with a stagger. */
-  unlocked?: GameAchievement[];
+  unlocked?: UnlockedAchievement[];
   /** Progress hint toward the next locked achievement. */
   hint?: string | null;
   primary?: { label: string; onPress: () => void };
   secondary?: { label: string; onPress: () => void };
-  onShareAchievement?: (a: GameAchievement) => void;
+  onShareAchievement?: (a: UnlockedAchievement) => void;
 }
 
 /**
@@ -167,7 +176,7 @@ function CountUp({ value }: { value: number }) {
   );
 }
 
-function AchievementRow({ a, index, onPress }: { a: GameAchievement; index: number; onPress?: () => void }) {
+function AchievementRow({ a, index, onPress }: { a: UnlockedAchievement; index: number; onPress?: () => void }) {
   const theme = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
 

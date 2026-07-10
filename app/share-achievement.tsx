@@ -11,17 +11,24 @@ import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import { achievementById, GAME_NAMES } from '@/domain/games/achievements';
+import { ALTERNATIVES, altAchievementById } from '@/domain/alternatives';
 
-/** Strava-style share card for an unlocked game achievement. */
+/** Strava-style share card for an unlocked achievement — recreational games
+ *  and healthy-habit achievements share the same card and flow. */
 export default function ShareAchievement() {
   const router = useRouter();
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const games = useStore((s) => s.games);
+  const altAchievements = useStore((s) => s.altAchievements);
+  const altCounts = useStore((s) => s.altCounts);
+  const journalCount = useStore((s) => s.journal.length);
   const cardRef = useRef<View>(null);
   const [busy, setBusy] = useState(false);
 
-  const achievement = id ? achievementById(id) : undefined;
+  const gameAch = id ? achievementById(id) : undefined;
+  const altAch = !gameAch && id ? altAchievementById(id) : undefined;
+  const achievement = gameAch ?? altAch;
 
   // Navigation is a side effect — never call it during render.
   useEffect(() => {
@@ -29,12 +36,23 @@ export default function ShareAchievement() {
   }, [achievement, router]);
   if (!achievement) return null;
 
-  const unlockedAt = games.achievements[achievement.id] ?? Date.now();
+  const categoryLabel = gameAch ? GAME_NAMES[gameAch.game] : 'Healthy Habits';
+  const unlockedAt =
+    (gameAch ? games.achievements[gameAch.id] : altAchievements[achievement.id]) ?? Date.now();
   const date = new Date(unlockedAt).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  // Per-game stats that make the card feel earned.
+  // Stats that make the card feel earned — per game, or habit totals.
   const stats: { label: string; value: string }[] = (() => {
-    switch (achievement.game) {
+    if (!gameAch) {
+      const counts = { ...altCounts, journal: journalCount };
+      const totalDone = ALTERNATIVES.reduce((sum, a) => sum + (counts[a.id] ?? 0), 0);
+      return [
+        { label: 'Activities done', value: `${totalDone}` },
+        { label: 'Journal entries', value: `${journalCount}` },
+        { label: 'Habit badges', value: `${Object.keys(altAchievements).length}` },
+      ];
+    }
+    switch (gameAch.game) {
       case 'checkers': {
         const played = games.checkersWins + games.checkersLosses;
         const rate = played ? Math.round((games.checkersWins / played) * 100) : 0;
@@ -74,7 +92,7 @@ export default function ShareAchievement() {
     }
   })();
 
-  const summary = `Achievement unlocked: ${achievement.title} — ${GAME_NAMES[achievement.game]} 🏆\n${achievement.desc}\nRecovering, one calm day at a time. — Unchain`;
+  const summary = `Achievement unlocked: ${achievement.title} — ${categoryLabel} 🏆\n${achievement.desc}\nRecovering, one calm day at a time. — Unchain`;
 
   const shareImage = async () => {
     setBusy(true);
@@ -126,7 +144,7 @@ export default function ShareAchievement() {
                 <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchain</Text>
                 <View style={{ flex: 1 }} />
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: 4 }}>
-                  <Text variant="caption" color={palette.white}>{GAME_NAMES[achievement.game]}</Text>
+                  <Text variant="caption" color={palette.white}>{categoryLabel}</Text>
                 </View>
               </View>
 

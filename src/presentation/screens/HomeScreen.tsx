@@ -26,7 +26,7 @@ import {
 import { quoteOfNow } from '@/domain/content';
 import type { TimelineType } from '@/domain/records';
 import { sameDay } from '@/domain/records';
-import { DailyQuoteCard, FavoriteQuotesCarousel } from '../components/QuoteCards';
+import { QuoteFeed } from '../components/QuoteCards';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -163,6 +163,13 @@ export function HomeScreen() {
         </View>
       </View>
 
+      {/* Recovery Motivation — today's quote first, saved favorites after.
+          Placed above Today's Recovery so it's among the first things seen. */}
+      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+        Recovery Motivation
+      </Text>
+      <QuoteFeed />
+
       {/* Share progress */}
       <Pressable
         onPress={() => router.push('/share' as Href)}
@@ -281,28 +288,7 @@ export function HomeScreen() {
         )}
       </Card>
 
-      {/* Recovery Motivation — one quote per day, heart to keep it */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Recovery Motivation
-      </Text>
-      <DailyQuoteCard />
-
-      {/* Favorite quotes carousel (hidden until the user hearts one) */}
-      <FavoritesSection />
     </Screen>
-  );
-}
-
-function FavoritesSection() {
-  const hasFavorites = useStore((s) => s.favoriteQuotes.length > 0);
-  if (!hasFavorites) return null;
-  return (
-    <>
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Your Favorite Quotes
-      </Text>
-      <FavoriteQuotesCarousel />
-    </>
   );
 }
 

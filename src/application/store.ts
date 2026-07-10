@@ -29,8 +29,13 @@ import type {
   UrgeLog,
 } from '@/domain/records';
 import { sameDay } from '@/domain/records';
-import type { AlternativeId } from '@/domain/alternatives';
-import { alternativeById } from '@/domain/alternatives';
+import type { AltAchievement, AltCounts, AlternativeId } from '@/domain/alternatives';
+import {
+  ALTERNATIVES,
+  altAchievementById,
+  alternativeById,
+  evaluateAltAchievements,
+} from '@/domain/alternatives';
 import type { FavoriteQuote } from '@/domain/quotes';
 import { QUOTES, QUOTE_HISTORY_SIZE, localDayKey, pickDailyQuoteIndex } from '@/domain/quotes';
 
@@ -102,6 +107,11 @@ interface RecoveryState {
   /** Last completion timestamp per activity. "Done today" = sameDay(ts, now),
    *  so state resets automatically at local midnight without a scheduler. */
   alternatives: Partial<Record<AlternativeId, number>>;
+  /** Lifetime completion counts (one per activity per day) — powers the
+   *  healthy-habit achievements. `journal` is derived, not stored here. */
+  altCounts: AltCounts;
+  /** Permanently unlocked habit achievements: id → unlockedAt (ms). */
+  altAchievements: Record<string, number>;
 
   // ── Recovery Motivation ─────────────────────────────────────────────────
   /** Quotes the user has hearted. Survive restarts/updates via persistence. */
@@ -130,8 +140,9 @@ interface RecoveryState {
   setTodayMood: (mood: number) => void;
 
   /** Mark a Healthy Alternative complete for today (idempotent per day —
-   *  repeat sessions refresh the timestamp without double-awarding). */
-  completeAlternative: (id: AlternativeId) => void;
+   *  repeat sessions refresh the timestamp without double-awarding). Returns
+   *  any habit achievements newly unlocked by this completion. */
+  completeAlternative: (id: AlternativeId) => AltAchievement[];
   /** Heart / un-heart a quote. */
   toggleFavoriteQuote: (q: { text: string; author?: string }) => void;
   removeFavoriteQuote: (savedAt: number) => void;
@@ -171,6 +182,32 @@ function evt(type: TimelineType, label: string): TimelineEvent {
 }
 
 const PERSIST_KEY = 'unchained-gambling-v1';
+
+/** True when every Healthy Alternative has been completed today —
+ *  the journal activity is derived from the journal entries themselves. */
+function altFullDay(
+  alternatives: Partial<Record<AlternativeId, number>>,
+  journal: Array<{ at: number }>,
+  now: number,
+): boolean {
+  return ALTERNATIVES.every((a) =>
+    a.id === 'journal'
+      ? journal.some((j) => sameDay(j.at, now))
+      : alternatives[a.id] != null && sameDay(alternatives[a.id]!, now),
+  );
+}
+
+/** Habit-achievement ids newly satisfied and not yet unlocked. */
+function newAltUnlocks(
+  counts: AltCounts,
+  fullDay: boolean,
+  unlockedMap: Record<string, number>,
+): AltAchievement[] {
+  return evaluateAltAchievements(counts, fullDay)
+    .filter((id) => !unlockedMap[id])
+    .map((id) => altAchievementById(id))
+    .filter((a): a is AltAchievement => !!a);
+}
 
 /**
  * Merge a games-state update with achievement evaluation. Returns the state
@@ -221,28 +258,47 @@ export const useStore = create<RecoveryState>()(
       games: initialGames,
       themePref: 'system',
       alternatives: {},
+      altCounts: {},
+      altAchievements: {},
       favoriteQuotes: [],
       dailyQuote: null,
       recentQuotes: [],
 
       completeAlternative: (id) => {
+        let unlocked: AltAchievement[] = [];
         set((s) => {
+          const now = Date.now();
           const prev = s.alternatives[id];
-          const already = prev != null && sameDay(prev, Date.now());
+          const already = prev != null && sameDay(prev, now);
+          const alternatives = { ...s.alternatives, [id]: now };
+
+          // Repeat sessions the same day refresh the timestamp only — no
+          // double points, counts, timeline entries, or achievement checks.
+          if (already) return { alternatives };
+
+          const altCounts: AltCounts = { ...s.altCounts, [id]: (s.altCounts[id] ?? 0) + 1 };
+          const counts: AltCounts = { ...altCounts, journal: s.journal.length };
+          unlocked = newAltUnlocks(
+            counts,
+            altFullDay(alternatives, s.journal, now),
+            s.altAchievements,
+          );
+
           return {
-            alternatives: { ...s.alternatives, [id]: Date.now() },
-            // Award points + a timeline event only once per day per activity.
-            ...(already
-              ? {}
-              : {
-                  points: s.points + 5,
-                  timeline: [
-                    evt('activity', `Recovery activity — ${alternativeById(id).title}`),
-                    ...s.timeline,
-                  ],
-                }),
+            alternatives,
+            altCounts,
+            altAchievements: unlocked.length
+              ? { ...s.altAchievements, ...Object.fromEntries(unlocked.map((a) => [a.id, now])) }
+              : s.altAchievements,
+            points: s.points + 5 + unlocked.length * 5,
+            timeline: [
+              ...unlocked.map((a) => evt('achievement', `Achievement unlocked — ${a.title}`)),
+              evt('activity', `Recovery activity — ${alternativeById(id).title}`),
+              ...s.timeline,
+            ],
           };
         });
+        return unlocked;
       },
 
       toggleFavoriteQuote: (q) => {
@@ -531,6 +587,24 @@ export const useStore = create<RecoveryState>()(
 
           const entry: JournalEntry = { ...data, id: uid(), at: Date.now() };
 
+          // Journaling is also a Healthy Alternative — a new entry can unlock
+          // habit achievements (journal count, or completing the full day).
+          const journalAfter = [entry, ...s.journal];
+          const altUnlocked = newAltUnlocks(
+            { ...s.altCounts, journal: journalAfter.length },
+            altFullDay(s.alternatives, journalAfter, Date.now()),
+            s.altAchievements,
+          );
+          const altPatch = altUnlocked.length
+            ? {
+                altAchievements: {
+                  ...s.altAchievements,
+                  ...Object.fromEntries(altUnlocked.map((a) => [a.id, Date.now()])),
+                },
+              }
+            : {};
+          const altEvents = altUnlocked.map((a) => evt('achievement', `Achievement unlocked — ${a.title}`));
+
           if (data.gambled) {
             // Record the relapse event but do NOT touch profile.startedAt.
             // The streak and calendar are derived purely from the events array.
@@ -544,11 +618,13 @@ export const useStore = create<RecoveryState>()(
               cause: data.whyGambled,
             };
             return {
-              journal: [entry, ...s.journal],
+              journal: journalAfter,
               relapses: [relapseEntry, ...s.relapses],
               longestStreak: Math.max(s.longestStreak, prevDays),
-              points: s.points + 5,
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...altPatch,
               timeline: [
+                ...altEvents,
                 evt('journal', 'Journal entry — gambling relapse logged'),
                 evt('relapse', 'Logged a relapse via journal — recovery continues'),
                 ...s.timeline,
@@ -557,9 +633,10 @@ export const useStore = create<RecoveryState>()(
           }
 
           return {
-            journal: [entry, ...s.journal],
-            points: s.points + 5,
-            timeline: [evt('journal', 'Wrote a journal entry'), ...s.timeline],
+            journal: journalAfter,
+            points: s.points + 5 + altUnlocked.length * 5,
+            ...altPatch,
+            timeline: [...altEvents, evt('journal', 'Wrote a journal entry'), ...s.timeline],
           };
         });
       },
@@ -616,6 +693,8 @@ export const useStore = create<RecoveryState>()(
           games: initialGames,
           themePref: 'system',
           alternatives: {},
+          altCounts: {},
+          altAchievements: {},
           favoriteQuotes: [],
           dailyQuote: null,
           recentQuotes: [],

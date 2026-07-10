@@ -11,7 +11,6 @@ export type AlternativeId =
   | 'stretch'
   | 'water'
   | 'journal'
-  | 'message'
   | 'music';
 
 export interface Alternative {
@@ -30,7 +29,6 @@ export const ALTERNATIVES: Alternative[] = [
   { id: 'stretch', title: 'Stretch Your Body',              subtitle: 'A short guided release',              icon: 'body',                 tint: 'celebrate' },
   { id: 'water',   title: 'Drink a Glass of Water',         subtitle: 'Small anchor, real reset',            icon: 'water',                tint: 'primary' },
   { id: 'journal', title: "Write Down What You're Feeling", subtitle: "Today's journal entry",               icon: 'create',               tint: 'primary' },
-  { id: 'message', title: 'Message Someone You Trust',      subtitle: 'Reach out — connection helps',        icon: 'chatbubble-ellipses',  tint: 'accent' },
   { id: 'music',   title: 'Listen to Calming Music',        subtitle: 'A few minutes of built-in calm',      icon: 'musical-notes',        tint: 'celebrate' },
 ];
 
@@ -53,6 +51,76 @@ export const STRETCH_STEPS: StretchStep[] = [
   { title: 'Forward Fold',   instruction: 'Stand and fold forward with soft knees. Hang loose and breathe into your back.',   seconds: 40, icon: 'arrow-down' },
   { title: 'Side Stretch',   instruction: 'Reach one arm overhead and lean gently to the side. Switch halfway through.',      seconds: 40, icon: 'resize' },
 ];
+
+// ---------------------------------------------------------------------------
+// Healthy-habit achievements — permanent unlocks, mirrored on the game
+// achievement system (id → unlockedAt in the store, shareable cards).
+// ---------------------------------------------------------------------------
+
+/** Lifetime completion counts per activity. `journal` is derived from the
+ *  journal itself at evaluation time; the rest are counted by the store. */
+export type AltCounts = Partial<Record<AlternativeId, number>>;
+
+export interface AltAchievement {
+  id: string;
+  title: string;
+  desc: string;
+  /** Ionicons glyph name. */
+  icon: string;
+  /** Live progress for locked achievements (counter-based ones only). */
+  progress?: (c: AltCounts) => { current: number; target: number };
+  /** `fullDay` = every activity completed on the same calendar day. */
+  test: (c: AltCounts, fullDay: boolean) => boolean;
+}
+
+const total = (c: AltCounts) =>
+  ALTERNATIVES.reduce((sum, a) => sum + (c[a.id] ?? 0), 0);
+
+const countOf = (id: AlternativeId, target: number) => ({
+  progress: (c: AltCounts) => ({ current: Math.min(c[id] ?? 0, target), target }),
+  test: (c: AltCounts) => (c[id] ?? 0) >= target,
+});
+
+export const ALT_ACHIEVEMENTS: AltAchievement[] = [
+  {
+    id: 'alt-first', title: 'First Step', icon: 'footsteps',
+    desc: 'Complete your first healthy alternative.',
+    progress: (c) => ({ current: Math.min(total(c), 1), target: 1 }),
+    test: (c) => total(c) >= 1,
+  },
+  { id: 'alt-walk-10',    title: 'Ten Walks',       icon: 'walk',           desc: 'Complete 10 recovery walks.',            ...countOf('walk', 10) },
+  { id: 'alt-water-10',   title: 'Hydration Habit', icon: 'water',          desc: 'Log a glass of water on 10 days.',       ...countOf('water', 10) },
+  { id: 'alt-breathe-10', title: 'Calm Mind',       icon: 'leaf',           desc: 'Finish 10 deep-breathing sessions.',     ...countOf('breathe', 10) },
+  { id: 'alt-stretch-10', title: 'Loose & Limber',  icon: 'body',           desc: 'Finish 10 guided stretch sessions.',     ...countOf('stretch', 10) },
+  { id: 'alt-music-10',   title: 'Sound of Calm',   icon: 'musical-notes',  desc: 'Complete 10 calming-music sessions.',    ...countOf('music', 10) },
+  { id: 'alt-journal-10', title: 'Honest Pages',    icon: 'create',         desc: 'Write 10 journal entries.',              ...countOf('journal', 10) },
+  {
+    id: 'alt-total-25', title: 'Habit Builder', icon: 'construct',
+    desc: 'Complete 25 healthy alternatives in total.',
+    progress: (c) => ({ current: Math.min(total(c), 25), target: 25 }),
+    test: (c) => total(c) >= 25,
+  },
+  {
+    id: 'alt-total-100', title: 'Lifestyle Change', icon: 'infinite',
+    desc: 'Complete 100 healthy alternatives in total.',
+    progress: (c) => ({ current: Math.min(total(c), 100), target: 100 }),
+    test: (c) => total(c) >= 100,
+  },
+  {
+    id: 'alt-full-day', title: 'Full Reset', icon: 'sparkles',
+    desc: 'Complete every healthy alternative in a single day.',
+    test: (_c, fullDay) => fullDay,
+  },
+];
+
+export function altAchievementById(id: string): AltAchievement | undefined {
+  return ALT_ACHIEVEMENTS.find((a) => a.id === id);
+}
+
+/** Ids whose criteria are currently met. Callers filter out already-unlocked. */
+export function evaluateAltAchievements(counts: AltCounts, fullDay: boolean): string[] {
+  return ALT_ACHIEVEMENTS.filter((a) => a.test(counts, fullDay)).map((a) => a.id);
+}
 
 /** Walk session length (seconds). */
 export const WALK_SECONDS = 10 * 60;
