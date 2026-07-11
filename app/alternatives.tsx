@@ -22,6 +22,7 @@ import { ActionSheet } from '@/presentation/components/ActionSheet';
 import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { BreathingOrb } from '@/presentation/components/BreathingOrb';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { StretchFigure } from '@/presentation/components/StretchFigure';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
@@ -854,20 +855,10 @@ function StretchSheet({
           </View>
         </View>
       ) : step == null ? null : (
-        <View style={{ gap: spacing.lg, alignItems: 'center' }}>
+        <View style={{ gap: spacing.md, alignItems: 'center' }}>
           <SheetHeading title={step.title} />
-          <View
-            style={{
-              width: 76,
-              height: 76,
-              borderRadius: 38,
-              backgroundColor: theme.color.primarySoft,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name={step.icon as any} size={34} color={theme.color.primary} />
-          </View>
+          {/* Animated demo — move along with the figure. */}
+          <StretchFigure title={step.title} size={132} />
           <Text variant="callout" dim center style={{ lineHeight: 22, paddingHorizontal: spacing.md }}>
             {step.instruction}
           </Text>

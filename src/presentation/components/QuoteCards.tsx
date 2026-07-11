@@ -25,15 +25,11 @@ import Animated, {
   FadeOut,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withSpring,
-  withTiming,
-  Easing,
 } from 'react-native-reanimated';
 import { palette, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
-import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Text } from './Text';
 import { useStore } from '@/application/store';
 import { QUOTES, type FavoriteQuote, type Quote } from '@/domain/quotes';
@@ -83,7 +79,6 @@ type FeedItem =
 
 export function QuoteFeed() {
   const theme = useTheme();
-  const reduce = useReducedMotion();
   const dailyQuote = useStore((s) => s.dailyQuote);
   const ensureDailyQuote = useStore((s) => s.ensureDailyQuote);
   const favorites = useStore((s) => s.favoriteQuotes);
@@ -128,24 +123,6 @@ export function QuoteFeed() {
     ],
     [today, favorites],
   );
-
-  // Gentle floating animation — disabled under Reduce Motion.
-  const float = useSharedValue(0);
-  useEffect(() => {
-    if (reduce) {
-      float.value = 0;
-      return;
-    }
-    float.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: 2600, easing: Easing.inOut(Easing.quad) }),
-      ),
-      -1,
-      true,
-    );
-  }, [float, reduce]);
-  const floatStyle = useAnimatedStyle(() => ({ transform: [{ translateY: float.value * -3 }] }));
 
   const heartToday = () => {
     if (!feed[0] || feed[0].kind !== 'today') return;
@@ -263,7 +240,7 @@ export function QuoteFeed() {
   };
 
   return (
-    <Animated.View style={floatStyle} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {width > 0 && (
         <FlatList
           data={feed}
@@ -331,6 +308,6 @@ export function QuoteFeed() {
           </Text>
         </Animated.View>
       )}
-    </Animated.View>
+    </View>
   );
 }

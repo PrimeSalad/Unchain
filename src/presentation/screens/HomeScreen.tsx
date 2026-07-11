@@ -2,9 +2,9 @@ import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
-import { Card } from '../components/Card';
 import { RecoveryRing } from '../components/RecoveryRing';
 import { StatTile } from '../components/StatTile';
 import { Mascot } from '../components/Mascot';
@@ -24,7 +24,6 @@ import {
   milestoneCrossed,
   addictionMeta,
 } from '@/domain/gambling';
-import { quoteOfNow } from '@/domain/content';
 import type { TimelineType } from '@/domain/records';
 import { sameDay } from '@/domain/records';
 import { QuoteFeed } from '../components/QuoteCards';
@@ -118,8 +117,10 @@ export function HomeScreen() {
       {/* Greeting */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }}>
         <View style={{ flex: 1 }}>
-          <Text variant="title1">{greeting()}, {profile.name}</Text>
-          <Text variant="callout" dim style={{ marginTop: 2 }}>{quoteOfNow()}</Text>
+          <Text variant="caption" dim style={{ letterSpacing: 1.2, textTransform: 'uppercase' }}>
+            {new Date(now).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </Text>
+          <Text variant="title1" style={{ marginTop: 2 }}>{greeting()}, {profile.name}</Text>
         </View>
         <Mascot state={days > 0 ? 'happy' : 'braced'} size={72} />
       </View>
@@ -199,28 +200,48 @@ export function HomeScreen() {
         </View>
       </View>
 
-      {/* Recovery Motivation — today's quote first, saved favorites after.
-          Placed above Today's Recovery so it's among the first things seen. */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Recovery Motivation
-      </Text>
-      <QuoteFeed />
-
-      {/* Share progress */}
+      {/* Share progress — sits above the motivation feed. */}
       <Pressable
         onPress={() => router.push('/share' as Href)}
         accessibilityRole="button"
         accessibilityLabel="Share your progress"
-        style={({ pressed }) => ({ marginTop: spacing.md, opacity: pressed ? 0.85 : 1 })}
+        style={({ pressed }) => ({
+          marginTop: spacing.xl,
+          opacity: pressed ? 0.7 : 1,
+          transform: [{ scale: pressed ? 0.99 : 1 }],
+        })}
       >
-        <Card tone="primarySoft" style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Ionicons name="share-social" size={20} color={theme.color.primary} />
-          <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }} color={theme.color.primary}>
-            Share your progress
-          </Text>
-          <Ionicons name="chevron-forward" size={18} color={theme.color.primary} />
-        </Card>
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+            backgroundColor: theme.color.surface,
+            borderRadius: radius.card,
+            borderWidth: 1, borderColor: theme.color.hairline,
+            padding: spacing.lg,
+          }}
+        >
+          <View
+            style={{
+              width: 40, height: 40, borderRadius: 12,
+              backgroundColor: theme.color.primarySoft,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="share-social" size={20} color={theme.color.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="callout">Share your progress</Text>
+            <Text variant="caption" dim style={{ marginTop: 1 }}>Turn your streak into a card</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
+        </View>
       </Pressable>
+
+      {/* Daily motivation — today's quote first, saved favorites after. */}
+      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+        Daily Motivation
+      </Text>
+      <QuoteFeed />
 
       {/* Daily Missions */}
       <View style={{ marginTop: spacing.xl }}>
@@ -231,7 +252,7 @@ export function HomeScreen() {
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
         Quick Actions
       </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         <QuickAction icon="pulse"  label="Log Urge"  onPress={() => router.push('/log-urge')} />
         <QuickAction icon="book"   label="Journal"   onPress={() => router.push('/(tabs)/journal')} />
         <QuickAction icon="warning" label="SOS"      accent onPress={() => router.push('/sos')} />
@@ -242,36 +263,50 @@ export function HomeScreen() {
 
       {/* Recreational Games */}
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Recreational Games
+        Take a Break
       </Text>
       <Pressable
         onPress={() => router.push('/games' as Href)}
         accessibilityRole="button"
         accessibilityLabel="Play a game"
-        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
+        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
       >
-        <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+            backgroundColor: theme.color.surface,
+            borderRadius: radius.card,
+            borderWidth: 1, borderColor: theme.color.hairline,
+            padding: spacing.lg,
+          }}
+        >
           <View style={{
-            width: 48, height: 48, borderRadius: radius.round,
+            width: 40, height: 40, borderRadius: 12,
             backgroundColor: theme.color.primarySoft, alignItems: 'center', justifyContent: 'center',
           }}>
-            <Ionicons name="game-controller" size={24} color={theme.color.primary} />
+            <Ionicons name="game-controller" size={20} color={theme.color.primary} />
           </View>
-          <View style={{ flex: 1, marginLeft: spacing.md }}>
+          <View style={{ flex: 1 }}>
             <Text variant="callout">Play a game</Text>
-            <Text variant="footnote" dim style={{ marginTop: 2 }}>
+            <Text variant="caption" dim style={{ marginTop: 1 }}>
               Checkers, Clarity, Sudoku & Block Puzzle — all offline
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
-        </Card>
+        </View>
       </Pressable>
 
-      {/* Recovery Timeline */}
+      {/* Recent activity */}
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Recovery Timeline
+        Recent Activity
       </Text>
-      <Card padding={0}>
+      <View
+        style={{
+          backgroundColor: theme.color.surface,
+          borderRadius: radius.card,
+          borderWidth: 1, borderColor: theme.color.hairline,
+          overflow: 'hidden',
+        }}>
         {timeline.length === 0 ? (
           <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.sm }}>
             <Ionicons name="footsteps-outline" size={26} color={theme.color.textDim} />
@@ -294,7 +329,7 @@ export function HomeScreen() {
             </View>
           ))
         )}
-      </Card>
+      </View>
 
     </Screen>
   );
@@ -305,13 +340,14 @@ export function HomeScreen() {
 // ---------------------------------------------------------------------------
 
 
+/** Compact iOS-style action tile — 3-up grid, flat surface with a hairline
+ *  border and a tinted rounded-square glyph. Calm, not carnival. */
 function QuickAction({
   icon, label, onPress, accent,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
-  tone?: boolean;
   accent?: boolean;
 }) {
   const theme = useTheme();
@@ -319,20 +355,43 @@ function QuickAction({
   const chipBg = accent ? theme.color.accentSoft : theme.color.primarySoft;
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => ({ flexBasis: '40%', flexGrow: 1, minWidth: 130, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
+      style={({ pressed }) => ({
+        flexBasis: '30%',
+        flexGrow: 1,
+        opacity: pressed ? 0.7 : 1,
+        transform: [{ scale: pressed ? 0.97 : 1 }],
+      })}
     >
-      <Card style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.sm }}>
-        <View style={{
-          width: 48, height: 48, borderRadius: radius.round,
-          backgroundColor: chipBg, alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Ionicons name={icon} size={24} color={tint} />
+      <View
+        style={{
+          backgroundColor: theme.color.surface,
+          borderRadius: radius.card,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
+          alignItems: 'center',
+          paddingVertical: spacing.md + 2,
+          gap: spacing.sm,
+        }}
+      >
+        <View
+          style={{
+            width: 40, height: 40, borderRadius: 12,
+            backgroundColor: chipBg,
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Ionicons name={icon} size={20} color={tint} />
         </View>
-        <Text variant="callout" color={theme.color.text}>{label}</Text>
-      </Card>
+        <Text variant="footnote" color={theme.color.text} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
     </Pressable>
   );
 }

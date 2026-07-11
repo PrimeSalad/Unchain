@@ -1,21 +1,175 @@
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
-import { Collapsible } from '@/presentation/components/Collapsible';
-import { palette, radius, spacing } from '@/presentation/theme/tokens';
+import { Mascot } from '@/presentation/components/Mascot';
+import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
+import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useProfile, useStore } from '@/application/store';
 import { recoveryTimer, moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
 import { QUOTES } from '@/domain/quotes';
 
+const GLASS = 'rgba(255,255,255,0.07)';
+const GLASS_BORDER = 'rgba(255,255,255,0.12)';
+const FOG_SOFT = 'rgba(236,230,242,0.75)';
+
+/** Slow double-ring pulse behind the mascot — a visual breath to sync with. */
+function PulseHero({ reduce }: { reduce: boolean }) {
+  const a = useRef(new Animated.Value(0)).current;
+  const b = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (reduce) return;
+    const loop = (v: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(v, { toValue: 1, duration: 3200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ]),
+      );
+    const l1 = loop(a, 0);
+    const l2 = loop(b, 1600);
+    l1.start();
+    l2.start();
+    return () => {
+      l1.stop();
+      l2.stop();
+    };
+  }, [a, b, reduce]);
+
+  const ring = (v: Animated.Value) => ({
+    position: 'absolute' as const,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    borderWidth: 1.5,
+    borderColor: palette.grape300,
+    opacity: v.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.45, 0] }),
+    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.45] }) }],
+  });
+
+  return (
+    <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' }}>
+      {!reduce && <Animated.View pointerEvents="none" style={ring(a)} />}
+      {!reduce && <Animated.View pointerEvents="none" style={ring(b)} />}
+      <View
+        style={{
+          width: 168,
+          height: 168,
+          borderRadius: 84,
+          backgroundColor: GLASS,
+          borderWidth: 1,
+          borderColor: GLASS_BORDER,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Mascot state="comfort" size={118} />
+      </View>
+    </View>
+  );
+}
+
+function GlassTile({
+  children,
+  style,
+  ...rest
+}: {
+  children: React.ReactNode;
+  style?: object;
+  accessibilityLabel?: string;
+}) {
+  return (
+    <View
+      {...rest}
+      style={[
+        {
+          backgroundColor: GLASS,
+          borderRadius: radius.card,
+          borderWidth: 1,
+          borderColor: GLASS_BORDER,
+          padding: spacing.lg,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+function Anchor({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
+  return (
+    <GlassTile style={{ flex: 1, gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Ionicons name={icon} size={13} color={palette.grape300} />
+        <Text variant="caption" color={FOG_SOFT}>{label}</Text>
+      </View>
+      <Text variant="title2" color={palette.fog} style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
+    </GlassTile>
+  );
+}
+
+function ToolTile({
+  icon, label, onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        flexBasis: '30%',
+        flexGrow: 1,
+        opacity: pressed ? 0.7 : 1,
+        transform: [{ scale: pressed ? 0.97 : 1 }],
+      })}
+    >
+      <View
+        style={{
+          backgroundColor: GLASS,
+          borderRadius: radius.card,
+          borderWidth: 1,
+          borderColor: GLASS_BORDER,
+          alignItems: 'center',
+          paddingVertical: spacing.md + 2,
+          gap: spacing.sm,
+        }}
+      >
+        <View
+          style={{
+            width: 40, height: 40, borderRadius: 12,
+            backgroundColor: 'rgba(185,143,214,0.18)',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Ionicons name={icon} size={20} color={palette.grape300} />
+        </View>
+        <Text variant="footnote" color={palette.fog} numberOfLines={1}>{label}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function Sos() {
   const router = useRouter();
   const safeBack = useSafeBack();
+  const reduce = useReducedMotion();
   const profile = useProfile();
-  const [panel, setPanel] = useState<'motiv' | null>(null);
+
   // The same daily quote shown on Home — consistent all day, offline.
   const dailyQuote = useStore((s) => s.dailyQuote);
   const ensureDailyQuote = useStore((s) => s.ensureDailyQuote);
@@ -26,9 +180,7 @@ export default function Sos() {
   // never index blindly.
   const motivation = (QUOTES[dailyQuote?.index ?? 0] ?? QUOTES[0]).text;
 
-  // ── Focus Protection ──────────────────────────────────────────────────────
-  // The blocklist is permanent — every website the user added is always
-  // protected, so in a moment of crisis this is simply a reassurance.
+  // The blocklist is permanent — in a moment of crisis this is reassurance.
   const protectedCount = useStore((s) => s.blockedSites.length);
 
   const relapses = useStore((s) => s.relapses);
@@ -42,119 +194,126 @@ export default function Sos() {
     : { today: 0, week: 0, month: 0, total: 0 };
   const currency = profile?.currency ?? '₱';
 
-  const tools: {
-    icon: keyof typeof Ionicons.glyphMap;
-    label: string;
-    onPress: () => void;
-    /** Rows with a panel expand in place instead of navigating. */
-    panelKey?: 'motiv';
-  }[] = [
-    { icon: 'flower', label: 'Mindful Pause', onPress: () => router.replace('/mindful-pause' as Href) },
-    { icon: 'game-controller', label: 'Recreational Games', onPress: () => router.push('/games' as Href) },
-    { icon: 'book', label: 'Read Journal', onPress: () => router.replace('/(tabs)/journal') },
-    { icon: 'walk', label: 'Healthy Alternatives', onPress: () => router.push('/alternatives' as Href) },
-    { icon: 'shield-checkmark', label: 'Focus Protection', onPress: () => router.push('/protection' as Href) },
-    { icon: 'heart', label: 'Recovery Motivation', panelKey: 'motiv', onPress: () => setPanel(panel === 'motiv' ? null : 'motiv') },
-    { icon: 'create', label: 'Emergency Reflection', onPress: () => router.replace('/reflection') },
-  ];
-
   return (
     <View style={{ flex: 1, backgroundColor: palette.night }}>
+      <LinearGradient
+        colors={[palette.night, '#241735', palette.grapeDeep]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.4, y: 1 }}
+        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+      />
       <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: spacing.lg }}>
-          <Pressable onPress={safeBack} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
-            <Ionicons name="close" size={26} color={palette.fogDim} />
+        {/* Close */}
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+          <Pressable
+            onPress={safeBack}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={({ pressed }) => ({
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: GLASS, borderWidth: 1, borderColor: GLASS_BORDER,
+              alignItems: 'center', justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Ionicons name="close" size={20} color={palette.fog} />
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }} showsVerticalScrollIndicator={false}>
-          <Text variant="display" center color={palette.fog} style={{ fontSize: 44 }}>STOP</Text>
-          <Text variant="title2" center color={palette.fog} style={{ marginTop: spacing.md }}>Take a deep breath.</Text>
-          <Text variant="body" center color={palette.fogDim} style={{ marginTop: spacing.sm }}>Don't make any decisions yet.</Text>
+        <ScrollView
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hero */}
+          <PulseHero reduce={reduce} />
+          <Text variant="caption" center color={palette.grape300} style={{ letterSpacing: 3, textTransform: 'uppercase', marginTop: spacing.md }}>
+            Emergency pause
+          </Text>
+          <Text variant="title1" center color={palette.fog} style={{ marginTop: spacing.xs }}>
+            Take a deep breath.
+          </Text>
+          <Text variant="body" center color={FOG_SOFT} style={{ marginTop: spacing.sm, paddingHorizontal: spacing.lg }}>
+            You're safe. Don't decide anything yet — the urge will pass.
+          </Text>
+
+          {/* Primary action */}
+          <Pressable
+            onPress={() => router.replace('/mindful-pause' as Href)}
+            accessibilityRole="button"
+            accessibilityLabel="Start a Mindful Pause"
+            style={({ pressed }) => ({
+              marginTop: spacing.xl,
+              height: 54,
+              borderRadius: radius.button,
+              backgroundColor: palette.grape300,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: spacing.sm,
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.99 : 1 }],
+            })}
+          >
+            <Ionicons name="flower" size={20} color={palette.night} />
+            <Text variant="headline" color={palette.night}>Start a Mindful Pause</Text>
+          </Pressable>
 
           {/* Anchors */}
-          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
-            <Anchor label="Recovery" value={`${timer.days}d ${timer.hours}h`} />
-            <Anchor label="Money Saved" value={formatMoney(money.total, currency)} />
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg }}>
+            <Anchor icon="time" label="Recovery" value={`${timer.days}d ${timer.hours}h`} />
+            <Anchor icon="wallet" label="Money saved" value={formatMoney(money.total, currency)} />
           </View>
-          {/* Focus Protection status — the user's permanent blocklist. */}
-          {protectedCount > 0 && (
-            <View
-              accessibilityLabel={`Focus Protection on, ${protectedCount} websites permanently protected`}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-                backgroundColor: palette.nightRaised, borderRadius: radius.card,
-                padding: spacing.lg, marginTop: spacing.md,
-                borderLeftWidth: 3, borderLeftColor: '#77B58A',
-              }}
-            >
-              <Ionicons name="shield-checkmark" size={20} color="#77B58A" />
-              <View style={{ flex: 1 }}>
-                <Text variant="callout" color={palette.fog}>Focus Protection is on</Text>
-                <Text variant="caption" color={palette.fogDim} style={{ marginTop: 1 }}>
-                  {protectedCount} website{protectedCount === 1 ? '' : 's'} permanently protected
-                </Text>
-              </View>
-            </View>
-          )}
+
+          {/* Your reason */}
           {profile?.reason ? (
-            <View style={{ backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg, marginTop: spacing.md }}>
-              <Text variant="footnote" color={palette.fogDim}>Your reason for quitting</Text>
-              <Text variant="body" color={palette.fog} style={{ marginTop: 4 }}>“{profile.reason}”</Text>
-            </View>
+            <GlassTile style={{ marginTop: spacing.sm, flexDirection: 'row', gap: spacing.md }}>
+              <View style={{ width: 3, borderRadius: 2, backgroundColor: palette.grape300 }} />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text variant="caption" color={FOG_SOFT}>Your reason for quitting</Text>
+                <Text variant="body" color={palette.fog}>“{profile.reason}”</Text>
+              </View>
+            </GlassTile>
           ) : null}
 
-          {/* Tools */}
-          <Text variant="headline" color={palette.fog} style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>Recovery Tools</Text>
-          <View style={{ gap: spacing.sm }}>
-            {tools.map((t) => {
-              const expanded = t.panelKey != null && panel === t.panelKey;
-              return (
-                <View key={t.label}>
-                  <Pressable
-                    onPress={t.onPress}
-                    accessibilityRole="button"
-                    accessibilityLabel={t.label}
-                    accessibilityState={t.panelKey ? { expanded } : undefined}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row', alignItems: 'center', backgroundColor: palette.nightRaised,
-                      borderRadius: radius.button, padding: spacing.lg, opacity: pressed ? 0.85 : 1,
-                    })}
-                  >
-                    <Ionicons name={t.icon} size={22} color={palette.grape300} />
-                    <Text variant="headline" color={palette.fog} style={{ flex: 1, marginLeft: spacing.md }}>{t.label}</Text>
-                    <Ionicons
-                      name={t.panelKey ? (expanded ? 'chevron-up' : 'chevron-down') : 'chevron-forward'}
-                      size={18}
-                      color={palette.fogDim}
-                    />
-                  </Pressable>
+          {/* Focus Protection status */}
+          {protectedCount > 0 && (
+            <GlassTile
+              style={{ marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}
+              accessibilityLabel={`Focus Protection on, ${protectedCount} websites permanently protected`}
+            >
+              <Ionicons name="shield-checkmark" size={18} color="#77B58A" />
+              <Text variant="callout" color={palette.fog} style={{ flex: 1 }}>
+                {protectedCount} website{protectedCount === 1 ? '' : 's'} protected — always on
+              </Text>
+            </GlassTile>
+          )}
 
-                  {/* Expandable content lives directly beneath its own row. */}
-                  {t.panelKey === 'motiv' && (
-                    <Collapsible open={expanded}>
-                      <View style={{ paddingTop: spacing.sm }}>
-                        <View style={{ backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg, marginLeft: spacing.lg }}>
-                          <Text variant="body" color={palette.fog}>{motivation}</Text>
-                        </View>
-                      </View>
-                    </Collapsible>
-                  )}
-                </View>
-              );
-            })}
+          {/* Tools */}
+          <Text variant="headline" color={palette.fog} style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+            Steady yourself
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            <ToolTile icon="pulse" label="Log Urge" onPress={() => router.replace('/log-urge')} />
+            <ToolTile icon="book" label="Journal" onPress={() => router.replace('/(tabs)/journal')} />
+            <ToolTile icon="game-controller" label="Games" onPress={() => router.push('/games' as Href)} />
+            <ToolTile icon="walk" label="Habits" onPress={() => router.push('/alternatives' as Href)} />
+            <ToolTile icon="shield-checkmark" label="Protect" onPress={() => router.push('/protection' as Href)} />
+            <ToolTile icon="create" label="Reflect" onPress={() => router.replace('/reflection')} />
           </View>
+
+          {/* Today's reminder */}
+          <GlassTile style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="heart" size={13} color={palette.coral300} />
+              <Text variant="caption" color={FOG_SOFT}>Today's reminder</Text>
+            </View>
+            <Text variant="body" color={palette.fog} style={{ lineHeight: 24 }}>
+              {motivation}
+            </Text>
+          </GlassTile>
         </ScrollView>
       </SafeAreaView>
-    </View>
-  );
-}
-
-function Anchor({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: palette.nightRaised, borderRadius: radius.card, padding: spacing.lg }}>
-      <Text variant="footnote" color={palette.fogDim}>{label}</Text>
-      <Text variant="title2" color={palette.fog} style={{ marginTop: 2 }}>{value}</Text>
     </View>
   );
 }
