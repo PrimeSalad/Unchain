@@ -138,24 +138,26 @@ export function HomeScreen() {
         <View style={{ alignSelf: 'stretch', marginTop: spacing.xl, gap: spacing.md }}>
           {profile.addictionType === 'pornography' ? (
             <>
+              {/* Compact values + context in the label — same visual rhythm
+                  as the gambling money tiles. */}
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
                 <StatTile
-                  value={`${Math.max(longestStreak, days)} day${Math.max(longestStreak, days) === 1 ? '' : 's'}`}
-                  label="Longest Streak"
+                  value={`${Math.max(longestStreak, days)}`}
+                  label={`Longest streak (day${Math.max(longestStreak, days) === 1 ? '' : 's'})`}
                 />
                 <StatTile
                   value={formatLastCheckedIn(lastCheckedIn, now)}
-                  label="Last Check-in"
+                  label="Last check-in"
                 />
               </View>
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
                 <StatTile
-                  value={`${urgesResisted} this week`}
-                  label="Urges Resisted"
+                  value={`${urgesResisted}`}
+                  label="Urges resisted this week"
                 />
                 <StatTile
-                  value={`${healthyHabitsCount} completed`}
-                  label="Healthy Habits"
+                  value={`${healthyHabitsCount}`}
+                  label="Healthy habits done"
                   tone="primarySoft"
                 />
               </View>

@@ -22,6 +22,7 @@ import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile, initialGames } from '@/application/store';
 import { streakDays, addictionMeta, TRIGGERS, currentStreakStart } from '@/domain/gambling';
+import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
 const BACKUP_MARKER = 'unchain-backup';
 
@@ -233,6 +234,10 @@ export function ProfileScreen() {
           walkMeters: s.walkMeters,
           waterToday: s.waterToday,
           waterGlassesTotal: s.waterGlassesTotal,
+          lastCheckedIn: s.lastCheckedIn,
+          urgesResisted: s.urgesResisted,
+          urgesResistedWeek: s.urgesResistedWeek,
+          healthyHabitsCount: s.healthyHabitsCount,
           blockedSites: s.blockedSites,
           dailyMissions: s.dailyMissions,
           missionXp: s.missionXp,
@@ -314,6 +319,10 @@ export function ProfileScreen() {
             ? data.waterToday
             : { day: '', glasses: 0 },
         waterGlassesTotal: typeof data.waterGlassesTotal === 'number' ? data.waterGlassesTotal : 0,
+        lastCheckedIn: typeof data.lastCheckedIn === 'number' ? data.lastCheckedIn : null,
+        urgesResisted: typeof data.urgesResisted === 'number' ? data.urgesResisted : 0,
+        urgesResistedWeek: typeof data.urgesResistedWeek === 'number' ? data.urgesResistedWeek : 0,
+        healthyHabitsCount: typeof data.healthyHabitsCount === 'number' ? data.healthyHabitsCount : 0,
         blockedSites: arr(data.blockedSites),
         dailyMissions:
           data.dailyMissions && typeof data.dailyMissions.day === 'string' && Array.isArray(data.dailyMissions.completed)
@@ -491,7 +500,7 @@ export function ProfileScreen() {
         Trigger Preferences
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        {TRIGGERS.map((t) => {
+        {(profile.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => {
           const active = profile.triggers.includes(t);
           return (
             <Pill

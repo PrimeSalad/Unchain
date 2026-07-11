@@ -931,6 +931,10 @@ export const useStore = create<RecoveryState>()(
           goals: [],
           celebratedBadges: [],
           alternatives: {},
+          // Weekly porn-recovery counters are recovery data — restart them
+          // with the streak. Lifetime habit totals are kept, like altCounts.
+          urgesResisted: 0,
+          urgesResistedWeek: 0,
           // Restart the streak from right now, keeping all profile details.
           profile: s.profile ? { ...s.profile, startedAt: Date.now() } : null,
         })),
@@ -963,6 +967,10 @@ export const useStore = create<RecoveryState>()(
           walkMeters: 0,
           waterToday: { day: '', glasses: 0 },
           waterGlassesTotal: 0,
+          lastCheckedIn: null,
+          urgesResisted: 0,
+          urgesResistedWeek: 0,
+          healthyHabitsCount: 0,
           blockedSites: [],
           favoriteQuotes: [],
           dailyQuote: null,
@@ -1031,6 +1039,15 @@ export function useTodayPornJournal(): import('@/domain/records').JournalEntry |
   return useStore((s) =>
     s.journal.find((j) => sameDay(j.at, Date.now()) && j.watched !== undefined),
   );
+}
+
+/**
+ * Today's journal entry of ANY addiction type. For type-agnostic surfaces
+ * (Healthy Alternatives "journal done today", Protection's activity counter)
+ * that only care whether the user journaled at all — never for wizard gates.
+ */
+export function useTodayAnyJournal(): import('@/domain/records').JournalEntry | undefined {
+  return useStore((s) => s.journal.find((j) => sameDay(j.at, Date.now())));
 }
 
 /**

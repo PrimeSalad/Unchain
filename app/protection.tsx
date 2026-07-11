@@ -22,7 +22,7 @@ import { ActionSheet } from '@/presentation/components/ActionSheet';
 import { elevation, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useProfile, useTodayJournal } from '@/application/store';
+import { useStore, useProfile, useTodayAnyJournal } from '@/application/store';
 import { currentStreakStart, streakDays } from '@/domain/gambling';
 import { ALTERNATIVES } from '@/domain/alternatives';
 import { sameDay } from '@/domain/records';
@@ -491,7 +491,8 @@ export default function Protection() {
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
   const completions = useStore((s) => s.alternatives);
-  const todayJournal = useTodayJournal();
+  // Any addiction type's entry counts toward "activities today".
+  const todayJournal = useTodayAnyJournal();
 
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

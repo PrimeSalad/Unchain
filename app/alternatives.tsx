@@ -26,7 +26,7 @@ import { StretchFigure } from '@/presentation/components/StretchFigure';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useTodayJournal } from '@/application/store';
+import { useProfile, useStore, useTodayAnyJournal } from '@/application/store';
 import { startCalmMusic, stopCalmMusic } from '@/application/sound';
 import {
   ALT_ACHIEVEMENTS,
@@ -1448,7 +1448,11 @@ export default function Alternatives() {
   const altCounts = useStore((s) => s.altCounts);
   const altAchievements = useStore((s) => s.altAchievements);
   const journalCount = useStore((s) => s.journal.length);
-  const todayJournal = useTodayJournal();
+  const profile = useProfile();
+  // Any addiction type's entry counts as "journaled today" here; the wizard
+  // route below still picks the correct addiction-specific flow.
+  const todayJournal = useTodayAnyJournal();
+  const journalRoute = profile?.addictionType === 'pornography' ? '/porn-journal-entry' : '/journal-entry';
 
   const [sheet, setSheet] = useState<AlternativeId | null>(null);
   // Achievements unlocked mid-sheet are celebrated after the sheet closes —
@@ -1510,7 +1514,7 @@ export default function Alternatives() {
   const open = (id: AlternativeId) => {
     if (id === 'journal') {
       if (todayJournal) setSheet('journal');
-      else router.push('/journal-entry');
+      else router.push(journalRoute as Parameters<typeof router.push>[0]);
       return;
     }
     setSheet(id);

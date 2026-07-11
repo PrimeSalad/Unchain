@@ -15,6 +15,7 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useTodayCheckIn, useProfile } from '@/application/store';
 import { TRIGGERS, addictionMeta } from '@/domain/gambling';
+import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
 export default function CheckIn() {
   const theme = useTheme();
@@ -24,7 +25,12 @@ export default function CheckIn() {
   const logRelapse = useStore((s) => s.logRelapse);
   const already = useTodayCheckIn();
   const profile = useProfile();
-  const verb = profile ? addictionMeta(profile.addictionType).verb : 'gamble';
+  const meta = profile ? addictionMeta(profile.addictionType) : null;
+  const verb = meta?.verb ?? 'gamble';
+  // Money questions only make sense for addictions with a spend component.
+  const hasExpense = meta?.hasExpense ?? true;
+  // Trigger options match the addiction, same as onboarding and the journal.
+  const triggerOptions = profile?.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS;
 
   const setTodayMood = useStore((s) => s.setTodayMood);
   const [gambled, setGambled] = useState<boolean | null>(null);
@@ -59,7 +65,7 @@ export default function CheckIn() {
 
   const save = () => {
     if (gambled) {
-      logRelapse({ amount: amount ? parseInt(amount, 10) : undefined, whatHappened: what.trim() || undefined, cause: triggers.join(', ') || undefined, feeling: feeling.trim() || undefined });
+      logRelapse({ amount: hasExpense && amount ? parseInt(amount, 10) : undefined, whatHappened: what.trim() || undefined, cause: triggers.join(', ') || undefined, feeling: feeling.trim() || undefined });
       submit({ gambled: true, notes: what.trim() || undefined, triggers });
     } else {
       submit({ gambled: false, mood, urgeStrength: urge, triggers, notes: notes.trim() || undefined });
@@ -159,7 +165,7 @@ export default function CheckIn() {
           <View>
             <Text variant="headline" style={{ marginBottom: spacing.md }}>What triggered them?</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {TRIGGERS.map((t) => <Pill key={t} label={t} active={triggers.includes(t)} onPress={() => toggle(t)} />)}
+              {triggerOptions.map((t) => <Pill key={t} label={t} active={triggers.includes(t)} onPress={() => toggle(t)} />)}
             </View>
           </View>
           <TextInput value={notes} onChangeText={setNotes} placeholder="Notes (optional)" placeholderTextColor={theme.color.textDim} multiline style={[input, { minHeight: 80 }]} />
@@ -170,15 +176,17 @@ export default function CheckIn() {
       {gambled === true && (
         <View style={{ marginTop: spacing.xl, gap: spacing.lg }}>
           <Text variant="body" dim>Thank you for being honest. This is data, not failure.</Text>
-          <View>
-            <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>How much did you spend?</Text>
-            <TextInput value={amount} onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))} placeholder={`${profile?.currency ?? '₱'}0`} placeholderTextColor={theme.color.textDim} keyboardType="number-pad" style={input} />
-          </View>
+          {hasExpense && (
+            <View>
+              <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>How much did you spend?</Text>
+              <TextInput value={amount} onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))} placeholder={`${profile?.currency ?? '₱'}0`} placeholderTextColor={theme.color.textDim} keyboardType="number-pad" style={input} />
+            </View>
+          )}
           <TextInput value={what} onChangeText={setWhat} placeholder="What happened?" placeholderTextColor={theme.color.textDim} multiline style={[input, { minHeight: 70 }]} />
           <View>
             <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>What caused it?</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {TRIGGERS.map((t) => <Pill key={t} label={t} active={triggers.includes(t)} onPress={() => toggle(t)} />)}
+              {triggerOptions.map((t) => <Pill key={t} label={t} active={triggers.includes(t)} onPress={() => toggle(t)} />)}
             </View>
           </View>
           <TextInput value={feeling} onChangeText={setFeeling} placeholder="How do you feel right now?" placeholderTextColor={theme.color.textDim} multiline style={[input, { minHeight: 70 }]} />

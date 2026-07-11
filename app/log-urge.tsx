@@ -14,6 +14,7 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
 import { TRIGGERS, urgeLevel } from '@/domain/gambling';
+import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
 export default function LogUrge() {
   const theme = useTheme();
@@ -94,7 +95,9 @@ export default function LogUrge() {
 
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>What triggered it?</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        {TRIGGERS.map((t) => <Pill key={t} label={t} active={trigger === t} onPress={() => setTrigger(trigger === t ? undefined : t)} />)}
+        {(profile?.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => (
+          <Pill key={t} label={t} active={trigger === t} onPress={() => setTrigger(trigger === t ? undefined : t)} />
+        ))}
       </View>
 
       <TextInput
