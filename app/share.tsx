@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, ImageBackground, Pressable, Share, View } from 'react-native';
+import { Alert, Image, ImageBackground, Platform, Pressable, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,14 +58,19 @@ export default function ShareCard() {
 
   const pickPhoto = async () => {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        // Explain instead of failing silently — the user tapped for a reason.
-        Alert.alert(
-          'Photo access needed',
-          'Allow photo access in Settings to use one of your pictures as the card background.',
-        );
-        return;
+      // iOS uses the system photo picker (PHPicker) which needs NO library
+      // permission — asking anyway shows a needless prompt and blocks the
+      // feature when declined. Older Androids may still need the permission.
+      if (Platform.OS === 'android') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          // Explain instead of failing silently — the user tapped for a reason.
+          Alert.alert(
+            'Photo access needed',
+            'Allow photo access in Settings to use one of your pictures as the card background.',
+          );
+          return;
+        }
       }
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],

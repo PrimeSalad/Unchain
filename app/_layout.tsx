@@ -1,9 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 import {
   useFonts,
   Nunito_600SemiBold,
@@ -12,7 +11,8 @@ import {
   Nunito_900Black,
 } from '@expo-google-fonts/nunito';
 import * as SplashScreen from 'expo-splash-screen';
-import { ThemeProvider } from '@/presentation/theme/ThemeProvider';
+import { ThemeProvider, useTheme } from '@/presentation/theme/ThemeProvider';
+import { useStore } from '@/application/store';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -20,8 +20,34 @@ export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/App
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+/** Status bar text follows the RESOLVED app theme (system pref + in-app
+ *  override), so forcing dark mode on a light-system device stays legible. */
+function ThemedStatusBar() {
+  const theme = useTheme();
+  return <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />;
+}
+
+/**
+ * Wait for the persisted store to rehydrate from AsyncStorage before any
+ * route renders. Without this gate, app/index.tsx reads `onboarded` while it
+ * is still the default `false` and cold launches race returning users onto
+ * the onboarding screen. The splash stays up during the (brief) wait.
+ */
+function useStoreHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(() => useStore.persist.hasHydrated());
+  useEffect(() => {
+    if (useStore.persist.hasHydrated()) {
+      setHydrated(true);
+      return;
+    }
+    const unsub = useStore.persist.onFinishHydration(() => setHydrated(true));
+    return unsub;
+  }, []);
+  return hydrated;
+}
+
 export default function RootLayout() {
-  const scheme = useColorScheme();
+  const hydrated = useStoreHydrated();
   const [loaded] = useFonts({
     Nunito_600SemiBold,
     Nunito_700Bold,
@@ -29,17 +55,18 @@ export default function RootLayout() {
     Nunito_900Black,
   });
 
+  const ready = loaded && hydrated;
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync().catch(() => {});
-  }, [loaded]);
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
 
-  if (!loaded) return null;
+  if (!ready) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+          <ThemedStatusBar />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="onboarding" />

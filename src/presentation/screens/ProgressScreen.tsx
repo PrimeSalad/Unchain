@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
@@ -63,6 +63,17 @@ export function ProgressScreen() {
   const addGoal = useStore((s) => s.addGoal);
   const removeGoal = useStore((s) => s.removeGoal);
   const syncAchievements = useStore((s) => s.syncAchievements);
+  const completeMission = useStore((s) => s.completeMission);
+
+  // Viewing this screen IS the "Review Your Progress" daily mission —
+  // without this call the mission could never be completed. Runs on every
+  // focus (not just mount) so it also counts on later days while the tab
+  // stays mounted; completeMission is idempotent per day.
+  useFocusEffect(
+    useCallback(() => {
+      completeMission('review_progress');
+    }, [completeMission]),
+  );
 
   const [goalModal, setGoalModal] = useState(false);
 

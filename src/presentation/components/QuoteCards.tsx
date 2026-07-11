@@ -109,7 +109,9 @@ export function QuoteFeed() {
     return () => clearTimeout(id);
   }, [toast]);
 
-  const today = QUOTES[dailyQuote?.index ?? 0];
+  // A persisted index can outlive a shrunken quote pool after an update —
+  // never index blindly.
+  const today = QUOTES[dailyQuote?.index ?? 0] ?? QUOTES[0];
 
   // Today's quote first; saved favorites after it (today's never duplicated).
   const feed = useMemo<FeedItem[]>(

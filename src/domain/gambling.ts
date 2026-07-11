@@ -180,7 +180,9 @@ export function moneySaved(p: RecoveryProfile, now = Date.now()): MoneySaved {
 }
 
 export function formatMoney(amount: number, currency = '₱'): string {
-  return currency + Math.round(amount).toLocaleString('en-PH');
+  const n = Math.round(amount);
+  // Sign before the currency symbol: -₱500, never ₱-500.
+  return (n < 0 ? '-' : '') + currency + Math.abs(n).toLocaleString('en-PH');
 }
 
 // ---------------------------------------------------------------------------

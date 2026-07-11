@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -80,6 +80,14 @@ export function ProfileScreen() {
   const [toast, setToast] = useState<ToastConfig | null>(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Never let a pending toast timer fire against an unmounted screen.
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
 
   if (!profile) return null;
 
@@ -200,7 +208,7 @@ export function ProfileScreen() {
       // A single self-describing backup file with every locally-stored slice.
       const backup = {
         app: BACKUP_MARKER,
-        version: 1,
+        version: 2,
         exportedAt: Date.now(),
         data: {
           profile: s.profile,
@@ -216,6 +224,15 @@ export function ProfileScreen() {
           celebratedBadges: s.celebratedBadges,
           games: s.games,
           themePref: s.themePref,
+          alternatives: s.alternatives,
+          altCounts: s.altCounts,
+          altAchievements: s.altAchievements,
+          blockedSites: s.blockedSites,
+          dailyMissions: s.dailyMissions,
+          missionXp: s.missionXp,
+          favoriteQuotes: s.favoriteQuotes,
+          dailyQuote: s.dailyQuote,
+          recentQuotes: s.recentQuotes,
         },
       };
       const json = JSON.stringify(backup, null, 2);
@@ -259,7 +276,11 @@ export function ProfileScreen() {
       }
 
       const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
-      // Replace state wholesale (no merge) so nothing duplicates.
+      const obj = <T extends object>(v: unknown, fallback: T): T =>
+        v && typeof v === 'object' && !Array.isArray(v) ? (v as T) : fallback;
+      // Replace state wholesale (no merge) so nothing duplicates and no slice
+      // from the pre-import state leaks into the restored one. Slices missing
+      // from older (v1) backups restore to clean defaults.
       useStore.setState({
         onboarded: true,
         profile: data.profile,
@@ -275,6 +296,21 @@ export function ProfileScreen() {
         celebratedBadges: arr(data.celebratedBadges),
         games: data.games && typeof data.games === 'object' ? { ...initialGames, ...data.games } : initialGames,
         themePref: ['system', 'light', 'dark'].includes(data.themePref) ? data.themePref : 'system',
+        alternatives: obj(data.alternatives, {}),
+        altCounts: obj(data.altCounts, {}),
+        altAchievements: obj(data.altAchievements, {}),
+        blockedSites: arr(data.blockedSites),
+        dailyMissions:
+          data.dailyMissions && typeof data.dailyMissions.day === 'string' && Array.isArray(data.dailyMissions.completed)
+            ? data.dailyMissions
+            : { day: '', completed: [] },
+        missionXp: typeof data.missionXp === 'number' ? data.missionXp : 0,
+        favoriteQuotes: arr(data.favoriteQuotes),
+        dailyQuote:
+          data.dailyQuote && typeof data.dailyQuote.day === 'string' && typeof data.dailyQuote.index === 'number'
+            ? data.dailyQuote
+            : null,
+        recentQuotes: arr(data.recentQuotes),
       });
       showToast('Backup restored successfully');
     } catch {

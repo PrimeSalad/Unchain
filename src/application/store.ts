@@ -436,7 +436,11 @@ export const useStore = create<RecoveryState>()(
       ensureDailyQuote: () => {
         const s = get();
         const day = localDayKey();
-        if (s.dailyQuote?.day === day) return s.dailyQuote.index;
+        // Re-pick when the stored index no longer fits the pool (an app
+        // update can shrink QUOTES; a stale index must never crash a lookup).
+        if (s.dailyQuote?.day === day && s.dailyQuote.index < QUOTES.length) {
+          return s.dailyQuote.index;
+        }
         const index = pickDailyQuoteIndex(s.recentQuotes, QUOTES.length);
         set({
           dailyQuote: { day, index },

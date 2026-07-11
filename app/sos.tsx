@@ -20,7 +20,9 @@ export default function Sos() {
   useEffect(() => {
     ensureDailyQuote();
   }, [ensureDailyQuote]);
-  const motivation = QUOTES[dailyQuote?.index ?? 0].text;
+  // A persisted index can outlive a shrunken quote pool after an update —
+  // never index blindly.
+  const motivation = (QUOTES[dailyQuote?.index ?? 0] ?? QUOTES[0]).text;
 
   // ── Focus Protection ──────────────────────────────────────────────────────
   // The blocklist is permanent — every website the user added is always

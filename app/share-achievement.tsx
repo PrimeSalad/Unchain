@@ -184,7 +184,7 @@ export default function ShareAchievement() {
                   ))}
                 </View>
                 <Text variant="caption" center color="rgba(255,255,255,0.7)" style={{ marginTop: spacing.md }}>
-                  {date} · unchain.app
+                  {date} · Unchain
                 </Text>
               </View>
             </LinearGradient>
