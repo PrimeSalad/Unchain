@@ -19,6 +19,7 @@ import {
   type AddictionType,
   type ExpensePeriod,
 } from '@/domain/gambling';
+import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
 const PERIODS: ExpensePeriod[] = ['daily', 'weekly', 'monthly'];
 
@@ -336,7 +337,7 @@ export function OnboardingScreen() {
             Select all that apply.
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            {TRIGGERS.map((tr) => (
+            {(atype === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((tr) => (
               <Pill
                 key={tr}
                 label={tr}

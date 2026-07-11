@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RecoveryProfile } from '@/domain/gambling';
 import { streakDays, currentStreakStart } from '@/domain/gambling';
+import { currentWeekStart } from '@/domain/pornRecovery';
 import type { Badge, Goal, GoalKind } from '@/domain/achievements';
 import type { SudokuLevel } from '@/domain/games/sudoku';
 import type { Difficulty as CheckersDifficulty } from '@/domain/games/checkers';
@@ -128,6 +129,13 @@ interface RecoveryState {
   /** Lifetime walk totals — steps counted and metres covered (GPS). */
   walkSteps: number;
   walkMeters: number;
+
+  // ── Porn Recovery Metrics ───────────────────────────────────────────────
+  lastCheckedIn: number | null;
+  urgesResisted: number;
+  urgesResistedWeek: number;
+  healthyHabitsCount: number;
+  updateLastCheckedIn: () => void;
 
   // ── Focus Protection ────────────────────────────────────────────────────
   /** The user's permanent blocklist — every entry added explicitly by them,
@@ -323,6 +331,12 @@ export const useStore = create<RecoveryState>()(
       missionXp: 0,
       dailyQuote: null,
       recentQuotes: [],
+      lastCheckedIn: null,
+      urgesResisted: 0,
+      urgesResistedWeek: 0,
+      healthyHabitsCount: 0,
+
+      updateLastCheckedIn: () => set({ lastCheckedIn: Date.now() }),
 
       recordWalkMetrics: (steps, meters) =>
         set((s) => ({
@@ -447,6 +461,7 @@ export const useStore = create<RecoveryState>()(
               ? { ...s.altAchievements, ...Object.fromEntries(unlocked.map((a) => [a.id, now])) }
               : s.altAchievements,
             points: s.points + 5 + unlocked.length * 5,
+            healthyHabitsCount: s.healthyHabitsCount + 1,
             timeline: [
               ...unlocked.map((a) => evt('achievement', `Achievement unlocked — ${a.title}`)),
               evt('activity', `Recovery activity — ${alternativeById(id).title}`),
@@ -602,8 +617,10 @@ export const useStore = create<RecoveryState>()(
       completeSetup: (profile) => {
         // If the user last used on a past day, seed:
         //   1. A RelapseEvent on that day (for streak math).
-        //   2. A JournalEntry(gambled=true) on that day → calendar shows red.
-        //   3. A JournalEntry(gambled=false) for every day BETWEEN the relapse
+        //   2. An addiction-specific JournalEntry on that day → calendar shows red.
+        //      - gambling/smoking/alcohol/drugs/etc. → gambled: true
+        //      - pornography                         → watched: true
+        //   3. Addiction-specific clean entries for every day BETWEEN the relapse
         //      and today (exclusive) → calendar shows those days green.
         //   Today itself is left blank — the user fills it in via the journal.
         const now = new Date();
@@ -613,6 +630,8 @@ export const useStore = create<RecoveryState>()(
         // Seed timestamp: 1ms after local midnight of the last-used day.
         const seedAt = profile.startedAt + 1;
 
+        const isPorn = profile.addictionType === 'pornography';
+
         const initialRelapses: RelapseEvent[] = isToday
           ? []
           : [{ id: uid(), at: seedAt, whatHappened: 'Last use before recovery' }];
@@ -620,13 +639,12 @@ export const useStore = create<RecoveryState>()(
         const initialJournal: import('@/domain/records').JournalEntry[] = [];
 
         if (!isToday) {
-          // Red dot on the last-used day.
-          initialJournal.push({
-            id: uid(),
-            at: seedAt,
-            gambled: true,
-            text: 'Last use before recovery.',
-          });
+          // Red dot on the last-used day — use the correct field for the addiction type.
+          initialJournal.push(
+            isPorn
+              ? { id: uid(), at: seedAt, watched: true,  text: 'Last use before recovery.' }
+              : { id: uid(), at: seedAt, gambled: true,  text: 'Last use before recovery.' },
+          );
 
           // Green dots for every full calendar day after the relapse up to
           // (but not including) today. Each entry is stamped at noon local
@@ -634,12 +652,11 @@ export const useStore = create<RecoveryState>()(
           const MS_PER_DAY = 86_400_000;
           let dayMid = profile.startedAt + MS_PER_DAY; // midnight of day after relapse
           while (dayMid < todayMid) {
-            initialJournal.push({
-              id: uid(),
-              at: dayMid + 12 * 3_600_000, // noon of that day
-              gambled: false,
-              text: 'Clean day.',
-            });
+            initialJournal.push(
+              isPorn
+                ? { id: uid(), at: dayMid + 12 * 3_600_000, watched: false, text: 'Clean day.' }
+                : { id: uid(), at: dayMid + 12 * 3_600_000, gambled: false, text: 'Clean day.' },
+            );
             dayMid += MS_PER_DAY;
           }
         }
@@ -748,10 +765,19 @@ export const useStore = create<RecoveryState>()(
         set((s) => {
           if (!s.profile) return s;
 
-          // ── One journal entry per calendar day ─────────────────────────
-          // If the user already submitted today, silently no-op so double-taps
-          // and navigation loops can never create duplicates.
-          if (s.journal.some((j) => sameDay(j.at, Date.now()))) return s;
+          // ── One journal entry per calendar day per addiction type ──────
+          // Gambling entries are keyed by the `gambled` field; porn entries by
+          // the `watched` field.  This lets the gates stay completely separate
+          // so neither addiction type ever blocks the other.
+          const isGamblingEntry = data.gambled !== undefined;
+          const isPornEntry = data.watched !== undefined;
+          const alreadyToday = s.journal.some((j) => {
+            if (!sameDay(j.at, Date.now())) return false;
+            if (isGamblingEntry) return j.gambled !== undefined;
+            if (isPornEntry) return j.watched !== undefined;
+            return true; // generic entry — block any duplicate
+          });
+          if (alreadyToday) return s;
 
           const entry: JournalEntry = { ...data, id: uid(), at: Date.now() };
 
@@ -795,6 +821,50 @@ export const useStore = create<RecoveryState>()(
                 ...altEvents,
                 evt('journal', 'Journal entry — gambling relapse logged'),
                 evt('relapse', 'Logged a relapse via journal — recovery continues'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          // ── Porn recovery: watched=true → relapse; watched=false → clean ──
+          if (data.watched === true) {
+            const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
+            const prevDays = streakDays(streakStart);
+            const relapseEntry: RelapseEvent = {
+              id: uid(),
+              at: Date.now(),
+              whatHappened: data.relapseLeadUp,
+              cause: data.relapseTrigger,
+              feeling: data.emotionsBefore,
+            };
+            return {
+              journal: journalAfter,
+              relapses: [relapseEntry, ...s.relapses],
+              longestStreak: Math.max(s.longestStreak, prevDays),
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Journal entry — porn relapse logged'),
+                evt('relapse', 'Logged a relapse via journal — recovery continues'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          if (data.watched === false) {
+            const now = Date.now();
+            const weekStart = currentWeekStart(now);
+            const sameWeek = s.urgesResistedWeek === weekStart;
+            return {
+              journal: journalAfter,
+              points: s.points + 5 + altUnlocked.length * 5,
+              urgesResisted: sameWeek ? s.urgesResisted + 1 : 1,
+              urgesResistedWeek: weekStart,
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Wrote a journal entry — clean day'),
                 ...s.timeline,
               ],
             };
@@ -914,9 +984,27 @@ export function useTodayCheckIn(): DailyCheckIn | undefined {
   return useStore((s) => s.checkIns.find((c) => sameDay(c.at, Date.now())));
 }
 
-/** Today's journal entry, or undefined if none submitted yet today. */
+/**
+ * Today's journal entry for gambling users, or undefined if none submitted yet.
+ * Finds any entry today where `gambled` is defined (gambling-specific gate).
+ * For gambling users only — do NOT use this in porn-journal-entry.tsx.
+ */
 export function useTodayJournal(): import('@/domain/records').JournalEntry | undefined {
-  return useStore((s) => s.journal.find((j) => sameDay(j.at, Date.now())));
+  return useStore((s) =>
+    s.journal.find((j) => sameDay(j.at, Date.now()) && j.gambled !== undefined),
+  );
+}
+
+/**
+ * Today's journal entry for pornography users, or undefined if none submitted yet.
+ * Finds any entry today where `watched` is defined (porn-specific gate).
+ * Completely separate from useTodayJournal so a user who has both types of
+ * entries (edge case) never has their porn gate blocked by a gambling entry.
+ */
+export function useTodayPornJournal(): import('@/domain/records').JournalEntry | undefined {
+  return useStore((s) =>
+    s.journal.find((j) => sameDay(j.at, Date.now()) && j.watched !== undefined),
+  );
 }
 
 /**

@@ -121,11 +121,13 @@ const MS_PER_DAY = 86_400_000;
 export function currentStreakStart(
   profileStartedAt: number,
   relapses: Array<{ at: number }>,
-  journalEntries: Array<{ gambled?: boolean; at: number }>,
+  journalEntries: Array<{ gambled?: boolean; watched?: boolean; at: number }>,
 ): number {
   const relapseTimestamps: number[] = [
     ...relapses.map((r) => r.at),
-    ...journalEntries.filter((j) => j.gambled === true).map((j) => j.at),
+    // Gambling relapse: gambled === true
+    // Porn relapse: watched === true
+    ...journalEntries.filter((j) => j.gambled === true || j.watched === true).map((j) => j.at),
   ];
 
   if (relapseTimestamps.length === 0) {

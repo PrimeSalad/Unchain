@@ -28,6 +28,7 @@ import { quoteOfNow } from '@/domain/content';
 import type { TimelineType } from '@/domain/records';
 import { sameDay } from '@/domain/records';
 import { QuoteFeed } from '../components/QuoteCards';
+import { formatLastCheckedIn } from '@/domain/pornRecovery';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -64,6 +65,10 @@ export function HomeScreen() {
   const relapses = useStore((s) => s.relapses);
   const pushTimeline = useStore((s) => s.pushTimeline);
   const completeMission = useStore((s) => s.completeMission);
+  const longestStreak = useStore((s) => s.longestStreak);
+  const lastCheckedIn = useStore((s) => s.lastCheckedIn);
+  const urgesResisted = useStore((s) => s.urgesResisted);
+  const healthyHabitsCount = useStore((s) => s.healthyHabitsCount);
 
   // Derive the current streak start from the event log — never from startedAt
   // directly — so a relapse only marks today red without wiping history.
@@ -130,39 +135,67 @@ export function HomeScreen() {
         </Text>
 
         <View style={{ alignSelf: 'stretch', marginTop: spacing.xl, gap: spacing.md }}>
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <StatTile
-              value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '—'}
-              label="Current Balance"
-            />
-            <StatTile
-              value={
-                moneyStats.change != null
-                  ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
-                  : '—'
-              }
-              label="Since Last Entry"
-            />
-          </View>
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <StatTile
-              value={
-                moneyStats.weeklyTrend != null
-                  ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency) + '/day'
-                  : '—'
-              }
-              label="Weekly Trend"
-            />
-            <StatTile
-              value={
-                moneyStats.monthlyTrend != null
-                  ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency) + '/day'
-                  : '—'
-              }
-              label="Monthly Trend"
-              tone="primarySoft"
-            />
-          </View>
+          {profile.addictionType === 'pornography' ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <StatTile
+                  value={`${Math.max(longestStreak, days)} day${Math.max(longestStreak, days) === 1 ? '' : 's'}`}
+                  label="Longest Streak"
+                />
+                <StatTile
+                  value={formatLastCheckedIn(lastCheckedIn, now)}
+                  label="Last Check-in"
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <StatTile
+                  value={`${urgesResisted} this week`}
+                  label="Urges Resisted"
+                />
+                <StatTile
+                  value={`${healthyHabitsCount} completed`}
+                  label="Healthy Habits"
+                  tone="primarySoft"
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <StatTile
+                  value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '—'}
+                  label="Current Balance"
+                />
+                <StatTile
+                  value={
+                    moneyStats.change != null
+                      ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
+                      : '—'
+                  }
+                  label="Since Last Entry"
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <StatTile
+                  value={
+                    moneyStats.weeklyTrend != null
+                      ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency) + '/day'
+                      : '—'
+                  }
+                  label="Weekly Trend"
+                />
+                <StatTile
+                  value={
+                    moneyStats.monthlyTrend != null
+                      ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency) + '/day'
+                      : '—'
+                  }
+                  label="Monthly Trend"
+                  tone="primarySoft"
+                />
+              </View>
+            </>
+          )}
         </View>
       </View>
 

@@ -61,6 +61,32 @@ export interface JournalEntry {
    * calendar, achievements) is NEVER inferred from this field.
    */
   moneyBalance?: number;
+
+  // ── Pornography-specific fields (only populated for porn addiction) ────────
+  /**
+   * Did the user watch pornography on this day?
+   * true  → relapse (red calendar day, streak resets)
+   * false → clean   (green calendar day, urgesResisted++)
+   */
+  watched?: boolean;
+  /** Urge intensity experienced today (1–10, clean day only). */
+  urgeIntensity?: number;
+  /** Triggers the user encountered today (clean day). */
+  triggersEncountered?: string[];
+  /** What helped them stay clean (clean day). */
+  whatHelped?: string;
+  /** How long they watched in minutes (relapse day). */
+  watchDuration?: number;
+  /** What led up to the relapse (relapse day). */
+  relapseLeadUp?: string;
+  /** Emotions felt before watching (relapse day). */
+  emotionsBefore?: string;
+  /** What triggered the relapse (relapse day). */
+  relapseTrigger?: string;
+  /** What could help next time (relapse day). */
+  nextTimePlan?: string;
+  /** How they feel now after watching (relapse day). */
+  feelingNow?: string;
 }
 
 /** Emergency Reflection — captured during a crisis (SOS). Stored separately

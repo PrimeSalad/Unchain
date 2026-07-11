@@ -47,7 +47,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-type Filter = 'all' | 'clean' | 'gambled';
+type Filter = 'all' | 'clean' | 'gambled' | 'watched';
+type DateRange = 'all_time' | 'today' | 'week' | 'month' | 'year';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mood helpers — text only, no emoji
@@ -113,6 +114,7 @@ function StatCard({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Entry card — animated expand, accent stroke, mood emoji badge
+// Supports both gambling entries (gambled field) and porn entries (watched field).
 // ─────────────────────────────────────────────────────────────────────────────
 function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: number; currency: string }) {
   const theme = useTheme();
@@ -120,16 +122,31 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
   const chevronRot = useSharedValue(0);
   const press = useSharedValue(0);
 
+  // Gambling entry detection
   const isGamble = entry.gambled === true;
   const isClean  = entry.gambled === false;
+  // Porn entry detection
+  const isWatched    = entry.watched === true;
+  const isPornClean  = entry.watched === false;
+  // Whether this is a porn-type entry at all
+  const isPornEntry  = entry.watched !== undefined;
 
   const accent =
-    isGamble ? theme.color.danger :
-    isClean  ? theme.color.success :
+    isGamble || isWatched ? theme.color.danger :
+    isClean || isPornClean ? theme.color.success :
     theme.color.primary;
 
-  const statusLabel = isGamble ? 'Gambled' : isClean ? 'Clean day' : 'Entry';
-  const statusIcon  = isGamble ? 'alert-circle' : isClean ? 'checkmark-circle' : 'document-text-outline';
+  const statusLabel =
+    isGamble    ? 'Gambled' :
+    isClean     ? 'Clean day' :
+    isWatched   ? 'Relapse' :
+    isPornClean ? 'Clean day' :
+    'Entry';
+
+  const statusIcon =
+    isGamble || isWatched   ? 'alert-circle' :
+    isClean  || isPornClean ? 'checkmark-circle' :
+    'document-text-outline';
 
   const dateStr = new Date(entry.at).toLocaleDateString('en-PH', {
     weekday: 'short', month: 'short', day: 'numeric',
@@ -292,6 +309,8 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
               {entry.mood != null && (
                 <DetailRow icon="bar-chart-outline" color={theme.color.primary} label="Mood" value={`${entry.mood}/10 — ${moodLabel(entry.mood)}`} />
               )}
+
+              {/* ── Gambling-specific rows ── */}
               {entry.gambled === true && entry.amountWagered != null && (
                 <DetailRow icon="cash-outline" color={theme.color.textDim} label="Wagered" value={`${currency}${entry.amountWagered.toLocaleString()}`} />
               )}
@@ -322,6 +341,44 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
                   label="Trigger"
                   value={entry.whyGambled ?? entry.trigger ?? ''}
                 />
+              )}
+
+              {/* ── Porn clean-day rows ── */}
+              {entry.watched === false && entry.urgeIntensity != null && (
+                <DetailRow icon="pulse-outline" color={theme.color.celebrate} label="Urge" value={`${entry.urgeIntensity}/10`} />
+              )}
+              {entry.watched === false && entry.triggersEncountered != null && entry.triggersEncountered.length > 0 && (
+                <DetailRow icon="warning-outline" color={theme.color.textDim} label="Triggers" value={entry.triggersEncountered.join(', ')} />
+              )}
+              {entry.watched === false && entry.whatHelped && (
+                <DetailRow icon="shield-checkmark-outline" color={theme.color.success} label="Helped" value={entry.whatHelped} />
+              )}
+
+              {/* ── Porn relapse rows ── */}
+              {entry.watched === true && entry.watchDuration != null && (
+                <DetailRow icon="time-outline" color={theme.color.textDim} label="Duration"
+                  value={
+                    entry.watchDuration < 10 ? 'Less than 10 min' :
+                    entry.watchDuration <= 30 ? '10–30 min' :
+                    entry.watchDuration <= 60 ? '30–60 min' :
+                    'More than 1 hour'
+                  }
+                />
+              )}
+              {entry.watched === true && entry.relapseLeadUp && (
+                <DetailRow icon="flag-outline" color={theme.color.textDim} label="Lead-up" value={entry.relapseLeadUp} />
+              )}
+              {entry.watched === true && entry.emotionsBefore && (
+                <DetailRow icon="heart-outline" color={theme.color.danger} label="Emotions" value={entry.emotionsBefore} />
+              )}
+              {entry.watched === true && entry.relapseTrigger && (
+                <DetailRow icon="warning-outline" color={theme.color.danger} label="Trigger" value={entry.relapseTrigger} />
+              )}
+              {entry.watched === true && entry.nextTimePlan && (
+                <DetailRow icon="bulb-outline" color={theme.color.primary} label="Next time" value={entry.nextTimePlan} />
+              )}
+              {entry.watched === true && entry.feelingNow && (
+                <DetailRow icon="happy-outline" color={theme.color.primary} label="Feeling now" value={entry.feelingNow} />
               )}
             </View>
           )}
@@ -449,9 +506,11 @@ export function JournalScreen() {
   const entries = useStore((s) => s.journal);
 
   const isGambling = profile?.addictionType === 'gambling';
+  const isPorn     = profile?.addictionType === 'pornography';
 
   const [query, setQuery]         = useState('');
   const [filter, setFilter]       = useState<Filter>('all');
+  const [dateRange, setDateRange] = useState<DateRange>('all_time');
   const [searching, setSearching] = useState(false);
 
   const toggleSearch = useCallback(() => {
@@ -464,27 +523,63 @@ export function JournalScreen() {
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
+    const isPorn = profile?.addictionType === 'pornography';
     const total    = entries.length;
+    // Gambling stats
     const clean    = entries.filter((e) => e.gambled === false).length;
     const relapses = entries.filter((e) => e.gambled === true).length;
+    // Porn stats
+    const pornClean    = entries.filter((e) => e.watched === false).length;
+    const pornRelapses = entries.filter((e) => e.watched === true).length;
     const withMood = entries.filter((e) => e.mood != null);
     const avgMood  = withMood.length
       ? Math.round(withMood.reduce((s, e) => s + (e.mood ?? 0), 0) / withMood.length * 10) / 10
       : null;
-    return { total, clean, relapses, avgMood };
-  }, [entries]);
+    return { total, clean, relapses, pornClean, pornRelapses, avgMood };
+  }, [entries, profile]);
 
-  // ── Filtered entries ──────────────────────────────────────────────────────
+  // ── Filtered + sorted entries ─────────────────────────────────────────────
   const filtered = useMemo(() => {
-    return entries.filter((e) => {
-      if (isGambling) {
-        if (filter === 'clean'   && e.gambled !== false) return false;
-        if (filter === 'gambled' && e.gambled !== true)  return false;
+    const now = Date.now();
+
+    // Date-range cutoff — local calendar boundaries so "this week" means
+    // Mon 00:00:00 of the current week, not exactly 7 × 24h ago.
+    let cutoff = 0;
+    if (dateRange !== 'all_time') {
+      const d = new Date();
+      if (dateRange === 'today') {
+        cutoff = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      } else if (dateRange === 'week') {
+        const day = d.getDay();
+        const diffToMon = day === 0 ? -6 : 1 - day;
+        cutoff = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diffToMon).getTime();
+      } else if (dateRange === 'month') {
+        cutoff = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+      } else if (dateRange === 'year') {
+        cutoff = new Date(d.getFullYear(), 0, 1).getTime();
       }
-      if (query && !e.text.toLowerCase().includes(query.toLowerCase())) return false;
-      return true;
-    });
-  }, [entries, query, filter, isGambling]);
+    }
+
+    return entries
+      .filter((e) => {
+        // Date range
+        if (cutoff > 0 && e.at < cutoff) return false;
+        // Addiction-specific status filter
+        if (isGambling) {
+          if (filter === 'clean'   && e.gambled !== false) return false;
+          if (filter === 'gambled' && e.gambled !== true)  return false;
+        }
+        if (isPorn) {
+          if (filter === 'clean'   && e.watched !== false) return false;
+          if (filter === 'watched' && e.watched !== true)  return false;
+        }
+        // Search
+        if (query && !e.text.toLowerCase().includes(query.toLowerCase())) return false;
+        return true;
+      })
+      // Newest first
+      .sort((a, b) => b.at - a.at);
+  }, [entries, query, filter, dateRange, isGambling, isPorn]);
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -527,7 +622,7 @@ export function JournalScreen() {
               color={searching ? '#FFF' : theme.color.textDim}
             />
           </Pressable>
-          <FAB onPress={() => router.push('/journal-entry')} />
+          <FAB onPress={() => router.push(isPorn ? '/porn-journal-entry' : '/journal-entry')} />
         </View>
       </View>
 
@@ -565,7 +660,62 @@ export function JournalScreen() {
         </View>
       )}
 
-      {/* ── Filter pills ── */}
+      {isPorn && entries.length > 0 && (
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
+          <StatCard
+            icon="checkmark-circle"
+            value={stats.pornClean}
+            label="Clean days"
+            color={theme.color.success}
+            delay={0}
+          />
+          <StatCard
+            icon="alert-circle"
+            value={stats.pornRelapses}
+            label="Relapses"
+            color={theme.color.danger}
+            delay={60}
+          />
+          {stats.avgMood != null && (
+            <StatCard
+              icon="happy"
+              value={stats.avgMood}
+              label="Avg mood"
+              color={theme.color.primary}
+              delay={120}
+            />
+          )}
+        </View>
+      )}
+
+      {/* ── Date-range filter (all users, always visible when entries exist) ── */}
+      {entries.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.sm }}
+        >
+          {([
+            { key: 'all_time', label: 'All time'   },
+            { key: 'today',    label: 'Today'      },
+            { key: 'week',     label: 'This week'  },
+            { key: 'month',    label: 'This month' },
+            { key: 'year',     label: 'This year'  },
+          ] as { key: DateRange; label: string }[]).map(({ key, label }) => (
+            <Pill
+              key={key}
+              label={label}
+              active={dateRange === key}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setDateRange(key);
+              }}
+            />
+          ))}
+        </ScrollView>
+      )}
+
+      {/* ── Status filter pills (addiction-specific) ── */}
       {isGambling && entries.length > 0 && (
         <ScrollView
           horizontal
@@ -577,10 +727,32 @@ export function JournalScreen() {
               key={f}
               label={f === 'all' ? 'All entries' : f === 'clean' ? 'Clean days' : 'Relapses'}
               active={filter === f}
-              onPress={() => setFilter(f)}
+              onPress={() => { Haptics.selectionAsync().catch(() => {}); setFilter(f); }}
             />
           ))}
         </ScrollView>
+      )}
+
+      {isPorn && entries.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.lg }}
+        >
+          {(['all', 'clean', 'watched'] as Filter[]).map((f) => (
+            <Pill
+              key={f}
+              label={f === 'all' ? 'All entries' : f === 'clean' ? 'Clean days' : 'Relapses'}
+              active={filter === f}
+              onPress={() => { Haptics.selectionAsync().catch(() => {}); setFilter(f); }}
+            />
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Spacer when no addiction pills are shown (e.g. social media, other) */}
+      {!isGambling && !isPorn && entries.length > 0 && (
+        <View style={{ marginBottom: spacing.lg }} />
       )}
 
       {/* ── Empty state ── */}
@@ -632,13 +804,13 @@ export function JournalScreen() {
             <Text variant="callout" dim center style={{ paddingHorizontal: spacing.xl, lineHeight: 22 }}>
               {entries.length === 0
                 ? 'Your first entry is the hardest.\nEven one sentence counts.'
-                : 'Try a different filter or search term.'}
+                : 'Try a different filter, date range, or search term.'}
             </Text>
           </View>
 
           {entries.length === 0 && (
             <Pressable
-              onPress={() => router.push('/journal-entry')}
+              onPress={() => router.push(isPorn ? '/porn-journal-entry' : '/journal-entry')}
               style={({ pressed }) => ({
                 paddingHorizontal: spacing.xxl,
                 paddingVertical: spacing.md + 2,

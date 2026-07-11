@@ -75,6 +75,11 @@ export function ProgressScreen() {
     }, [completeMission]),
   );
 
+  const urgesResisted     = useStore((s) => s.urgesResisted);
+  const healthyHabitsCount = useStore((s) => s.healthyHabitsCount);
+
+  const isPorn = profile?.addictionType === 'pornography';
+
   const [goalModal, setGoalModal] = useState(false);
 
   const current = profile
@@ -88,6 +93,26 @@ export function ProgressScreen() {
   const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
   const resisted = urges.filter((u) => u.resisted).length;
+
+  // Porn-specific journal stats — computed only when needed.
+  const pornStats = useMemo(() => {
+    const pornEntries = journal.filter((j) => j.watched !== undefined);
+    const cleanDays   = pornEntries.filter((j) => j.watched === false).length;
+    const relapseDays = pornEntries.filter((j) => j.watched === true).length;
+    const withUrge    = pornEntries.filter((j) => j.watched === false && j.urgeIntensity != null);
+    const avgUrge     = withUrge.length
+      ? Math.round((withUrge.reduce((s, j) => s + (j.urgeIntensity ?? 0), 0) / withUrge.length) * 10) / 10
+      : null;
+    // Triggers logged on clean days — find the most common one.
+    const triggerCounts: Record<string, number> = {};
+    pornEntries
+      .filter((j) => j.watched === false && j.triggersEncountered)
+      .forEach((j) => j.triggersEncountered!.forEach((t) => {
+        triggerCounts[t] = (triggerCounts[t] ?? 0) + 1;
+      }));
+    const topTrigger = Object.entries(triggerCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    return { cleanDays, relapseDays, avgUrge, topTrigger };
+  }, [journal]);
 
   const stats = useMemo(
     () =>
@@ -130,10 +155,13 @@ export function ProgressScreen() {
     const todayMid = todayLocalMidnight();
 
     // Index journal entries by local-midnight timestamp for O(1) lookup.
-    const journalByDay = new Map<number, boolean>(); // midnight → gambled
+    // Supports both gambling (gambled field) and porn recovery (watched field).
+    const journalByDay = new Map<number, boolean>(); // midnight → isRelapse
     journal.forEach((j) => {
       if (j.gambled !== undefined) {
         journalByDay.set(localMidnight(j.at), j.gambled);
+      } else if (j.watched !== undefined) {
+        journalByDay.set(localMidnight(j.at), j.watched);
       }
     });
 
@@ -280,42 +308,79 @@ export function ProgressScreen() {
       </Text>
       <BadgesPager badges={badges} />
 
-      {/* Money */}
-      <Card style={{ marginTop: spacing.xl }}>
-        <Text variant="headline" style={{ marginBottom: spacing.md }}>Financial Tracker</Text>
-        <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-          Based on your daily balance entries in the journal. A lost wager is subtracted from your balance; winnings are never counted — recovery comes first. Financial changes do not affect your streak or achievements.
-        </Text>
-        <Row
-          label="Current balance"
-          value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '—'}
-          bold
-        />
-        <Row
-          label="Since last entry"
-          value={
-            moneyStats.change != null
-              ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
-              : '—'
-          }
-        />
-        <Row
-          label="Weekly trend (avg/day)"
-          value={
-            moneyStats.weeklyTrend != null
-              ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency)
-              : '—'
-          }
-        />
-        <Row
-          label="Monthly trend (avg/day)"
-          value={
-            moneyStats.monthlyTrend != null
-              ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency)
-              : '—'
-          }
-        />
-      </Card>
+      {/* Financial Tracker — gambling users only */}
+      {!isPorn && (
+        <Card style={{ marginTop: spacing.xl }}>
+          <Text variant="headline" style={{ marginBottom: spacing.md }}>Financial Tracker</Text>
+          <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
+            Based on your daily balance entries in the journal. A lost wager is subtracted from your balance; winnings are never counted — recovery comes first. Financial changes do not affect your streak or achievements.
+          </Text>
+          <Row
+            label="Current balance"
+            value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '—'}
+            bold
+          />
+          <Row
+            label="Since last entry"
+            value={
+              moneyStats.change != null
+                ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
+                : '—'
+            }
+          />
+          <Row
+            label="Weekly trend (avg/day)"
+            value={
+              moneyStats.weeklyTrend != null
+                ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency)
+                : '—'
+            }
+          />
+          <Row
+            label="Monthly trend (avg/day)"
+            value={
+              moneyStats.monthlyTrend != null
+                ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency)
+                : '—'
+            }
+          />
+        </Card>
+      )}
+
+      {/* Porn Recovery Tracker — pornography users only */}
+      {isPorn && (
+        <Card style={{ marginTop: spacing.xl }}>
+          <Text variant="headline" style={{ marginBottom: spacing.md }}>Recovery Insights</Text>
+          <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
+            Based on your daily journal entries. These figures track how your recovery is growing — they never affect your streak or achievements.
+          </Text>
+          <Row
+            label="Clean days logged"
+            value={pornStats.cleanDays > 0 ? `${pornStats.cleanDays} day${pornStats.cleanDays === 1 ? '' : 's'}` : '—'}
+            bold
+          />
+          <Row
+            label="Relapses logged"
+            value={pornStats.relapseDays > 0 ? `${pornStats.relapseDays} time${pornStats.relapseDays === 1 ? '' : 's'}` : '—'}
+          />
+          <Row
+            label="Urges resisted (week)"
+            value={urgesResisted > 0 ? `${urgesResisted} urge${urgesResisted === 1 ? '' : 's'}` : '—'}
+          />
+          <Row
+            label="Healthy habits done"
+            value={healthyHabitsCount > 0 ? `${healthyHabitsCount} time${healthyHabitsCount === 1 ? '' : 's'}` : '—'}
+          />
+          <Row
+            label="Avg urge intensity"
+            value={pornStats.avgUrge != null ? `${pornStats.avgUrge} / 10` : '—'}
+          />
+          <Row
+            label="Top trigger"
+            value={pornStats.topTrigger ?? '—'}
+          />
+        </Card>
+      )}
 
       {/* Calendar */}
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { AppState, type AppStateStatus } from 'react-native';
 import {
   useFonts,
   Nunito_600SemiBold,
@@ -60,6 +61,21 @@ export default function RootLayout() {
     if (ready) SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
 
+  // Record every foreground event as the "Last Check-in" timestamp for porn
+  // recovery users. Fires on cold launch and every return from background.
+  const updateLastCheckedIn = useStore((s) => s.updateLastCheckedIn);
+  const appState = useRef<AppStateStatus>(AppState.currentState);
+  useEffect(() => {
+    updateLastCheckedIn();
+    const sub = AppState.addEventListener('change', (next) => {
+      if (appState.current !== 'active' && next === 'active') {
+        updateLastCheckedIn();
+      }
+      appState.current = next;
+    });
+    return () => sub.remove();
+  }, [updateLastCheckedIn]);
+
   if (!ready) return null;
 
   return (
@@ -83,6 +99,7 @@ export default function RootLayout() {
             <Stack.Screen name="checkin" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="log-urge" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="porn-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="reflection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="share" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="share-achievement" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
