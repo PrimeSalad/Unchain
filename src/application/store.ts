@@ -129,6 +129,10 @@ interface RecoveryState {
   /** Lifetime walk totals — steps counted and metres covered (GPS). */
   walkSteps: number;
   walkMeters: number;
+  /** Glasses drunk today — day-keyed so it resets at local midnight. */
+  waterToday: { day: string; glasses: number };
+  /** Lifetime glasses logged. */
+  waterGlassesTotal: number;
 
   // ── Porn Recovery Metrics ───────────────────────────────────────────────
   lastCheckedIn: number | null;
@@ -187,6 +191,9 @@ interface RecoveryState {
   recordAltSession: (id: AlternativeId, seconds: number) => void;
   /** Add a finished walk's steps + metres to the lifetime totals. */
   recordWalkMetrics: (steps: number, meters: number) => void;
+  /** Log glasses of water for today (clamped 1–24 per log). Returns today's
+   *  running total after the log. */
+  logWater: (glasses: number) => number;
   /** Add a website to the permanent blocklist. Validates + de-duplicates.
    *  Protection starts immediately and never expires. */
   addBlockedSite: (domainInput: string, nickname?: string) => 'added' | 'duplicate' | 'invalid';
@@ -325,6 +332,8 @@ export const useStore = create<RecoveryState>()(
       altSessions: {},
       walkSteps: 0,
       walkMeters: 0,
+      waterToday: { day: '', glasses: 0 },
+      waterGlassesTotal: 0,
       blockedSites: [],
       favoriteQuotes: [],
       dailyMissions: { day: '', completed: [] },
@@ -337,6 +346,21 @@ export const useStore = create<RecoveryState>()(
       healthyHabitsCount: 0,
 
       updateLastCheckedIn: () => set({ lastCheckedIn: Date.now() }),
+
+      logWater: (glasses) => {
+        const n = Math.max(1, Math.min(24, Math.round(glasses)));
+        let total = n;
+        set((s) => {
+          const day = localDayKey();
+          const sofar = s.waterToday.day === day ? s.waterToday.glasses : 0;
+          total = sofar + n;
+          return {
+            waterToday: { day, glasses: total },
+            waterGlassesTotal: s.waterGlassesTotal + n,
+          };
+        });
+        return total;
+      },
 
       recordWalkMetrics: (steps, meters) =>
         set((s) => ({
@@ -937,6 +961,8 @@ export const useStore = create<RecoveryState>()(
           altSessions: {},
           walkSteps: 0,
           walkMeters: 0,
+          waterToday: { day: '', glasses: 0 },
+          waterGlassesTotal: 0,
           blockedSites: [],
           favoriteQuotes: [],
           dailyQuote: null,

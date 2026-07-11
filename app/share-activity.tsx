@@ -12,7 +12,7 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
 import { currentStreakStart, streakDays } from '@/domain/gambling';
-import { ALTERNATIVES, alternativeById, type AlternativeId } from '@/domain/alternatives';
+import { ALTERNATIVES, WATER_GOAL_GLASSES, alternativeById, type AlternativeId } from '@/domain/alternatives';
 import { formatDistance, formatPace } from '@/domain/walk';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
@@ -72,7 +72,14 @@ const BREATH_CYCLE_SECONDS = 12;
 export default function ShareActivity() {
   const safeBack = useSafeBack();
   const theme = useTheme();
-  const params = useLocalSearchParams<{ id?: string; seconds?: string; steps?: string; meters?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    seconds?: string;
+    steps?: string;
+    meters?: string;
+    glasses?: string;
+    stretches?: string;
+  }>();
   const profile = useProfile();
   const altCounts = useStore((s) => s.altCounts);
   const altSeconds = useStore((s) => s.altSeconds);
@@ -108,6 +115,8 @@ export default function ShareActivity() {
 
   const sessionSteps = Math.max(0, parseInt(params.steps ?? '0', 10) || 0);
   const sessionMeters = Math.max(0, parseInt(params.meters ?? '0', 10) || 0);
+  const sessionGlasses = Math.max(0, parseInt(params.glasses ?? '0', 10) || 0);
+  const sessionStretches = Math.max(0, parseInt(params.stretches ?? '0', 10) || 0);
 
   // Three stats that make the session feel earned — tuned per activity.
   const stats: { label: string; value: string }[] = (() => {
@@ -130,7 +139,7 @@ export default function ShareActivity() {
         ];
       case 'stretch':
         return [
-          { label: 'Stretches', value: '4' },
+          { label: 'Stretches', value: sessionStretches > 0 ? `${sessionStretches}` : '—' },
           { label: 'Sessions', value: `${sessions}` },
           { label: 'Total time', value: fmtTotal(totalSeconds) },
         ];
@@ -147,10 +156,10 @@ export default function ShareActivity() {
           { label: 'Clean days', value: `${journal.filter((j) => j.gambled === false).length}` },
           { label: 'Day streak', value: `${streak}` },
         ];
-      default: // water — no meaningful duration
+      default: // water — glasses instead of duration
         return [
+          { label: 'Today', value: `${sessionGlasses}/${WATER_GOAL_GLASSES}` },
           { label: 'Days logged', value: `${daysDone}` },
-          { label: 'Glasses', value: `${sessions}` },
           { label: 'Day streak', value: `${streak}` },
         ];
     }
@@ -246,6 +255,15 @@ export default function ShareActivity() {
                   <Text color={palette.white} style={{ fontSize: 72, lineHeight: 78, fontFamily: 'Nunito_900Black', fontVariant: ['tabular-nums'], marginTop: spacing.xs }}>
                     {fmtClock(seconds)}
                   </Text>
+                ) : id === 'water' && sessionGlasses > 0 ? (
+                  <>
+                    <Text color={palette.white} style={{ fontSize: 72, lineHeight: 78, fontFamily: 'Nunito_900Black', fontVariant: ['tabular-nums'], marginTop: spacing.xs }}>
+                      {sessionGlasses}
+                    </Text>
+                    <Text variant="callout" color="rgba(255,255,255,0.85)" style={{ marginTop: -4 }}>
+                      glass{sessionGlasses === 1 ? '' : 'es'} today
+                    </Text>
+                  </>
                 ) : (
                   <Text color={palette.white} style={{ fontSize: 56, lineHeight: 64, fontFamily: 'Nunito_900Black', marginTop: spacing.xs }}>
                     Done ✓

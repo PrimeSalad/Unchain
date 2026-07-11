@@ -30,14 +30,21 @@ import { startCalmMusic, stopCalmMusic } from '@/application/sound';
 import {
   ALT_ACHIEVEMENTS,
   ALTERNATIVES,
+  BREATHE_MAX_MINUTES,
+  BREATHE_MIN_MINUTES,
   BREATHE_MINUTES,
   MUSIC_GOAL_SECONDS,
+  STRETCH_COUNT_OPTIONS,
+  STRETCH_SECONDS_OPTIONS,
   STRETCH_STEPS,
+  WATER_GOAL_GLASSES,
   type AltAchievement,
   type AltCounts,
   type Alternative,
   type AlternativeId,
+  type StretchStep,
 } from '@/domain/alternatives';
+import { localDayKey } from '@/domain/quotes';
 import {
   GPS_MAX_ACCURACY_M,
   WALK_MIN_SECONDS,
@@ -61,6 +68,14 @@ function fmtClock(totalSeconds: number): string {
 
 function fmtTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Lifetime durations as a compact human total: 45s → "45s", 12m, 1h 35m. */
+function fmtTotalDur(totalSeconds: number): string {
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const m = Math.floor(totalSeconds / 60);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
 function successHaptic() {
@@ -507,6 +522,35 @@ function WalkSheet({
 // 3. Water — small confirmation sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Round +/- stepper button shared by the water and breathe configurators. */
+function StepBtn({ icon, onPress, label, disabled }: {
+  icon: 'add' | 'remove';
+  onPress: () => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        width: 48, height: 48, borderRadius: radius.round,
+        backgroundColor: theme.color.surfaceAlt,
+        alignItems: 'center', justifyContent: 'center',
+        opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
+      })}
+    >
+      <Ionicons name={icon} size={22} color={theme.color.primary} />
+    </Pressable>
+  );
+}
+
 function WaterSheet({
   visible,
   onClose,
@@ -515,41 +559,90 @@ function WaterSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  onComplete: () => void;
+  /** Logs `glasses` and completes today's activity. */
+  onComplete: (glasses: number) => void;
   onShare: () => void;
 }) {
+  const theme = useTheme();
+  const waterToday = useStore((s) => s.waterToday);
+  const waterGlassesTotal = useStore((s) => s.waterGlassesTotal);
+  const glassesToday = waterToday.day === localDayKey() ? waterToday.glasses : 0;
+
+  const [glasses, setGlasses] = useState(1);
   const [done, setDone] = useState(false);
   useEffect(() => {
-    if (visible) setDone(false);
+    if (visible) {
+      setDone(false);
+      setGlasses(1);
+    }
   }, [visible]);
 
-  const yes = () => {
+  const log = () => {
     successHaptic();
-    onComplete();
+    onComplete(glasses);
     setDone(true);
   };
+
+  const goalPct = Math.min(1, glassesToday / WATER_GOAL_GLASSES);
 
   return (
     <ActionSheet visible={visible} onClose={onClose}>
       {done ? (
         <SheetDone
-          title="Nicely done."
-          message="Hydration helps your body recover."
+          title={glassesToday >= WATER_GOAL_GLASSES ? 'Hydration goal reached!' : 'Nicely done.'}
+          message={
+            glassesToday >= WATER_GOAL_GLASSES
+              ? `${WATER_GOAL_GLASSES} glasses today — your body thanks you.`
+              : 'Hydration helps your body recover.'
+          }
           stats={[
-            { label: 'Glass', value: '+1' },
-            { label: 'Logged', value: fmtTime(Date.now()) },
+            { label: 'Logged', value: `+${glasses}` },
+            { label: 'Today', value: `${glassesToday}/${WATER_GOAL_GLASSES}` },
+            { label: 'Lifetime', value: waterGlassesTotal.toLocaleString() },
           ]}
           onShare={onShare}
           onClose={onClose}
         />
       ) : (
-        <View style={{ gap: spacing.md }}>
+        <View style={{ gap: spacing.lg }}>
           <SheetHeading
-            title="Did you drink a glass of water?"
+            title="Drink Water"
             subtitle="A small reset for your body — and a pause for your mind."
           />
-          <Button label="Yes" onPress={yes} full />
-          <Button label="Not Yet" kind="secondary" onPress={onClose} full />
+
+          {/* Today's goal */}
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text variant="footnote" dim>Today's goal</Text>
+              <Text variant="footnote" color={glassesToday >= WATER_GOAL_GLASSES ? theme.color.success : theme.color.textDim} style={{ fontVariant: ['tabular-nums'] }}>
+                {glassesToday} of {WATER_GOAL_GLASSES} glasses
+              </Text>
+            </View>
+            <ProgressBar progress={goalPct} height={8} color={theme.color.success} />
+          </View>
+
+          {/* How many glasses */}
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: spacing.lg,
+              backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card,
+              padding: spacing.lg, justifyContent: 'center',
+            }}
+          >
+            <StepBtn icon="remove" label="One glass fewer" onPress={() => setGlasses((g) => Math.max(1, g - 1))} disabled={glasses <= 1} />
+            <View style={{ alignItems: 'center', minWidth: 96 }}>
+              <Text variant="display" style={{ fontSize: 40, lineHeight: 46, fontVariant: ['tabular-nums'] }}>
+                {glasses}
+              </Text>
+              <Text variant="caption" dim>{glasses === 1 ? 'glass' : 'glasses'}</Text>
+            </View>
+            <StepBtn icon="add" label="One glass more" onPress={() => setGlasses((g) => Math.min(12, g + 1))} disabled={glasses >= 12} />
+          </View>
+
+          <View style={{ gap: spacing.sm }}>
+            <Button label={`Log ${glasses} ${glasses === 1 ? 'glass' : 'glasses'}`} onPress={log} full />
+            <Button label="Not Yet" kind="tertiary" onPress={onClose} full />
+          </View>
         </View>
       )}
     </ActionSheet>
@@ -557,10 +650,61 @@ function WaterSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Stretch — guided steps, each on its own timer
+// 4. Stretch — the user builds the routine: how many stretches, how long each
 // ─────────────────────────────────────────────────────────────────────────────
 
 type StretchPhase = 'idle' | 'running' | 'done';
+
+/** Fisher–Yates copy — sessions draw a fresh mix from the stretch library. */
+function shuffled<T>(arr: readonly T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Selection chip row shared by the stretch configurator. */
+function ChipRow<T extends number>({
+  options, value, onChange, format,
+}: {
+  options: readonly T[];
+  value: T;
+  onChange: (v: T) => void;
+  format: (v: T) => string;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+      {options.map((o) => {
+        const on = value === o;
+        return (
+          <Pressable
+            key={o}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(o);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={format(o)}
+            accessibilityState={{ selected: on }}
+            style={({ pressed }) => ({
+              flex: 1, height: 40, borderRadius: radius.round,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text variant="footnote" color={on ? theme.color.onPrimary : theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>
+              {format(o)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 function StretchSheet({
   visible,
@@ -570,15 +714,21 @@ function StretchSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  onComplete: (seconds: number) => void;
-  onShare: (seconds: number) => void;
+  onComplete: (m: { seconds: number; stretches: number }) => void;
+  onShare: (m: { seconds: number; stretches: number }) => void;
 }) {
   const theme = useTheme();
   const [phase, setPhase] = useState<StretchPhase>('idle');
+  const [count, setCount] = useState<number>(5);
+  const [perStep, setPerStep] = useState<number>(30);
+  const [routine, setRoutine] = useState<StretchStep[]>([]);
   const [stepIdx, setStepIdx] = useState(0);
-  const [remaining, setRemaining] = useState(STRETCH_STEPS[0].seconds);
+  const [remaining, setRemaining] = useState(30);
   const [sessionSecs, setSessionSecs] = useState(0);
   const endAtRef = useRef(0);
+  // Refs mirror the config so timer callbacks never read stale state.
+  const routineRef = useRef<StretchStep[]>([]);
+  const perStepRef = useRef(30);
   // Wall-clock session start — the shared card reports real time spent.
   const startedAtRef = useRef(0);
 
@@ -586,7 +736,6 @@ function StretchSheet({
     if (visible) {
       setPhase('idle');
       setStepIdx(0);
-      setRemaining(STRETCH_STEPS[0].seconds);
     }
   }, [visible]);
 
@@ -597,25 +746,19 @@ function StretchSheet({
     setSessionSecs(secs);
     setPhase('done');
     successHaptic();
-    onComplete(secs);
+    onComplete({ seconds: secs, stretches: routineRef.current.length });
   }, [onComplete]);
-
-  const beginStep = (idx: number) => {
-    endAtRef.current = Date.now() + STRETCH_STEPS[idx].seconds * 1000;
-    setStepIdx(idx);
-    setRemaining(STRETCH_STEPS[idx].seconds);
-  };
 
   const advance = useCallback(() => {
     setStepIdx((i) => {
       const next = i + 1;
-      if (next >= STRETCH_STEPS.length) {
+      if (next >= routineRef.current.length) {
         finish();
         return i;
       }
       Haptics.selectionAsync().catch(() => {});
-      endAtRef.current = Date.now() + STRETCH_STEPS[next].seconds * 1000;
-      setRemaining(STRETCH_STEPS[next].seconds);
+      endAtRef.current = Date.now() + perStepRef.current * 1000;
+      setRemaining(perStepRef.current);
       return next;
     });
   }, [finish]);
@@ -632,18 +775,25 @@ function StretchSheet({
 
   const start = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    const picked = shuffled(STRETCH_STEPS).slice(0, Math.min(count, STRETCH_STEPS.length));
+    routineRef.current = picked;
+    perStepRef.current = perStep;
+    setRoutine(picked);
     startedAtRef.current = Date.now();
-    beginStep(0);
+    endAtRef.current = Date.now() + perStep * 1000;
+    setStepIdx(0);
+    setRemaining(perStep);
     setPhase('running');
   };
 
-  const step = STRETCH_STEPS[stepIdx];
+  const step = routine[stepIdx];
   const overall =
-    phase === 'running'
-      ? (stepIdx + 1 - remaining / step.seconds) / STRETCH_STEPS.length
+    phase === 'running' && routine.length > 0
+      ? (stepIdx + 1 - remaining / perStep) / routine.length
       : phase === 'done'
         ? 1
         : 0;
+  const estMinutes = Math.max(1, Math.round((count * perStep) / 60));
 
   return (
     <ActionSheet visible={visible} onClose={onClose} dismissable={phase !== 'running'}>
@@ -653,40 +803,57 @@ function StretchSheet({
           message="Tension released is stress your recovery no longer carries."
           stats={[
             { label: 'Stretched', value: fmtClock(sessionSecs) },
-            { label: 'Stretches', value: `${STRETCH_STEPS.length}` },
+            { label: 'Stretches', value: `${routine.length}` },
             { label: 'Finished', value: fmtTime(Date.now()) },
           ]}
-          onShare={() => onShare(sessionSecs)}
+          onShare={() => onShare({ seconds: sessionSecs, stretches: routine.length })}
           onClose={onClose}
         />
       ) : phase === 'idle' ? (
-        <View style={{ gap: spacing.md }}>
+        <View style={{ gap: spacing.lg }}>
           <SheetHeading
             title="Stretch Your Body"
-            subtitle={`${STRETCH_STEPS.length} gentle stretches · about ${Math.round(
-              STRETCH_STEPS.reduce((s, x) => s + x.seconds, 0) / 60,
-            )} minutes`}
+            subtitle="Build your own routine — pick how many stretches and how long each one runs."
           />
-          {STRETCH_STEPS.map((s) => (
-            <View
-              key={s.title}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: spacing.md,
-                backgroundColor: theme.color.surfaceAlt,
-                borderRadius: radius.card,
-                padding: spacing.md,
-              }}
-            >
-              <Ionicons name={s.icon as any} size={18} color={theme.color.primary} />
-              <Text variant="callout" style={{ flex: 1 }}>{s.title}</Text>
-              <Text variant="footnote" dim style={{ fontVariant: ['tabular-nums'] }}>{s.seconds}s</Text>
-            </View>
-          ))}
-          <Button label="Begin stretching" onPress={start} full style={{ marginTop: spacing.sm }} />
+
+          <View style={{ gap: spacing.sm }}>
+            <Text variant="footnote" dim>How many stretches?</Text>
+            <ChipRow
+              options={STRETCH_COUNT_OPTIONS}
+              value={count as (typeof STRETCH_COUNT_OPTIONS)[number]}
+              onChange={setCount}
+              format={(v) => `${v}`}
+            />
+          </View>
+
+          <View style={{ gap: spacing.sm }}>
+            <Text variant="footnote" dim>Seconds per stretch</Text>
+            <ChipRow
+              options={STRETCH_SECONDS_OPTIONS}
+              value={perStep as (typeof STRETCH_SECONDS_OPTIONS)[number]}
+              onChange={setPerStep}
+              format={(v) => `${v}s`}
+            />
+          </View>
+
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+              backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md,
+            }}
+          >
+            <Ionicons name="shuffle" size={18} color={theme.color.primary} />
+            <Text variant="callout" style={{ flex: 1 }}>
+              {count} stretches · about {estMinutes} minute{estMinutes === 1 ? '' : 's'} — a fresh mix from {STRETCH_STEPS.length} moves
+            </Text>
+          </View>
+
+          <View style={{ gap: spacing.sm }}>
+            <Button label="Begin stretching" onPress={start} full />
+            <Button label="Cancel" kind="tertiary" onPress={onClose} full />
+          </View>
         </View>
-      ) : (
+      ) : step == null ? null : (
         <View style={{ gap: spacing.lg, alignItems: 'center' }}>
           <SheetHeading title={step.title} />
           <View
@@ -714,7 +881,7 @@ function StretchSheet({
           <View style={{ alignSelf: 'stretch', gap: spacing.sm }}>
             <ProgressBar progress={overall} height={8} />
             <Text variant="caption" dim center style={{ fontVariant: ['tabular-nums'] }}>
-              Stretch {stepIdx + 1} of {STRETCH_STEPS.length}
+              Stretch {stepIdx + 1} of {routine.length}
             </Text>
           </View>
           <View style={{ alignSelf: 'stretch', gap: spacing.sm }}>
@@ -748,6 +915,9 @@ function BreatheSheet({
   const [phase, setPhase] = useState<BreathePhase>('idle');
   const [remaining, setRemaining] = useState(0);
   const [sessionSecs, setSessionSecs] = useState(0);
+  /** User-chosen session length in minutes — chips for quick picks, stepper
+   *  for anything from 1 to 30. */
+  const [minutes, setMinutes] = useState(3);
   const endAtRef = useRef(0);
   /** Chosen session length in seconds — elapsed = chosen − remaining. */
   const chosenRef = useRef(0);
@@ -797,32 +967,73 @@ function BreatheSheet({
           onClose={onClose}
         />
       ) : phase === 'idle' ? (
-        <View style={{ gap: spacing.md }}>
+        <View style={{ gap: spacing.lg }}>
           <SheetHeading
             title="Practice Deep Breathing"
-            subtitle="Inhale, hold, exhale — the orb sets the pace. Choose a length."
+            subtitle="Inhale, hold, exhale — the orb sets the pace. Set any length you like."
           />
-          {BREATHE_MINUTES.map((m) => (
-            <Pressable
-              key={m}
-              onPress={() => start(m)}
-              accessibilityRole="button"
-              accessibilityLabel={`Breathe for ${m} minute${m === 1 ? '' : 's'}`}
-              style={({ pressed }) => ({
-                height: 54,
-                borderRadius: radius.button,
-                backgroundColor: theme.color.surfaceAlt,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: spacing.sm,
-                opacity: pressed ? 0.8 : 1,
-              })}
-            >
-              <Ionicons name="leaf" size={16} color={theme.color.primary} />
-              <Text variant="headline">{m} minute{m === 1 ? '' : 's'}</Text>
-            </Pressable>
-          ))}
+
+          {/* Quick picks */}
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {BREATHE_MINUTES.map((m) => {
+              const on = minutes === m;
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setMinutes(m);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${m} minute${m === 1 ? '' : 's'}`}
+                  accessibilityState={{ selected: on }}
+                  style={({ pressed }) => ({
+                    flex: 1, height: 40, borderRadius: radius.round,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <Text variant="footnote" color={on ? theme.color.onPrimary : theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>
+                    {m}m
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Free stepper — 1 to 30 minutes */}
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: spacing.lg,
+              backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card,
+              padding: spacing.lg, justifyContent: 'center',
+            }}
+          >
+            <StepBtn
+              icon="remove"
+              label="One minute less"
+              onPress={() => setMinutes((m) => Math.max(BREATHE_MIN_MINUTES, m - 1))}
+              disabled={minutes <= BREATHE_MIN_MINUTES}
+            />
+            <View style={{ alignItems: 'center', minWidth: 110 }}>
+              <Text variant="display" style={{ fontSize: 40, lineHeight: 46, fontVariant: ['tabular-nums'] }}>
+                {minutes}
+              </Text>
+              <Text variant="caption" dim>minute{minutes === 1 ? '' : 's'}</Text>
+            </View>
+            <StepBtn
+              icon="add"
+              label="One minute more"
+              onPress={() => setMinutes((m) => Math.min(BREATHE_MAX_MINUTES, m + 1))}
+              disabled={minutes >= BREATHE_MAX_MINUTES}
+            />
+          </View>
+
+          <View style={{ gap: spacing.sm }}>
+            <Button label={`Breathe for ${minutes} minute${minutes === 1 ? '' : 's'}`} onPress={() => start(minutes)} full />
+            <Button label="Cancel" kind="tertiary" onPress={onClose} full />
+          </View>
         </View>
       ) : (
         <View style={{ alignItems: 'center', gap: spacing.lg }}>
@@ -1034,6 +1245,91 @@ function JournalDoneSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Health Metrics — the on-device health dashboard. Everything is measured by
+// this phone (pedometer, GPS, session timers, water logs) and never uploaded.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MetricTile({
+  icon, label, value, tint, index,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  tint: string;
+  index: number;
+}) {
+  const theme = useTheme();
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(Math.min(index, 8) * 50).springify().damping(18)}
+      style={{ flexBasis: '30%', flexGrow: 1 }}
+    >
+      <View
+        style={{
+          backgroundColor: theme.color.surface,
+          borderRadius: radius.card,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.sm,
+          alignItems: 'center',
+          gap: 3,
+        }}
+      >
+        <View
+          style={{
+            width: 30, height: 30, borderRadius: 15,
+            backgroundColor: tint + '18',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Ionicons name={icon} size={15} color={tint} />
+        </View>
+        <Text variant="headline" style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+          {value}
+        </Text>
+        <Text variant="caption" dim numberOfLines={1}>{label}</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+function HealthMetrics() {
+  const theme = useTheme();
+  const altSeconds = useStore((s) => s.altSeconds);
+  const walkSteps = useStore((s) => s.walkSteps);
+  const walkMeters = useStore((s) => s.walkMeters);
+  const waterToday = useStore((s) => s.waterToday);
+  const glassesToday = waterToday.day === localDayKey() ? waterToday.glasses : 0;
+
+  const activeSeconds =
+    (altSeconds.walk ?? 0) + (altSeconds.stretch ?? 0) + (altSeconds.breathe ?? 0) + (altSeconds.music ?? 0);
+
+  const tiles: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; tint: string }[] = [
+    { icon: 'footsteps', label: 'Steps', value: walkSteps > 0 ? walkSteps.toLocaleString() : '—', tint: theme.color.success },
+    { icon: 'navigate', label: 'Distance', value: walkMeters > 0 ? formatDistance(walkMeters) : '—', tint: theme.color.success },
+    { icon: 'time', label: 'Active time', value: activeSeconds > 0 ? fmtTotalDur(activeSeconds) : '—', tint: theme.color.primary },
+    { icon: 'water', label: 'Water today', value: `${glassesToday}/${WATER_GOAL_GLASSES}`, tint: '#4A6FA5' },
+    { icon: 'leaf', label: 'Breathing', value: (altSeconds.breathe ?? 0) > 0 ? fmtTotalDur(altSeconds.breathe ?? 0) : '—', tint: theme.color.primary },
+    { icon: 'body', label: 'Stretching', value: (altSeconds.stretch ?? 0) > 0 ? fmtTotalDur(altSeconds.stretch ?? 0) : '—', tint: theme.color.celebrateText },
+  ];
+
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: spacing.sm }}>
+        <Text variant="headline" style={{ flex: 1 }}>Health Metrics</Text>
+        <Text variant="caption" dim>All measured on this device</Text>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+        {tiles.map((t, i) => (
+          <MetricTile key={t.label} {...t} index={i} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Activity card
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1157,6 +1453,7 @@ export default function Alternatives() {
   const completeAlternative = useStore((s) => s.completeAlternative);
   const recordAltSession = useStore((s) => s.recordAltSession);
   const recordWalkMetrics = useStore((s) => s.recordWalkMetrics);
+  const logWater = useStore((s) => s.logWater);
   const altCounts = useStore((s) => s.altCounts);
   const altAchievements = useStore((s) => s.altAchievements);
   const journalCount = useStore((s) => s.journal.length);
@@ -1267,6 +1564,11 @@ export default function Alternatives() {
         </Text>
       </View>
 
+      {/* Health metrics dashboard */}
+      <View style={{ marginBottom: spacing.xl }}>
+        <HealthMetrics />
+      </View>
+
       {/* Activity cards */}
       <View style={{ gap: spacing.md }}>
         {ALTERNATIVES.map((alt, i) => (
@@ -1321,14 +1623,21 @@ export default function Alternatives() {
       <WaterSheet
         visible={sheet === 'water'}
         onClose={close}
-        onComplete={() => handleComplete('water')}
-        onShare={() => shareSession('water', 0)}
+        onComplete={(glasses) => {
+          logWater(glasses);
+          handleComplete('water', 0);
+        }}
+        onShare={() => {
+          const w = useStore.getState().waterToday;
+          const today = w.day === localDayKey() ? w.glasses : 0;
+          shareSession('water', 0, { glasses: String(today) });
+        }}
       />
       <StretchSheet
         visible={sheet === 'stretch'}
         onClose={close}
-        onComplete={(secs) => handleComplete('stretch', secs)}
-        onShare={(secs) => shareSession('stretch', secs)}
+        onComplete={(m) => handleComplete('stretch', m.seconds)}
+        onShare={(m) => shareSession('stretch', m.seconds, { stretches: String(m.stretches) })}
       />
       <BreatheSheet
         visible={sheet === 'breathe'}
