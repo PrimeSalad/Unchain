@@ -19,7 +19,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +31,7 @@ import { Card } from '@/presentation/components/Card';
 import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile, useTodayJournal } from '@/application/store';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -324,7 +324,7 @@ function ConfirmModal({
 
 export default function JournalEntry() {
   const theme      = useTheme();
-  const router     = useRouter();
+  const safeBack   = useSafeBack('/(tabs)/journal');
   const profile    = useProfile();
   const addJournal = useStore((s) => s.addJournal);
   const currency   = profile?.currency ?? '₱';
@@ -397,7 +397,7 @@ export default function JournalEntry() {
   }
 
   function goBack() {
-    if (stepIdx === 0) { router.back(); return; }
+    if (stepIdx === 0) { safeBack(); return; }
     Haptics.selectionAsync().catch(() => {});
     // If we're on the step immediately after did_gamble, going back means
     // the user wants to change their yes/no answer — unfreeze the step list
@@ -439,7 +439,7 @@ export default function JournalEntry() {
       moneyBalance: moneyBalance.trim() ? parseFloat(moneyBalance) || undefined : undefined,
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    router.back();
+    safeBack();
   }
 
   const isLastStep = stepIdx === (frozenSteps.current ?? steps).length - 1;
@@ -466,7 +466,7 @@ export default function JournalEntry() {
         {/* Close button */}
         <View style={{ flexDirection: 'row', marginTop: spacing.xs, marginBottom: spacing.xl }}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={safeBack}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Close"
@@ -529,7 +529,7 @@ export default function JournalEntry() {
           {/* Go back to see all entries */}
           <Button
             label="View all entries"
-            onPress={() => router.back()}
+            onPress={safeBack}
             kind="secondary"
             full
           />

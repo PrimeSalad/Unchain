@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, ImageBackground, Platform, Pressable, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { captureRef } from 'react-native-view-shot';
@@ -11,12 +10,13 @@ import { Text } from '@/presentation/components/Text';
 import { Roadmap } from '@/presentation/components/Roadmap';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
 import { streakDays, moneySaved, formatMoney, addictionMeta, currentStreakStart } from '@/domain/gambling';
 import { computeStats, badgeProgress } from '@/domain/achievements';
 
 export default function ShareCard() {
-  const router = useRouter();
+  const safeBack = useSafeBack();
   const theme = useTheme();
   const profile = useProfile();
   const store = useStore();
@@ -27,8 +27,8 @@ export default function ShareCard() {
 
   // Navigation is a side effect — never call it during render.
   useEffect(() => {
-    if (!profile) router.back();
-  }, [profile, router]);
+    if (!profile) safeBack();
+  }, [profile, safeBack]);
   if (!profile) return null;
 
   // Streak + money count from the current clean window (event-derived, same
@@ -152,7 +152,7 @@ export default function ShareCard() {
         {/* Top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <Text variant="title2" style={{ flex: 1 }}>Share your progress</Text>
-          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable onPress={safeBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
             <Ionicons name="close" size={26} color={theme.color.textDim} />
           </Pressable>
         </View>

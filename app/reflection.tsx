@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Alert, Pressable, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
@@ -8,6 +7,7 @@ import { Card } from '@/presentation/components/Card';
 import { Button } from '@/presentation/components/Button';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore } from '@/application/store';
 
 /**
@@ -16,7 +16,7 @@ import { useStore } from '@/application/store';
  */
 export default function ReflectionScreen() {
   const theme = useTheme();
-  const router = useRouter();
+  const safeBack = useSafeBack();
   const reflections = useStore((s) => s.reflections);
   const add = useStore((s) => s.addReflection);
   const remove = useStore((s) => s.deleteReflection);
@@ -40,7 +40,7 @@ export default function ReflectionScreen() {
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm }}>
-        <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
+        <Pressable onPress={safeBack} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
           <Ionicons name="close" size={26} color={theme.color.textDim} />
         </Pressable>
         <Text variant="headline">Emergency Reflection</Text>

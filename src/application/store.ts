@@ -69,6 +69,9 @@ export interface GamesState {
   clarityPracticeWon: number;
   /** Permanently unlocked game achievements: id → unlockedAt (ms). */
   achievements: Record<string, number>;
+  /** Games whose "How to play" popup the user opted out of ("Don't show
+   *  this again"). The header info button always re-opens it on demand. */
+  tutorialsHidden: Record<string, boolean>;
 }
 
 export const initialGames: GamesState = {
@@ -88,6 +91,7 @@ export const initialGames: GamesState = {
   clarityPracticePlayed: 0,
   clarityPracticeWon: 0,
   achievements: {},
+  tutorialsHidden: {},
 };
 
 interface RecoveryState {
@@ -151,6 +155,8 @@ interface RecoveryState {
   ) => GameAchievement[];
   recordBlocks: (score: number, ctx: { maxCombo: number; maxLines: number }) => GameAchievement[];
   saveClarityProgress: (day: number, guesses: string[]) => void;
+  /** Remember whether a game's "How to play" popup auto-shows on open. */
+  setTutorialHidden: (game: string, hidden: boolean) => void;
   recordClarityResult: (day: number, guesses: string[], won: boolean) => GameAchievement[];
   recordClarityPractice: (won: boolean, guessCount: number) => GameAchievement[];
   /** Set (or intentionally edit) today's mood on today's check-in. No-op without one. */
@@ -494,6 +500,14 @@ export const useStore = create<RecoveryState>()(
         });
         return unlocked;
       },
+
+      setTutorialHidden: (game, hidden) =>
+        set((s) => ({
+          games: {
+            ...s.games,
+            tutorialsHidden: { ...s.games.tutorialsHidden, [game]: hidden },
+          },
+        })),
 
       saveClarityProgress: (day, guesses) =>
         set((s) => ({

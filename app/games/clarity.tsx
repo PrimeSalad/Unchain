@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
@@ -92,6 +93,7 @@ export default function Clarity() {
   const recordPractice = useStore((s) => s.recordClarityPractice);
   const completeMission = useStore((s) => s.completeMission);
   const layout = useClarityLayout();
+  const tutorial = useGameTutorial('clarity');
 
   const [mode, setMode] = useState<'daily' | 'practice'>('daily');
   const daily = useMemo(() => dailyAnswer(), []);
@@ -248,6 +250,7 @@ export default function Clarity() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Clarity</Text>
+          <TutorialInfoButton onPress={tutorial.open} />
           {mode === 'daily' ? (
             <View style={{ alignItems: 'flex-end' }}>
               <Text variant="caption" dim>Daily #{daily.day}</Text>
@@ -373,6 +376,9 @@ export default function Clarity() {
           </View>
         )}
       </SafeAreaView>
+
+      {/* How to play */}
+      <GameTutorial game="clarity" visible={tutorial.visible} showOptOut={tutorial.auto} onClose={tutorial.close} />
 
       {/* End-of-round celebration */}
       <GameCelebration

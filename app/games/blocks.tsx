@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
@@ -67,6 +68,7 @@ export default function Blocks() {
   const maxLinesRef = useRef(0);
 
   const gridBoxRef = useRef<View>(null);
+  const tutorial = useGameTutorial('blocks');
 
   // Refs so the gesture handlers always read the latest state.
   const gridRef = useRef(grid); gridRef.current = grid;
@@ -231,6 +233,7 @@ export default function Blocks() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Block Puzzle</Text>
+          <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
         {/* Score row */}
@@ -311,6 +314,9 @@ export default function Blocks() {
           </View>
         )}
       </SafeAreaView>
+
+      {/* How to play */}
+      <GameTutorial game="blocks" visible={tutorial.visible} showOptOut={tutorial.auto} onClose={tutorial.close} />
 
       {/* Game-over celebration */}
       <GameCelebration

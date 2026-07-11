@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { captureRef } from 'react-native-view-shot';
@@ -9,6 +9,7 @@ import * as Sharing from 'expo-sharing';
 import { Text } from '@/presentation/components/Text';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore } from '@/application/store';
 import { achievementById, GAME_NAMES } from '@/domain/games/achievements';
 import { ALTERNATIVES, altAchievementById } from '@/domain/alternatives';
@@ -16,7 +17,7 @@ import { ALTERNATIVES, altAchievementById } from '@/domain/alternatives';
 /** Strava-style share card for an unlocked achievement — recreational games
  *  and healthy-habit achievements share the same card and flow. */
 export default function ShareAchievement() {
-  const router = useRouter();
+  const safeBack = useSafeBack();
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const games = useStore((s) => s.games);
@@ -32,8 +33,8 @@ export default function ShareAchievement() {
 
   // Navigation is a side effect — never call it during render.
   useEffect(() => {
-    if (!achievement) router.back();
-  }, [achievement, router]);
+    if (!achievement) safeBack();
+  }, [achievement, safeBack]);
   if (!achievement) return null;
 
   const categoryLabel = gameAch ? GAME_NAMES[gameAch.game] : 'Healthy Habits';
@@ -116,7 +117,7 @@ export default function ShareAchievement() {
         {/* Top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <Text variant="title2" style={{ flex: 1 }}>Share achievement</Text>
-          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable onPress={safeBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
             <Ionicons name="close" size={26} color={theme.color.textDim} />
           </Pressable>
         </View>

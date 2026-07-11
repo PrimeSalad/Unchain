@@ -12,12 +12,14 @@ import { Slider } from '@/presentation/components/Slider';
 import { Mascot } from '@/presentation/components/Mascot';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useTodayCheckIn, useProfile } from '@/application/store';
 import { TRIGGERS, addictionMeta } from '@/domain/gambling';
 
 export default function CheckIn() {
   const theme = useTheme();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const submit = useStore((s) => s.submitCheckIn);
   const logRelapse = useStore((s) => s.logRelapse);
   const already = useTodayCheckIn();
@@ -68,7 +70,7 @@ export default function CheckIn() {
 
   const Header = (
     <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.sm }}>
-      <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
+      <Pressable onPress={safeBack} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
         <Ionicons name="close" size={26} color={theme.color.textDim} />
       </Pressable>
     </View>
@@ -117,7 +119,7 @@ export default function CheckIn() {
             />
           )}
         </View>
-        <Button label="Done" onPress={() => router.back()} full />
+        <Button label="Done" onPress={safeBack} full />
       </Screen>
     );
   }

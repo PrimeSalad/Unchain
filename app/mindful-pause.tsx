@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BreathingOrb } from '@/presentation/components/BreathingOrb';
 import { Text } from '@/presentation/components/Text';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
 import { playSound, setCalmMusicPaused, startCalmMusic, stopCalmMusic } from '@/application/sound';
 import { moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
@@ -19,7 +19,7 @@ const DURATIONS = [5, 10, 15, 20, 30];
  * duration completes, so the pause is protected from distraction.
  */
 export default function MindfulPause() {
-  const router = useRouter();
+  const safeBack = useSafeBack();
   const profile = useProfile();
   const pushTimeline = useStore((s) => s.pushTimeline);
   const addPoints = useStore((s) => s.addPoints);
@@ -113,7 +113,7 @@ export default function MindfulPause() {
         {/* Close is only available before the session starts; music toggle while active. */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: spacing.lg, minHeight: 44 }}>
           {minutes == null && (
-            <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
+            <Pressable onPress={safeBack} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={26} color={palette.fogDim} />
             </Pressable>
           )}
@@ -183,7 +183,7 @@ export default function MindfulPause() {
               Money saved so far: {formatMoney(money.total, currency)}
             </Text>
             <Pressable
-              onPress={() => router.back()}
+              onPress={safeBack}
               accessibilityRole="button"
               accessibilityLabel="Done"
               style={({ pressed }) => ({ marginTop: spacing.xxxl, alignSelf: 'stretch', height: 52, borderRadius: radius.button, backgroundColor: palette.grape, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}

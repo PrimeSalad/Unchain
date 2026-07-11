@@ -11,12 +11,14 @@ import { Pill } from '@/presentation/components/Pill';
 import { Slider } from '@/presentation/components/Slider';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
 import { TRIGGERS, urgeLevel } from '@/domain/gambling';
 
 export default function LogUrge() {
   const theme = useTheme();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const logUrge = useStore((s) => s.logUrge);
   const profile = useProfile();
 
@@ -79,7 +81,7 @@ export default function LogUrge() {
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.sm }}>
-        <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
+        <Pressable onPress={safeBack} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
           <Ionicons name="close" size={26} color={theme.color.textDim} />
         </Pressable>
       </View>

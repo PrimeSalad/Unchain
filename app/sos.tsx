@@ -6,12 +6,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/presentation/components/Text';
 import { Collapsible } from '@/presentation/components/Collapsible';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useProfile, useStore } from '@/application/store';
 import { recoveryTimer, moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
 import { QUOTES } from '@/domain/quotes';
 
 export default function Sos() {
   const router = useRouter();
+  const safeBack = useSafeBack();
   const profile = useProfile();
   const [panel, setPanel] = useState<'motiv' | null>(null);
   // The same daily quote shown on Home — consistent all day, offline.
@@ -60,7 +62,7 @@ export default function Sos() {
     <View style={{ flex: 1, backgroundColor: palette.night }}>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: spacing.lg }}>
-          <Pressable onPress={() => router.back()} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable onPress={safeBack} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
             <Ionicons name="close" size={26} color={palette.fogDim} />
           </Pressable>
         </View>

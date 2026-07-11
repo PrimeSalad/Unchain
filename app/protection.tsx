@@ -11,7 +11,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -22,6 +21,7 @@ import { Card } from '@/presentation/components/Card';
 import { ActionSheet } from '@/presentation/components/ActionSheet';
 import { elevation, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile, useTodayJournal } from '@/application/store';
 import { currentStreakStart, streakDays } from '@/domain/gambling';
 import { ALTERNATIVES } from '@/domain/alternatives';
@@ -483,7 +483,7 @@ function SiteRow({
 
 export default function Protection() {
   const theme = useTheme();
-  const router = useRouter();
+  const safeBack = useSafeBack();
   const profile = useProfile();
   const blockedSites = useStore((s) => s.blockedSites);
   const addBlockedSite = useStore((s) => s.addBlockedSite);
@@ -556,7 +556,7 @@ export default function Protection() {
           </Text>
         </View>
         <Pressable
-          onPress={() => router.back()}
+          onPress={safeBack}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Close"

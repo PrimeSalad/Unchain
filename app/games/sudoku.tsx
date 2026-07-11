@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
@@ -49,6 +50,7 @@ export default function Sudoku() {
   const recorded = useRef(false);
   // Synchronous hint counter — state alone can be raced by rapid taps.
   const hintsRef = useRef(0);
+  const tutorial = useGameTutorial('sudoku');
 
   const givens = useMemo(() => new Set(puzzle.map((v, i) => (v !== 0 ? i : -1)).filter((i) => i >= 0)), [puzzle]);
   const bad = useMemo(() => conflicts(grid), [grid]);
@@ -182,6 +184,7 @@ export default function Sudoku() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Sudoku</Text>
+          <TutorialInfoButton onPress={tutorial.open} />
           <Text variant="callout" dim style={{ fontVariant: ['tabular-nums'] }}>{mm}:{ss}</Text>
         </View>
 
@@ -309,6 +312,9 @@ export default function Sudoku() {
           </View>
         )}
       </SafeAreaView>
+
+      {/* How to play */}
+      <GameTutorial game="sudoku" visible={tutorial.visible} showOptOut={tutorial.auto} onClose={tutorial.close} />
 
       {/* Solved celebration */}
       <GameCelebration

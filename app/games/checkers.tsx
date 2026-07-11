@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, View } from 'react-native';
+import { Alert, Animated, Easing, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, Foundation } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
@@ -67,6 +68,7 @@ export default function Checkers() {
   const [boardW, setBoardW] = useState(0);
   const recorded = useRef(false);
   const cell = boardW / 8;
+  const tutorial = useGameTutorial('checkers');
 
   // Stable animation plumbing — values are created once and reused for every
   // move, so no Animated node is ever torn down mid-animation.
@@ -220,6 +222,17 @@ export default function Checkers() {
     }
   };
 
+  /** Concede the game — recorded as a real loss, behind a confirmation.
+   *  Guarded against a mid-flight animation so the board can't half-commit. */
+  const surrender = () => {
+    if (over || flight) return;
+    Haptics.selectionAsync().catch(() => {});
+    Alert.alert('Surrender this game?', 'The AI takes the win and it counts as a loss.', [
+      { text: 'Keep playing', style: 'cancel' },
+      { text: 'Surrender', style: 'destructive', onPress: () => finish('b', board) },
+    ]);
+  };
+
   // AI turn — brief natural "thinking" beat, then an animated reply.
   useEffect(() => {
     if (turn !== 'b' || over || flight) return;
@@ -263,9 +276,24 @@ export default function Checkers() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Checkers</Text>
+          <TutorialInfoButton onPress={tutorial.open} />
+          {!over && (
+            <Pressable
+              onPress={surrender}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Surrender this game"
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 })}
+            >
+              <Ionicons name="flag-outline" size={16} color={theme.color.danger} />
+              <Text variant="footnote" color={theme.color.danger}>Surrender</Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={newGame}
             hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Start a new game"
             style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 })}
           >
             <Ionicons name="refresh" size={16} color={theme.color.primary} />
@@ -389,6 +417,9 @@ export default function Checkers() {
           <MiniStat label="Win rate" value={`${winRate}%`} />
         </View>
       </SafeAreaView>
+
+      {/* How to play */}
+      <GameTutorial game="checkers" visible={tutorial.visible} showOptOut={tutorial.auto} onClose={tutorial.close} />
 
       {/* Victory / defeat celebration */}
       <GameCelebration

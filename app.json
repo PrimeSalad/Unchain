@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "unchain",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dotorbit.unchain",
@@ -20,8 +19,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#5A2E7A",
         "foregroundImage": "./assets/images/adaptive-icon.png"
-      },
-      "edgeToEdgeEnabled": true
+      }
     },
     "web": {
       "bundler": "metro",
@@ -50,7 +48,8 @@
           "photosPermission": "Unchain uses a photo only as the background for the progress card you choose to share. Photos never leave your device otherwise."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

@@ -24,6 +24,7 @@ import { BreathingOrb } from '@/presentation/components/BreathingOrb';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useTodayJournal } from '@/application/store';
 import { startCalmMusic, stopCalmMusic } from '@/application/sound';
 import {
@@ -884,6 +885,7 @@ function ActivityCard({
 export default function Alternatives() {
   const theme = useTheme();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const completions = useStore((s) => s.alternatives);
   const completeAlternative = useStore((s) => s.completeAlternative);
   const altCounts = useStore((s) => s.altCounts);
@@ -944,7 +946,7 @@ export default function Alternatives() {
           </Text>
         </View>
         <Pressable
-          onPress={() => router.back()}
+          onPress={safeBack}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Close"
