@@ -227,6 +227,10 @@ export function ProfileScreen() {
           alternatives: s.alternatives,
           altCounts: s.altCounts,
           altAchievements: s.altAchievements,
+          altSeconds: s.altSeconds,
+          altSessions: s.altSessions,
+          walkSteps: s.walkSteps,
+          walkMeters: s.walkMeters,
           blockedSites: s.blockedSites,
           dailyMissions: s.dailyMissions,
           missionXp: s.missionXp,
@@ -299,6 +303,10 @@ export function ProfileScreen() {
         alternatives: obj(data.alternatives, {}),
         altCounts: obj(data.altCounts, {}),
         altAchievements: obj(data.altAchievements, {}),
+        altSeconds: obj(data.altSeconds, {}),
+        altSessions: obj(data.altSessions, {}),
+        walkSteps: typeof data.walkSteps === 'number' ? data.walkSteps : 0,
+        walkMeters: typeof data.walkMeters === 'number' ? data.walkMeters : 0,
         blockedSites: arr(data.blockedSites),
         dailyMissions:
           data.dailyMissions && typeof data.dailyMissions.day === 'string' && Array.isArray(data.dailyMissions.completed)

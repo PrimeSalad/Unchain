@@ -86,6 +86,7 @@ export default function RootLayout() {
             <Stack.Screen name="reflection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="share" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="share-achievement" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="share-activity" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>

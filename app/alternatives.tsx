@@ -8,17 +8,17 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, View, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Animated as RNAnimated, Easing, Modal, Pressable, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
+import { Pedometer } from 'expo-sensors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
 import { Button } from '@/presentation/components/Button';
 import { ActionSheet } from '@/presentation/components/ActionSheet';
-import { TimerRing } from '@/presentation/components/TimerRing';
 import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { BreathingOrb } from '@/presentation/components/BreathingOrb';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
@@ -33,12 +33,18 @@ import {
   BREATHE_MINUTES,
   MUSIC_GOAL_SECONDS,
   STRETCH_STEPS,
-  WALK_SECONDS,
   type AltAchievement,
   type AltCounts,
   type Alternative,
   type AlternativeId,
 } from '@/domain/alternatives';
+import {
+  GPS_MAX_ACCURACY_M,
+  WALK_MIN_SECONDS,
+  formatDistance,
+  formatPace,
+  gpsDelta,
+} from '@/domain/walk';
 import { sameDay } from '@/domain/records';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
@@ -61,35 +67,11 @@ function successHaptic() {
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 }
 
-/** Schedule the walk-complete notification. Returns null when not permitted —
- *  the in-app completion still works; the notification is a bonus. */
-async function scheduleWalkNotification(seconds: number): Promise<string | null> {
-  try {
-    let perm = await Notifications.getPermissionsAsync();
-    if (!perm.granted && perm.canAskAgain) {
-      perm = await Notifications.requestPermissionsAsync();
-    }
-    if (!perm.granted || seconds <= 0) return null;
-    return await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Walk complete',
-        body: 'Great job — every healthy choice strengthens your recovery.',
-        sound: 'default',
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds,
-        repeats: false,
-      },
-    });
-  } catch {
-    return null;
-  }
-}
-
-function cancelNotification(id: string | null) {
-  if (!id) return;
-  Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+/** Live walk metrics handed to the store + share card when a walk ends. */
+interface WalkMetrics {
+  seconds: number;
+  steps: number;
+  meters: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,10 +81,16 @@ function cancelNotification(id: string | null) {
 function SheetDone({
   title,
   message,
+  stats,
+  onShare,
   onClose,
 }: {
   title: string;
   message: string;
+  /** Session summary tiles (duration, finish time, …) — the Strava moment. */
+  stats?: { label: string; value: string }[];
+  /** Opens the shareable session card. */
+  onShare?: () => void;
   onClose: () => void;
 }) {
   const theme = useTheme();
@@ -128,7 +116,28 @@ function SheetDone({
       <Text variant="callout" dim center style={{ lineHeight: 22, paddingHorizontal: spacing.md }}>
         {message}
       </Text>
-      <Button label="Done" onPress={onClose} full style={{ marginTop: spacing.md }} />
+      {stats && stats.length > 0 && (
+        <View
+          style={{
+            alignSelf: 'stretch',
+            flexDirection: 'row',
+            backgroundColor: theme.color.surfaceAlt,
+            borderRadius: radius.card,
+            padding: spacing.md,
+          }}
+        >
+          {stats.map((st) => (
+            <View key={st.label} style={{ flex: 1, alignItems: 'center' }}>
+              <Text variant="headline" style={{ fontVariant: ['tabular-nums'] }}>{st.value}</Text>
+              <Text variant="caption" dim style={{ marginTop: 2 }} center>{st.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm }}>
+        {onShare && <Button label="Share this session" kind="secondary" onPress={onShare} full />}
+        <Button label="Done" onPress={onClose} full />
+      </View>
     </View>
   );
 }
@@ -149,91 +158,259 @@ function SheetHeading({ title, subtitle }: { title: string; subtitle?: string })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Walk — timed session with progress ring + optional local notification
+// 1. Walk — open-ended Strava-style session: live stopwatch, real step count
+// (pedometer) and GPS distance. The user decides when to stop. Sensors are
+// requested only when the walk starts and everything stays on-device.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type WalkPhase = 'idle' | 'running' | 'paused' | 'done';
+
+/** Soft pulsing halo behind the live stopwatch — the "recording" heartbeat. */
+function WalkPulse({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const theme = useTheme();
+  const anim = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    if (!active) return;
+    const loop = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(anim, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        RNAnimated.timing(anim, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, anim]);
+
+  return (
+    <View style={{ width: 190, height: 190, alignItems: 'center', justifyContent: 'center' }}>
+      <RNAnimated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', width: 190, height: 190, borderRadius: 95,
+          backgroundColor: theme.color.success,
+          opacity: active ? anim.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.22] }) : 0.06,
+          transform: [{ scale: active ? anim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.05] }) : 0.92 }],
+        }}
+      />
+      <View
+        style={{
+          width: 158, height: 158, borderRadius: 79,
+          backgroundColor: theme.color.successSoft,
+          alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
+/** Live metric tile — springs on every value change so the numbers feel alive. */
+function LiveStat({ label, value, on }: { label: string; value: string; on: boolean }) {
+  const theme = useTheme();
+  const scale = useRef(new RNAnimated.Value(1)).current;
+
+  useEffect(() => {
+    scale.setValue(1.12);
+    RNAnimated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 11, stiffness: 220 }).start();
+  }, [value, scale]);
+
+  return (
+    <View
+      style={{
+        flex: 1, alignItems: 'center', paddingVertical: spacing.md,
+        backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card,
+      }}
+    >
+      <RNAnimated.View style={{ transform: [{ scale }] }}>
+        <Text variant="headline" color={on ? theme.color.text : theme.color.textDim} style={{ fontVariant: ['tabular-nums'] }}>
+          {value}
+        </Text>
+      </RNAnimated.View>
+      <Text variant="caption" dim style={{ marginTop: 2 }}>{label}</Text>
+    </View>
+  );
+}
+
+function SensorBadge({ icon, label, on }: { icon: keyof typeof Ionicons.glyphMap; label: string; on: boolean }) {
+  const theme = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: on ? theme.color.success : theme.color.hairline }} />
+      <Ionicons name={icon} size={12} color={on ? theme.color.success : theme.color.textDim} />
+      <Text variant="caption" color={on ? theme.color.success : theme.color.textDim}>{label}</Text>
+    </View>
+  );
+}
 
 function WalkSheet({
   visible,
   onClose,
   onComplete,
+  onShare,
 }: {
   visible: boolean;
   onClose: () => void;
-  onComplete: () => void;
+  onComplete: (m: WalkMetrics) => void;
+  onShare: (m: WalkMetrics) => void;
 }) {
-  const { width } = useWindowDimensions();
-  // Ring shrinks gracefully on compact devices (iPhone SE) so the sheet's
-  // controls always stay on screen.
-  const ringSize = Math.max(160, Math.min(210, width - 120));
+  const theme = useTheme();
   const [phase, setPhase] = useState<WalkPhase>('idle');
-  const [remaining, setRemaining] = useState(WALK_SECONDS);
-  // Wall-clock deadline — backgrounding or locking the device never stretches
-  // the session; remaining time is recomputed from the clock on every tick.
-  const endAtRef = useRef(0);
-  const notifRef = useRef<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [steps, setSteps] = useState(0);
+  const [meters, setMeters] = useState(0);
+  const [hasSteps, setHasSteps] = useState(false);
+  const [hasGps, setHasGps] = useState(false);
 
-  const finish = useCallback(() => {
-    setPhase('done');
-    cancelNotification(notifRef.current);
-    notifRef.current = null;
-    successHaptic();
-    onComplete();
-  }, [onComplete]);
+  // Wall-clock elapsed, pause-aware — locking the phone stays honest.
+  const startAtRef = useRef(0);
+  const accumRef = useRef(0);
+  // Each pedometer watch counts from its own start; the base carries totals
+  // across pause/resume cycles.
+  const stepBaseRef = useRef(0);
+  const stepsRef = useRef(0);
+  const metersRef = useRef(0);
+  const lastFixRef = useRef<{ lat: number; lon: number } | null>(null);
+  const stepSubRef = useRef<{ remove(): void } | null>(null);
+  const locSubRef = useRef<{ remove(): void } | null>(null);
+  // Bumped on stop/unmount so a late async sensor grant can't leak a watcher.
+  const sensorGenRef = useRef(0);
 
-  // Reset for a fresh session each time the sheet opens.
+  const stopSensors = useCallback(() => {
+    sensorGenRef.current += 1;
+    stepSubRef.current?.remove();
+    stepSubRef.current = null;
+    locSubRef.current?.remove();
+    locSubRef.current = null;
+    // A GPS gap while paused must never count as distance walked.
+    lastFixRef.current = null;
+  }, []);
+
+  const startSensors = useCallback(async () => {
+    const gen = sensorGenRef.current;
+
+    // Steps — Motion & Fitness permission, requested only now, in context.
+    try {
+      if (await Pedometer.isAvailableAsync()) {
+        const perm = await Pedometer.requestPermissionsAsync();
+        if (perm.granted && gen === sensorGenRef.current) {
+          setHasSteps(true);
+          stepSubRef.current = Pedometer.watchStepCount((r) => {
+            stepsRef.current = stepBaseRef.current + r.steps;
+            setSteps(stepsRef.current);
+          });
+        }
+      }
+    } catch {
+      /* step counting is a bonus — the walk still works without it */
+    }
+
+    // Distance — while-in-use location, requested only now, in context.
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.granted) {
+        const sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
+          (loc) => {
+            const next = {
+              lat: loc.coords.latitude,
+              lon: loc.coords.longitude,
+              accuracy: loc.coords.accuracy,
+            };
+            const d = gpsDelta(lastFixRef.current, next);
+            if (d > 0) {
+              metersRef.current += d;
+              setMeters(metersRef.current);
+            }
+            if (next.accuracy == null || next.accuracy <= GPS_MAX_ACCURACY_M) {
+              lastFixRef.current = { lat: next.lat, lon: next.lon };
+            }
+          },
+        );
+        if (gen === sensorGenRef.current) {
+          setHasGps(true);
+          locSubRef.current = sub;
+        } else {
+          sub.remove(); // the session ended while the OS was granting
+        }
+      }
+    } catch {
+      /* distance is a bonus — the walk still works without it */
+    }
+  }, []);
+
+  // Fresh state on open; hard cleanup on close/unmount.
   useEffect(() => {
     if (visible) {
       setPhase('idle');
-      setRemaining(WALK_SECONDS);
+      setElapsed(0);
+      setSteps(0);
+      setMeters(0);
+      setHasSteps(false);
+      setHasGps(false);
+      accumRef.current = 0;
+      stepBaseRef.current = 0;
+      stepsRef.current = 0;
+      metersRef.current = 0;
     } else {
-      cancelNotification(notifRef.current);
-      notifRef.current = null;
+      stopSensors();
     }
-  }, [visible]);
+  }, [visible, stopSensors]);
+  useEffect(() => () => stopSensors(), [stopSensors]);
 
+  // Stopwatch — derived from the wall clock, never drift-prone increments.
   useEffect(() => {
     if (phase !== 'running') return;
     const id = setInterval(() => {
-      const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
-      setRemaining(left);
-      if (left <= 0) finish();
+      setElapsed(Math.floor(accumRef.current + (Date.now() - startAtRef.current) / 1000));
     }, 500);
     return () => clearInterval(id);
-  }, [phase, finish]);
+  }, [phase]);
 
   const start = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    endAtRef.current = Date.now() + WALK_SECONDS * 1000;
-    setRemaining(WALK_SECONDS);
+    startAtRef.current = Date.now();
     setPhase('running');
-    scheduleWalkNotification(WALK_SECONDS).then((id) => (notifRef.current = id));
+    startSensors();
   };
 
   const pause = () => {
     Haptics.selectionAsync().catch(() => {});
-    setRemaining(Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000)));
+    accumRef.current += (Date.now() - startAtRef.current) / 1000;
+    setElapsed(Math.floor(accumRef.current));
+    stepBaseRef.current = stepsRef.current;
+    stopSensors();
     setPhase('paused');
-    cancelNotification(notifRef.current);
-    notifRef.current = null;
   };
 
   const resume = () => {
     Haptics.selectionAsync().catch(() => {});
-    endAtRef.current = Date.now() + remaining * 1000;
+    startAtRef.current = Date.now();
     setPhase('running');
-    scheduleWalkNotification(remaining).then((id) => (notifRef.current = id));
+    startSensors();
+  };
+
+  const finish = () => {
+    const secs =
+      phase === 'paused'
+        ? Math.floor(accumRef.current)
+        : Math.floor(accumRef.current + (Date.now() - startAtRef.current) / 1000);
+    stopSensors();
+    setElapsed(secs);
+    setPhase('done');
+    successHaptic();
+    onComplete({ seconds: secs, steps: stepsRef.current, meters: Math.round(metersRef.current) });
   };
 
   const cancel = () => {
-    cancelNotification(notifRef.current);
-    notifRef.current = null;
+    stopSensors();
     setPhase('idle');
     onClose();
   };
 
-  const elapsed = WALK_SECONDS - remaining;
+  const canFinish = elapsed >= WALK_MIN_SECONDS;
+  const pace = formatPace(elapsed, meters);
   const status =
     phase === 'running' ? 'Walking — stay with it' : phase === 'paused' ? 'Paused' : 'Ready when you are';
 
@@ -241,51 +418,83 @@ function WalkSheet({
     <ActionSheet visible={visible} onClose={onClose} dismissable={phase === 'idle'}>
       {phase === 'done' ? (
         <SheetDone
-          title="Great job."
+          title="Great walk."
           message="Every healthy choice strengthens your recovery."
+          stats={[
+            { label: 'Time', value: fmtClock(elapsed) },
+            { label: 'Steps', value: hasSteps ? steps.toLocaleString() : '—' },
+            { label: 'Distance', value: hasGps && meters > 0 ? formatDistance(meters) : '—' },
+          ]}
+          onShare={() => onShare({ seconds: elapsed, steps: stepsRef.current, meters: Math.round(metersRef.current) })}
           onClose={onClose}
         />
+      ) : phase === 'idle' ? (
+        <View style={{ gap: spacing.md }}>
+          <SheetHeading
+            title="Take a Walk"
+            subtitle="Walk as long as you like — you decide when to stop. Time, steps, and distance are tracked live, all on this device."
+          />
+          <View style={{ gap: spacing.sm }}>
+            {([
+              ['stopwatch', 'Live stopwatch — walk at your own pace'],
+              ['footsteps', 'Step counting via your phone’s motion sensor'],
+              ['navigate', 'GPS distance & pace, only while walking'],
+            ] as [keyof typeof Ionicons.glyphMap, string][]).map(([icon, text]) => (
+              <View
+                key={text}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                  backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md,
+                }}
+              >
+                <Ionicons name={icon} size={18} color={theme.color.success} />
+                <Text variant="callout" style={{ flex: 1 }}>{text}</Text>
+              </View>
+            ))}
+          </View>
+          <Button label="Start Walking" onPress={start} full style={{ marginTop: spacing.sm }} />
+          <Button label="Cancel" kind="tertiary" onPress={onClose} full />
+        </View>
       ) : (
         <View style={{ alignItems: 'center', gap: spacing.lg }}>
-          <SheetHeading title="Take a 10-Minute Walk" subtitle={status} />
-          <TimerRing progress={remaining / WALK_SECONDS} size={ringSize}>
+          <SheetHeading title="Recovery Walk" subtitle={status} />
+
+          <WalkPulse active={phase === 'running'}>
             <Text
               variant="display"
-              style={{ fontSize: 44, lineHeight: 50, fontVariant: ['tabular-nums'] }}
-              accessibilityLabel={`${fmtClock(remaining)} remaining`}
+              style={{ fontSize: 40, lineHeight: 46, fontVariant: ['tabular-nums'] }}
+              accessibilityLabel={`${fmtClock(elapsed)} elapsed`}
             >
-              {fmtClock(remaining)}
+              {fmtClock(elapsed)}
             </Text>
-            <Text variant="footnote" dim style={{ fontVariant: ['tabular-nums'] }}>
-              {phase === 'idle' ? 'remaining' : `${fmtClock(elapsed)} elapsed`}
-            </Text>
-          </TimerRing>
+            <Text variant="footnote" dim>elapsed</Text>
+          </WalkPulse>
 
-          <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm }}>
-            {phase === 'idle' && (
-              <>
-                <Button label="Start" onPress={start} full />
-                <Button label="Cancel" kind="tertiary" onPress={onClose} full />
-              </>
-            )}
-            {phase === 'running' && (
-              <>
-                <Button label="Pause" kind="secondary" onPress={pause} full />
-                <Button label="Finish Early" kind="tertiary" onPress={finish} full />
-                <Button label="Cancel Session" kind="destructive" onPress={cancel} full />
-              </>
-            )}
-            {phase === 'paused' && (
-              <>
-                <Button label="Resume" onPress={resume} full />
-                <Button label="Finish Early" kind="tertiary" onPress={finish} full />
-                <Button label="Cancel Session" kind="destructive" onPress={cancel} full />
-              </>
-            )}
+          {/* Live metrics */}
+          <View style={{ alignSelf: 'stretch', flexDirection: 'row', gap: spacing.sm }}>
+            <LiveStat label="Steps" value={hasSteps ? steps.toLocaleString() : '—'} on={hasSteps} />
+            <LiveStat label="Distance" value={hasGps ? formatDistance(meters) : '—'} on={hasGps} />
+            <LiveStat label="Pace" value={pace ?? '—'} on={pace != null} />
           </View>
-          {phase === 'idle' && (
+
+          {/* Sensor status */}
+          <View style={{ flexDirection: 'row', gap: spacing.lg, marginTop: -spacing.sm }}>
+            <SensorBadge icon="footsteps" label={hasSteps ? 'Steps on' : 'Steps off'} on={hasSteps} />
+            <SensorBadge icon="navigate" label={hasGps ? 'GPS on' : 'GPS off'} on={hasGps} />
+          </View>
+
+          <View style={{ alignSelf: 'stretch', gap: spacing.sm }}>
+            {phase === 'running' ? (
+              <Button label="Pause" kind="secondary" onPress={pause} full />
+            ) : (
+              <Button label="Resume" onPress={resume} full />
+            )}
+            <Button label="Finish Walk" onPress={finish} disabled={!canFinish} full />
+            <Button label="Cancel Session" kind="destructive" onPress={cancel} full />
+          </View>
+          {!canFinish && (
             <Text variant="caption" dim center style={{ marginTop: -spacing.sm }}>
-              The timer keeps counting if you lock your phone.
+              Walk at least a minute for it to count.
             </Text>
           )}
         </View>
@@ -302,10 +511,12 @@ function WaterSheet({
   visible,
   onClose,
   onComplete,
+  onShare,
 }: {
   visible: boolean;
   onClose: () => void;
   onComplete: () => void;
+  onShare: () => void;
 }) {
   const [done, setDone] = useState(false);
   useEffect(() => {
@@ -324,6 +535,11 @@ function WaterSheet({
         <SheetDone
           title="Nicely done."
           message="Hydration helps your body recover."
+          stats={[
+            { label: 'Glass', value: '+1' },
+            { label: 'Logged', value: fmtTime(Date.now()) },
+          ]}
+          onShare={onShare}
           onClose={onClose}
         />
       ) : (
@@ -350,16 +566,21 @@ function StretchSheet({
   visible,
   onClose,
   onComplete,
+  onShare,
 }: {
   visible: boolean;
   onClose: () => void;
-  onComplete: () => void;
+  onComplete: (seconds: number) => void;
+  onShare: (seconds: number) => void;
 }) {
   const theme = useTheme();
   const [phase, setPhase] = useState<StretchPhase>('idle');
   const [stepIdx, setStepIdx] = useState(0);
   const [remaining, setRemaining] = useState(STRETCH_STEPS[0].seconds);
+  const [sessionSecs, setSessionSecs] = useState(0);
   const endAtRef = useRef(0);
+  // Wall-clock session start — the shared card reports real time spent.
+  const startedAtRef = useRef(0);
 
   useEffect(() => {
     if (visible) {
@@ -370,9 +591,13 @@ function StretchSheet({
   }, [visible]);
 
   const finish = useCallback(() => {
+    const secs = startedAtRef.current
+      ? Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000))
+      : 0;
+    setSessionSecs(secs);
     setPhase('done');
     successHaptic();
-    onComplete();
+    onComplete(secs);
   }, [onComplete]);
 
   const beginStep = (idx: number) => {
@@ -407,6 +632,7 @@ function StretchSheet({
 
   const start = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    startedAtRef.current = Date.now();
     beginStep(0);
     setPhase('running');
   };
@@ -425,6 +651,12 @@ function StretchSheet({
         <SheetDone
           title="You showed up for your body."
           message="Tension released is stress your recovery no longer carries."
+          stats={[
+            { label: 'Stretched', value: fmtClock(sessionSecs) },
+            { label: 'Stretches', value: `${STRETCH_STEPS.length}` },
+            { label: 'Finished', value: fmtTime(Date.now()) },
+          ]}
+          onShare={() => onShare(sessionSecs)}
           onClose={onClose}
         />
       ) : phase === 'idle' ? (
@@ -505,24 +737,31 @@ function BreatheSheet({
   visible,
   onClose,
   onComplete,
+  onShare,
 }: {
   visible: boolean;
   onClose: () => void;
-  onComplete: () => void;
+  onComplete: (seconds: number) => void;
+  onShare: (seconds: number) => void;
 }) {
   const theme = useTheme();
   const [phase, setPhase] = useState<BreathePhase>('idle');
   const [remaining, setRemaining] = useState(0);
+  const [sessionSecs, setSessionSecs] = useState(0);
   const endAtRef = useRef(0);
+  /** Chosen session length in seconds — elapsed = chosen − remaining. */
+  const chosenRef = useRef(0);
 
   useEffect(() => {
     if (visible) setPhase('idle');
   }, [visible]);
 
-  const finish = useCallback(() => {
+  const finish = useCallback((secondsLeft: number) => {
+    const breathed = Math.max(0, chosenRef.current - Math.max(0, secondsLeft));
+    setSessionSecs(breathed);
     setPhase('done');
     successHaptic();
-    onComplete();
+    onComplete(breathed);
   }, [onComplete]);
 
   useEffect(() => {
@@ -530,7 +769,7 @@ function BreatheSheet({
     const id = setInterval(() => {
       const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
       setRemaining(left);
-      if (left <= 0) finish();
+      if (left <= 0) finish(0);
     }, 500);
     return () => clearInterval(id);
   }, [phase, finish]);
@@ -538,6 +777,7 @@ function BreatheSheet({
   const start = (minutes: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     endAtRef.current = Date.now() + minutes * 60_000;
+    chosenRef.current = minutes * 60;
     setRemaining(minutes * 60);
     setPhase('running');
   };
@@ -548,6 +788,12 @@ function BreatheSheet({
         <SheetDone
           title="Breath by breath."
           message="Your nervous system just got a real reset. The urge is smaller than it was."
+          stats={[
+            { label: 'Breathed', value: fmtClock(sessionSecs) },
+            { label: 'Cycles', value: `${Math.max(1, Math.round(sessionSecs / 12))}` },
+            { label: 'Finished', value: fmtTime(Date.now()) },
+          ]}
+          onShare={() => onShare(sessionSecs)}
           onClose={onClose}
         />
       ) : phase === 'idle' ? (
@@ -588,7 +834,7 @@ function BreatheSheet({
           >
             {fmtClock(remaining)}
           </Text>
-          <Button label="Finish Early" kind="tertiary" onPress={finish} full />
+          <Button label="Finish Early" kind="tertiary" onPress={() => finish(remaining)} full />
           <Button label="Cancel Session" kind="destructive" onPress={onClose} full />
         </View>
       )}
@@ -606,10 +852,16 @@ function MusicSheet({
   visible,
   onClose,
   onComplete,
+  onSessionEnd,
+  onShare,
 }: {
   visible: boolean;
   onClose: () => void;
+  /** Fires once at the goal mark — unlocks the daily completion. */
   onComplete: () => void;
+  /** Fires at Stop with the FULL listening time (incl. beyond the goal). */
+  onSessionEnd: (seconds: number) => void;
+  onShare: (seconds: number) => void;
 }) {
   const theme = useTheme();
   const [phase, setPhase] = useState<MusicPhase>('idle');
@@ -652,8 +904,14 @@ function MusicSheet({
 
   const stop = () => {
     stopCalmMusic();
-    setPhase(completedRef.current ? 'done' : 'idle');
-    if (!completedRef.current) onClose();
+    if (completedRef.current) {
+      // Log the whole listen — minutes past the goal count toward lifetime.
+      onSessionEnd(Math.floor((Date.now() - startAtRef.current) / 1000));
+      setPhase('done');
+    } else {
+      setPhase('idle');
+      onClose();
+    }
   };
 
   const goal = Math.min(1, elapsed / MUSIC_GOAL_SECONDS);
@@ -664,6 +922,12 @@ function MusicSheet({
         <SheetDone
           title="A calmer mind."
           message="A few quiet minutes can carry you through the loudest urge."
+          stats={[
+            { label: 'Listened', value: fmtClock(elapsed) },
+            { label: 'Goal', value: fmtClock(MUSIC_GOAL_SECONDS) },
+            { label: 'Finished', value: fmtTime(Date.now()) },
+          ]}
+          onShare={() => onShare(elapsed)}
           onClose={onClose}
         />
       ) : phase === 'idle' ? (
@@ -727,11 +991,13 @@ function JournalDoneSheet({
   visible,
   onClose,
   onView,
+  onShare,
   completedAt,
 }: {
   visible: boolean;
   onClose: () => void;
   onView: () => void;
+  onShare: () => void;
   completedAt?: number;
 }) {
   const theme = useTheme();
@@ -759,7 +1025,8 @@ function JournalDoneSheet({
         </Text>
         <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm }}>
           <Button label="View Today's Journal" onPress={onView} full />
-          <Button label="Close" kind="secondary" onPress={onClose} full />
+          <Button label="Share this session" kind="secondary" onPress={onShare} full />
+          <Button label="Close" kind="tertiary" onPress={onClose} full />
         </View>
       </View>
     </ActionSheet>
@@ -888,6 +1155,8 @@ export default function Alternatives() {
   const safeBack = useSafeBack();
   const completions = useStore((s) => s.alternatives);
   const completeAlternative = useStore((s) => s.completeAlternative);
+  const recordAltSession = useStore((s) => s.recordAltSession);
+  const recordWalkMetrics = useStore((s) => s.recordWalkMetrics);
   const altCounts = useStore((s) => s.altCounts);
   const altAchievements = useStore((s) => s.altAchievements);
   const journalCount = useStore((s) => s.journal.length);
@@ -908,10 +1177,36 @@ export default function Alternatives() {
     }
   };
 
-  const handleComplete = (id: AlternativeId) => {
+  /** Complete today's activity. When `seconds` is given the session is also
+   *  logged to lifetime stats — music omits it here because its full length
+   *  is only known at Stop (see onSessionEnd), and logging twice would
+   *  double-count the session. */
+  const handleComplete = (id: AlternativeId, seconds?: number) => {
+    if (seconds != null) recordAltSession(id, seconds);
     const unlocked = completeAlternative(id);
     if (unlocked.length > 0) pendingUnlocks.current = unlocked;
   };
+
+  /** Open the Strava-style session card. Closes the sheet WITHOUT flushing
+   *  pending achievement unlocks — a visible RN Modal would float above the
+   *  pushed share screen. They celebrate on refocus instead (below). */
+  const shareSession = (id: AlternativeId, seconds: number, extra?: Record<string, string>) => {
+    setSheet(null);
+    router.push({
+      pathname: '/share-activity',
+      params: { id, seconds: String(Math.max(0, Math.round(seconds))), ...extra },
+    });
+  };
+
+  // Celebrate deferred unlocks when the user returns from the share screen.
+  useFocusEffect(
+    useCallback(() => {
+      if (sheet == null && celebrating == null && pendingUnlocks.current.length > 0) {
+        setCelebrating(pendingUnlocks.current);
+        pendingUnlocks.current = [];
+      }
+    }, [sheet, celebrating]),
+  );
 
   /** Counts including the derived journal total, for progress displays. */
   const counts: AltCounts = { ...altCounts, journal: journalCount };
@@ -1012,14 +1307,46 @@ export default function Alternatives() {
       </View>
 
       {/* Activity sheets */}
-      <WalkSheet visible={sheet === 'walk'} onClose={close} onComplete={() => handleComplete('walk')} />
-      <WaterSheet visible={sheet === 'water'} onClose={close} onComplete={() => handleComplete('water')} />
-      <StretchSheet visible={sheet === 'stretch'} onClose={close} onComplete={() => handleComplete('stretch')} />
-      <BreatheSheet visible={sheet === 'breathe'} onClose={close} onComplete={() => handleComplete('breathe')} />
-      <MusicSheet visible={sheet === 'music'} onClose={close} onComplete={() => handleComplete('music')} />
+      <WalkSheet
+        visible={sheet === 'walk'}
+        onClose={close}
+        onComplete={(m) => {
+          recordWalkMetrics(m.steps, m.meters);
+          handleComplete('walk', m.seconds);
+        }}
+        onShare={(m) =>
+          shareSession('walk', m.seconds, { steps: String(m.steps), meters: String(m.meters) })
+        }
+      />
+      <WaterSheet
+        visible={sheet === 'water'}
+        onClose={close}
+        onComplete={() => handleComplete('water')}
+        onShare={() => shareSession('water', 0)}
+      />
+      <StretchSheet
+        visible={sheet === 'stretch'}
+        onClose={close}
+        onComplete={(secs) => handleComplete('stretch', secs)}
+        onShare={(secs) => shareSession('stretch', secs)}
+      />
+      <BreatheSheet
+        visible={sheet === 'breathe'}
+        onClose={close}
+        onComplete={(secs) => handleComplete('breathe', secs)}
+        onShare={(secs) => shareSession('breathe', secs)}
+      />
+      <MusicSheet
+        visible={sheet === 'music'}
+        onClose={close}
+        onComplete={() => handleComplete('music')}
+        onSessionEnd={(secs) => recordAltSession('music', secs)}
+        onShare={(secs) => shareSession('music', secs)}
+      />
       <JournalDoneSheet
         visible={sheet === 'journal'}
         onClose={close}
+        onShare={() => shareSession('journal', 0)}
         completedAt={todayJournal?.at}
         onView={() => {
           close();

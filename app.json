@@ -49,7 +49,20 @@
         }
       ],
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Unchain uses your location only while a walk session is running, to measure how far you walked. Your location never leaves this device.",
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Unchain uses motion data only to count your steps during walk sessions. Step data never leaves this device."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

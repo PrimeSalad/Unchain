@@ -24,7 +24,7 @@ export interface Alternative {
 }
 
 export const ALTERNATIVES: Alternative[] = [
-  { id: 'walk',    title: 'Take a 10-Minute Walk',          subtitle: 'Move your body, quiet the urge',      icon: 'walk',                 tint: 'success' },
+  { id: 'walk',    title: 'Take a Walk',                    subtitle: 'Live steps & distance, on your terms', icon: 'walk',                tint: 'success' },
   { id: 'breathe', title: 'Practice Deep Breathing',        subtitle: 'Slow, guided breathing session',      icon: 'leaf',                 tint: 'primary' },
   { id: 'stretch', title: 'Stretch Your Body',              subtitle: 'A short guided release',              icon: 'body',                 tint: 'celebrate' },
   { id: 'water',   title: 'Drink a Glass of Water',         subtitle: 'Small anchor, real reset',            icon: 'water',                tint: 'primary' },
@@ -121,9 +121,6 @@ export function altAchievementById(id: string): AltAchievement | undefined {
 export function evaluateAltAchievements(counts: AltCounts, fullDay: boolean): string[] {
   return ALT_ACHIEVEMENTS.filter((a) => a.test(counts, fullDay)).map((a) => a.id);
 }
-
-/** Walk session length (seconds). */
-export const WALK_SECONDS = 10 * 60;
 
 /** Breathing session options (minutes). */
 export const BREATHE_MINUTES = [1, 2, 5] as const;

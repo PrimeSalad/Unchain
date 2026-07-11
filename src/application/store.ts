@@ -120,6 +120,14 @@ interface RecoveryState {
   altCounts: AltCounts;
   /** Permanently unlocked habit achievements: id → unlockedAt (ms). */
   altAchievements: Record<string, number>;
+  /** Lifetime seconds spent per timed activity — powers the Strava-style
+   *  session share cards. Every session adds, including same-day repeats. */
+  altSeconds: Partial<Record<AlternativeId, number>>;
+  /** Lifetime session counts per activity (every session, incl. repeats). */
+  altSessions: Partial<Record<AlternativeId, number>>;
+  /** Lifetime walk totals — steps counted and metres covered (GPS). */
+  walkSteps: number;
+  walkMeters: number;
 
   // ── Focus Protection ────────────────────────────────────────────────────
   /** The user's permanent blocklist — every entry added explicitly by them,
@@ -166,6 +174,11 @@ interface RecoveryState {
    *  repeat sessions refresh the timestamp without double-awarding). Returns
    *  any habit achievements newly unlocked by this completion. */
   completeAlternative: (id: AlternativeId) => AltAchievement[];
+  /** Log a finished activity session's duration for lifetime stats. Safe to
+   *  call on every session — repeats add up (that's the point). */
+  recordAltSession: (id: AlternativeId, seconds: number) => void;
+  /** Add a finished walk's steps + metres to the lifetime totals. */
+  recordWalkMetrics: (steps: number, meters: number) => void;
   /** Add a website to the permanent blocklist. Validates + de-duplicates.
    *  Protection starts immediately and never expires. */
   addBlockedSite: (domainInput: string, nickname?: string) => 'added' | 'duplicate' | 'invalid';
@@ -300,12 +313,31 @@ export const useStore = create<RecoveryState>()(
       alternatives: {},
       altCounts: {},
       altAchievements: {},
+      altSeconds: {},
+      altSessions: {},
+      walkSteps: 0,
+      walkMeters: 0,
       blockedSites: [],
       favoriteQuotes: [],
       dailyMissions: { day: '', completed: [] },
       missionXp: 0,
       dailyQuote: null,
       recentQuotes: [],
+
+      recordWalkMetrics: (steps, meters) =>
+        set((s) => ({
+          walkSteps: s.walkSteps + Math.max(0, Math.round(steps)),
+          walkMeters: s.walkMeters + Math.max(0, Math.round(meters)),
+        })),
+
+      recordAltSession: (id, seconds) =>
+        set((s) => ({
+          altSeconds: {
+            ...s.altSeconds,
+            [id]: (s.altSeconds[id] ?? 0) + Math.max(0, Math.round(seconds)),
+          },
+          altSessions: { ...s.altSessions, [id]: (s.altSessions[id] ?? 0) + 1 },
+        })),
 
       addBlockedSite: (domainInput, nickname) => {
         const domain = normalizeDomain(domainInput);
@@ -831,6 +863,10 @@ export const useStore = create<RecoveryState>()(
           alternatives: {},
           altCounts: {},
           altAchievements: {},
+          altSeconds: {},
+          altSessions: {},
+          walkSteps: 0,
+          walkMeters: 0,
           blockedSites: [],
           favoriteQuotes: [],
           dailyQuote: null,
