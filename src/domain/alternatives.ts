@@ -36,21 +36,36 @@ export function alternativeById(id: AlternativeId): Alternative {
   return ALTERNATIVES.find((a) => a.id === id) ?? ALTERNATIVES[0];
 }
 
-/** Guided stretch sequence — each step runs on its own timer. */
+/** Guided stretch — the user picks how many stretches and how long each runs. */
 export interface StretchStep {
   title: string;
   instruction: string;
-  seconds: number;
   /** Ionicons name for the simple illustration chip. */
   icon: string;
 }
 
+/** The full stretch library — sessions draw a shuffled subset from here. */
 export const STRETCH_STEPS: StretchStep[] = [
-  { title: 'Neck Release',   instruction: 'Slowly tilt your ear toward each shoulder. Let gravity do the work — no forcing.', seconds: 40, icon: 'person' },
-  { title: 'Shoulder Rolls', instruction: 'Roll your shoulders back in big, slow circles. Drop them away from your ears.',    seconds: 40, icon: 'sync' },
-  { title: 'Forward Fold',   instruction: 'Stand and fold forward with soft knees. Hang loose and breathe into your back.',   seconds: 40, icon: 'arrow-down' },
-  { title: 'Side Stretch',   instruction: 'Reach one arm overhead and lean gently to the side. Switch halfway through.',      seconds: 40, icon: 'resize' },
+  { title: 'Neck Release',   instruction: 'Slowly tilt your ear toward each shoulder. Let gravity do the work — no forcing.', icon: 'person' },
+  { title: 'Shoulder Rolls', instruction: 'Roll your shoulders back in big, slow circles. Drop them away from your ears.',    icon: 'sync' },
+  { title: 'Forward Fold',   instruction: 'Stand and fold forward with soft knees. Hang loose and breathe into your back.',   icon: 'arrow-down' },
+  { title: 'Side Stretch',   instruction: 'Reach one arm overhead and lean gently to the side. Switch halfway through.',      icon: 'resize' },
+  { title: 'Hamstring Reach', instruction: 'Reach gently toward your toes with soft knees. Ease in — no bouncing.',           icon: 'trending-down' },
+  { title: 'Chest Opener',   instruction: 'Clasp your hands behind your back and lift gently. Open across the chest.',        icon: 'expand' },
+  { title: 'Hip Circles',    instruction: 'Hands on hips, draw slow circles. Switch direction halfway through.',              icon: 'refresh' },
+  { title: 'Calf Stretch',   instruction: 'Step one foot back and press the heel down. Switch legs halfway through.',         icon: 'walk' },
+  { title: 'Seated Twist',   instruction: 'Sit tall and twist gently to one side, then the other. Move with your breath.',    icon: 'sync-circle' },
+  { title: 'Wrists & Hands', instruction: 'Circle your wrists, spread your fingers wide, then shake everything loose.',       icon: 'hand-left' },
 ];
+
+/** How many stretches a session can include. */
+export const STRETCH_COUNT_OPTIONS = [3, 5, 8, 10] as const;
+
+/** Seconds the user can choose per stretch. */
+export const STRETCH_SECONDS_OPTIONS = [20, 30, 40, 60] as const;
+
+/** Daily hydration goal (glasses). */
+export const WATER_GOAL_GLASSES = 8;
 
 // ---------------------------------------------------------------------------
 // Healthy-habit achievements — permanent unlocks, mirrored on the game
@@ -122,8 +137,10 @@ export function evaluateAltAchievements(counts: AltCounts, fullDay: boolean): st
   return ALT_ACHIEVEMENTS.filter((a) => a.test(counts, fullDay)).map((a) => a.id);
 }
 
-/** Breathing session options (minutes). */
-export const BREATHE_MINUTES = [1, 2, 5] as const;
+/** Quick-pick breathing lengths (minutes); the stepper allows 1–30 freely. */
+export const BREATHE_MINUTES = [1, 2, 3, 5, 10] as const;
+export const BREATHE_MIN_MINUTES = 1;
+export const BREATHE_MAX_MINUTES = 30;
 
 /** Listening time that counts as a meaningful calming-music session (seconds). */
 export const MUSIC_GOAL_SECONDS = 120;

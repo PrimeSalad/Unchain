@@ -231,6 +231,8 @@ export function ProfileScreen() {
           altSessions: s.altSessions,
           walkSteps: s.walkSteps,
           walkMeters: s.walkMeters,
+          waterToday: s.waterToday,
+          waterGlassesTotal: s.waterGlassesTotal,
           blockedSites: s.blockedSites,
           dailyMissions: s.dailyMissions,
           missionXp: s.missionXp,
@@ -307,6 +309,11 @@ export function ProfileScreen() {
         altSessions: obj(data.altSessions, {}),
         walkSteps: typeof data.walkSteps === 'number' ? data.walkSteps : 0,
         walkMeters: typeof data.walkMeters === 'number' ? data.walkMeters : 0,
+        waterToday:
+          data.waterToday && typeof data.waterToday.day === 'string' && typeof data.waterToday.glasses === 'number'
+            ? data.waterToday
+            : { day: '', glasses: 0 },
+        waterGlassesTotal: typeof data.waterGlassesTotal === 'number' ? data.waterGlassesTotal : 0,
         blockedSites: arr(data.blockedSites),
         dailyMissions:
           data.dailyMissions && typeof data.dailyMissions.day === 'string' && Array.isArray(data.dailyMissions.completed)
