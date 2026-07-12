@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +16,14 @@ import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useTodayCheckIn, useProfile } from '@/application/store';
 import { TRIGGERS, addictionMeta } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
+
+/** Re-format a typed string with thousand-separator commas as the user types. */
+function applyCommaFormat(input: string): string {
+  const stripped = input.replace(/[^0-9.]/g, '');
+  const parts = stripped.split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.length > 1 ? `${intPart}.${parts.slice(1).join('')}` : intPart;
+}
 
 export default function CheckIn() {
   const theme = useTheme();
@@ -45,7 +53,7 @@ export default function CheckIn() {
   // clean day
   const [mood, setMood] = useState(5);
   const [urge, setUrge] = useState(3);
-  // relapse
+  // relapse — `amount` stores raw digits only; displayed with commas
   const [amount, setAmount] = useState('');
   const [what, setWhat] = useState('');
   const [feeling, setFeeling] = useState('');
@@ -65,7 +73,7 @@ export default function CheckIn() {
 
   const save = () => {
     if (gambled) {
-      logRelapse({ amount: hasExpense && amount ? parseInt(amount, 10) : undefined, whatHappened: what.trim() || undefined, cause: triggers.join(', ') || undefined, feeling: feeling.trim() || undefined });
+      logRelapse({ amount: hasExpense && amount ? parseInt(amount.replace(/,/g, ''), 10) : undefined, whatHappened: what.trim() || undefined, cause: triggers.join(', ') || undefined, feeling: feeling.trim() || undefined });
       submit({ gambled: true, notes: what.trim() || undefined, triggers });
     } else {
       submit({ gambled: false, mood, urgeStrength: urge, triggers, notes: notes.trim() || undefined });
@@ -147,52 +155,111 @@ export default function CheckIn() {
     );
   }
 
+  // Determine whether the current state shows a Save button (so we pin it).
+  const showSave = gambled !== null;
+
   return (
-    <Screen edges={['top', 'bottom']}>
+    <Screen edges={['top', 'bottom']} scroll={false}>
       {Header}
-      <Text variant="title1" style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>Daily Check-in</Text>
 
-      <Text variant="headline" style={{ marginBottom: spacing.md }}>Did you {verb} today?</Text>
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <Choice label="No" active={gambled === false} onPress={() => setGambled(false)} good />
-        <Choice label="Yes" active={gambled === true} onPress={() => setGambled(true)} />
-      </View>
+      {/* KeyboardAvoidingView wraps scroll content + button so Save lifts above keyboard */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingBottom: spacing.lg }}
+        >
+          <Text variant="title1" style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>Daily Check-in</Text>
 
-      {gambled === false && (
-        <View style={{ marginTop: spacing.xl, gap: spacing.xl }}>
-          <Card><Slider label="How was your mood today?" value={mood} onChange={setMood} /></Card>
-          <Card><Slider kind="urge" label="How strong were the urges?" value={urge} onChange={setUrge} /></Card>
-          <View>
-            <Text variant="headline" style={{ marginBottom: spacing.md }}>What triggered them?</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {triggerOptions.map((t) => <Pill key={t} label={t} active={triggers.includes(t)} onPress={() => toggle(t)} />)}
-            </View>
+          <Text variant="headline" style={{ marginBottom: spacing.md }}>Did you {verb} today?</Text>
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <Choice label="No" active={gambled === false} onPress={() => setGambled(false)} good />
+            <Choice label="Yes" active={gambled === true} onPress={() => setGambled(true)} />
           </View>
-          <TextInput value={notes} onChangeText={setNotes} placeholder="Notes (optional)" placeholderTextColor={theme.color.textDim} multiline style={[input, { minHeight: 80 }]} />
-          <Button label="Save check-in" onPress={save} full />
-        </View>
-      )}
 
-      {gambled === true && (
-        <View style={{ marginTop: spacing.xl, gap: spacing.lg }}>
-          <Text variant="body" dim>Thank you for being honest. This is data, not failure.</Text>
-          {hasExpense && (
-            <View>
-              <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>How much did you spend?</Text>
-              <TextInput value={amount} onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))} placeholder={`${profile?.currency ?? '₱'}0`} placeholderTextColor={theme.color.textDim} keyboardType="number-pad" style={input} />
+          {gambled === false && (
+            <View style={{ marginTop: spacing.xl, gap: spacing.xl }}>
+              <Card><Slider label="How was your mood today?" value={mood} onChange={setMood} /></Card>
+              <Card><Slider kind="urge" label="How strong were the urges?" value={urge} onChange={setUrge} /></Card>
+              <View>
+                <Text variant="headline" style={{ marginBottom: spacing.md }}>What triggered them?</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {triggerOptions.map((t) => <Pill key={t} label={t} active={triggers.includes(t)} onPress={() => toggle(t)} />)}
+                </View>
+              </View>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Notes (optional)"
+                placeholderTextColor={theme.color.textDim}
+                multiline
+                underlineColorAndroid="transparent"
+                selectionColor={theme.color.primary}
+                style={[input, { minHeight: 80 }]}
+              />
             </View>
           )}
-          <TextInput value={what} onChangeText={setWhat} placeholder="What happened?" placeholderTextColor={theme.color.textDim} multiline style={[input, { minHeight: 70 }]} />
-          <View>
-            <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>What caused it?</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {triggerOptions.map((t) => <Pill key={t} label={t} active={triggers.includes(t)} onPress={() => toggle(t)} />)}
+
+          {gambled === true && (
+            <View style={{ marginTop: spacing.xl, gap: spacing.lg }}>
+              <Text variant="body" dim>Thank you for being honest. This is data, not failure.</Text>
+              {hasExpense && (
+                <View>
+                  <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>How much did you spend?</Text>
+                  {/* Comma-formatted as you type; raw numeric value extracted on save */}
+                  <TextInput
+                    value={amount}
+                    onChangeText={(t) => setAmount(applyCommaFormat(t))}
+                    placeholder={`${profile?.currency ?? '₱'}0`}
+                    placeholderTextColor={theme.color.textDim}
+                    keyboardType="number-pad"
+                    underlineColorAndroid="transparent"
+                    selectionColor={theme.color.primary}
+                    style={input}
+                  />
+                </View>
+              )}
+              <TextInput
+                value={what}
+                onChangeText={setWhat}
+                placeholder="What happened?"
+                placeholderTextColor={theme.color.textDim}
+                multiline
+                underlineColorAndroid="transparent"
+                selectionColor={theme.color.primary}
+                style={[input, { minHeight: 70 }]}
+              />
+              <View>
+                <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>What caused it?</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {triggerOptions.map((t) => <Pill key={t} label={t} active={triggers.includes(t)} onPress={() => toggle(t)} />)}
+                </View>
+              </View>
+              <TextInput
+                value={feeling}
+                onChangeText={setFeeling}
+                placeholder="How do you feel right now?"
+                placeholderTextColor={theme.color.textDim}
+                multiline
+                underlineColorAndroid="transparent"
+                selectionColor={theme.color.primary}
+                style={[input, { minHeight: 70 }]}
+              />
             </View>
+          )}
+        </ScrollView>
+
+        {/* Save button pinned above keyboard — only shown once yes/no is chosen */}
+        {showSave && (
+          <View style={{ paddingTop: spacing.sm }}>
+            <Button label="Save check-in" onPress={save} full />
           </View>
-          <TextInput value={feeling} onChangeText={setFeeling} placeholder="How do you feel right now?" placeholderTextColor={theme.color.textDim} multiline style={[input, { minHeight: 70 }]} />
-          <Button label="Save" onPress={save} full />
-        </View>
-      )}
+        )}
+      </KeyboardAvoidingView>
     </Screen>
   );
 }

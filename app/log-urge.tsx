@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -188,70 +188,91 @@ export default function LogUrge() {
   }
 
   return (
-    <Screen edges={['top', 'bottom']}>
+    <Screen edges={['top', 'bottom']} scroll={false}>
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.sm }}>
         <Pressable onPress={safeBack} hitSlop={16} accessibilityRole="button" accessibilityLabel="Close">
           <Ionicons name="close" size={26} color={theme.color.textDim} />
         </Pressable>
       </View>
-      <Text variant="title1" style={{ marginTop: spacing.sm }}>{existing ? 'Edit urge' : 'Log an urge'}</Text>
-      <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
-        Logging it before acting is a win in itself.
-      </Text>
 
-      {/* Urge intensity */}
-      <Card>
-        <Slider kind="urge" label="How strong is the urge?" value={intensity} onChange={setIntensity} />
-      </Card>
+      {/* Scrollable content area - shrinks when keyboard appears */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingBottom: spacing.lg }}
+        >
+          <Text variant="title1" style={{ marginTop: spacing.sm }}>{existing ? 'Edit urge' : 'Log an urge'}</Text>
+          <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
+            Logging it before acting is a win in itself.
+          </Text>
 
-      {/* Trigger */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        What triggered it?
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        {(profile?.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => (
-          <Pill
-            key={t}
-            label={t}
-            active={triggers.includes(t)}
-            onPress={() => setTriggers((current) => current.includes(t) ? current.filter((value) => value !== t) : [...current, t])}
+          {/* Urge intensity */}
+          <Text variant="headline" style={{ marginBottom: spacing.sm }}>
+            How strong is your urge?
+          </Text>
+          <Text variant="caption" dim style={{ marginBottom: spacing.md }}>
+            1 = barely there, 10 = overwhelming.
+          </Text>
+          <Card>
+            <Slider kind="urge" label="How strong is the urge?" value={intensity} onChange={setIntensity} />
+          </Card>
+
+          {/* Trigger */}
+          <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+            What triggered it?
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {(profile?.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => (
+              <Pill
+                key={t}
+                label={t}
+                active={triggers.includes(t)}
+                onPress={() => setTriggers((current) => current.includes(t) ? current.filter((value) => value !== t) : [...current, t])}
+              />
+            ))}
+          </View>
+
+          {/* Mood */}
+          <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>
+            How's your mood right now?
+          </Text>
+          <Text variant="caption" dim style={{ marginBottom: spacing.md }}>
+            Tracking mood helps identify patterns in your urges.
+          </Text>
+          <Card>
+            <Slider kind="mood" label="Mood" value={mood} onChange={setMood} />
+          </Card>
+
+          {/* Notes */}
+          <TextInput
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Notes (optional)"
+            placeholderTextColor={theme.color.textDim}
+            multiline
+            style={{
+              marginTop: spacing.xl,
+              minHeight: 80,
+              borderRadius: radius.input,
+              backgroundColor: theme.color.surface,
+              borderWidth: 1,
+              borderColor: theme.color.hairline,
+              padding: spacing.lg,
+              color: theme.color.text,
+              fontSize: 16,
+              textAlignVertical: 'top',
+            }}
           />
-        ))}
-      </View>
+        </ScrollView>
 
-      {/* Mood */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>
-        How's your mood right now?
-      </Text>
-      <Text variant="caption" dim style={{ marginBottom: spacing.md }}>
-        Tracking mood helps identify patterns in your urges.
-      </Text>
-      <Card>
-        <Slider kind="mood" label="Mood" value={mood} onChange={setMood} />
-      </Card>
-
-      {/* Notes */}
-      <TextInput
-        value={notes}
-        onChangeText={setNotes}
-        placeholder="Notes (optional)"
-        placeholderTextColor={theme.color.textDim}
-        multiline
-        style={{
-          marginTop: spacing.xl,
-          minHeight: 80,
-          borderRadius: radius.input,
-          backgroundColor: theme.color.surface,
-          borderWidth: 1,
-          borderColor: theme.color.hairline,
-          padding: spacing.lg,
-          color: theme.color.text,
-          fontSize: 16,
-          textAlignVertical: 'top',
-        }}
-      />
-
-      <Button label={existing ? 'Save changes' : 'Save'} onPress={save} full style={{ marginTop: spacing.xl }} />
+        {/* Save button pinned above keyboard */}
+        <Button label={existing ? 'Save changes' : 'Save'} onPress={save} full style={{ marginTop: spacing.sm }} />
+      </KeyboardAvoidingView>
     </Screen>
   );
 }

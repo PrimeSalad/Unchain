@@ -49,6 +49,19 @@ function moodColor(v: number, danger: string, celebrate: string, primary: string
   return success;
 }
 
+function urgeEmoji(v: number): string {
+  if (v <= 1) return '😌';
+  if (v <= 2) return '🙂';
+  if (v <= 3) return '😐';
+  if (v <= 4) return '😟';
+  if (v <= 5) return '😬';
+  if (v <= 6) return '😣';
+  if (v <= 7) return '😖';
+  if (v <= 8) return '😤';
+  if (v <= 9) return '😫';
+  return '😵';
+}
+
 function urgeLabel(v: number): string {
   if (v <= 2) return 'Very mild';
   if (v <= 4) return 'Mild';
@@ -200,6 +213,7 @@ export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: Slid
         {/* Emoji + label — swiping here also works */}
         <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
           {kind === 'mood' && <Text style={{ fontSize: 52, lineHeight: 60 }}>{moodEmoji(value)}</Text>}
+          {kind === 'urge' && <Text style={{ fontSize: 52, lineHeight: 60 }}>{urgeEmoji(value)}</Text>}
           <Text variant="title2" color={color} style={{ marginTop: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
             {value} / {max}
           </Text>

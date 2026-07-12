@@ -162,7 +162,29 @@ function YesNoToggle({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AmountInput - identical to the onboarding expense step
+// Displays with comma formatting (e.g. 1,000) while storing raw digits only.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Re-format a typed string with thousand-separator commas as the user types.
+ * Accepts the raw text coming from onChangeText (may contain commas already).
+ * Returns the formatted display string, e.g. "1000" → "1,000".
+ * The formatted string is also stored as state so the input value always
+ * matches what is displayed — this prevents cursor-jump on Android.
+ */
+function applyCommaFormat(input: string): string {
+  // Strip anything that isn't a digit or a decimal point first.
+  const stripped = input.replace(/[^0-9.]/g, '');
+  // Guard against multiple decimal points.
+  const parts = stripped.split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.length > 1 ? `${intPart}.${parts.slice(1).join('')}` : intPart;
+}
+
+/** Strip commas before passing to parseFloat. */
+function numericValue(formatted: string): number {
+  return parseFloat(formatted.replace(/,/g, '')) || 0;
+}
 
 function AmountInput({
   value,
@@ -174,12 +196,15 @@ function AmountInput({
   currency: string;
 }) {
   const theme = useTheme();
+  // `value` and `onChange` both use the formatted string (e.g. "1,000").
+  // Storing the formatted string as state means the TextInput's value prop
+  // always equals what was just typed, so the cursor never jumps.
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
       <Text variant="title1">{currency}</Text>
       <TextInput
         value={value}
-        onChangeText={(t) => onChange(t.replace(/[^0-9.]/g, ''))}
+        onChangeText={(t) => onChange(applyCommaFormat(t))}
         placeholder="0"
         placeholderTextColor={theme.color.textDim}
         keyboardType="decimal-pad"
@@ -427,16 +452,16 @@ export default function JournalEntry() {
       gambled: gambled === true,
       text: notes.trim() || (gambled === true ? 'Gambling relapse recorded.' : 'Clean day recorded.'),
       mood,
-      amountWagered: gambled === true && amountWagered ? parseFloat(amountWagered) || undefined : undefined,
+      amountWagered: gambled === true && amountWagered ? parseFloat(amountWagered.replace(/,/g, '')) || undefined : undefined,
       lost: gambled === true ? lost === true : undefined,
-      amountLost: gambled === true && lost === true && amountLost ? parseFloat(amountLost) || undefined : undefined,
+      amountLost: gambled === true && lost === true && amountLost ? parseFloat(amountLost.replace(/,/g, '')) || undefined : undefined,
       whyGambled: gambled === true ? whyText : undefined,
       // moneyBalance stores the RAW answer to "How much money do you have
       // today?" for all gambling users. Financial metrics read it through
       // recoveryAdjustedBalance(): on a losing day the wager is subtracted
       // (remaining = moneyToday - wagerAmount), a win is never added. It does
       // not affect recovery status, streak, or achievements.
-      moneyBalance: moneyBalance.trim() ? parseFloat(moneyBalance) || undefined : undefined,
+      moneyBalance: moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || undefined : undefined,
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     safeBack();
@@ -670,7 +695,7 @@ export default function JournalEntry() {
         // never adds anything.
         const lossApplied = gambled === true && lost === true && amountWagered !== '';
         const adjustedBalance = lossApplied && moneyBalance !== ''
-          ? Math.max(0, (parseFloat(moneyBalance) || 0) - (parseFloat(amountWagered) || 0))
+          ? Math.max(0, numericValue(moneyBalance) - numericValue(amountWagered))
           : null;
         return (
           <>
@@ -680,13 +705,13 @@ export default function JournalEntry() {
                 <SummaryRow icon={gambled ? 'alert-circle-outline' : 'checkmark-circle-outline'} iconColor={gambled ? theme.color.danger : theme.color.success} label="Today" value={gambled ? 'Relapse' : 'Clean day'} />
               )}
               {moneyBalance !== '' && (
-                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={`${currency}${parseFloat(moneyBalance).toLocaleString()}`} />
+                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={`${currency}${numericValue(moneyBalance).toLocaleString()}`} />
               )}
               {gambled === true && amountWagered !== '' && (
-                <SummaryRow icon="card-outline" iconColor={theme.color.textDim} label="Wagered" value={`${currency}${parseFloat(amountWagered).toLocaleString()}`} />
+                <SummaryRow icon="card-outline" iconColor={theme.color.textDim} label="Wagered" value={`${currency}${numericValue(amountWagered).toLocaleString()}`} />
               )}
               {gambled === true && lost != null && (
-                <SummaryRow icon={lost ? 'trending-down-outline' : 'trending-up-outline'} iconColor={lost ? theme.color.danger : theme.color.success} label="Result" value={lost ? `Lost ${currency}${parseFloat(amountLost || '0').toLocaleString()}` : 'No net loss'} />
+                <SummaryRow icon={lost ? 'trending-down-outline' : 'trending-up-outline'} iconColor={lost ? theme.color.danger : theme.color.success} label="Result" value={lost ? `Lost ${currency}${numericValue(amountLost || '0').toLocaleString()}` : 'No net loss'} />
               )}
               {adjustedBalance != null && (
                 <SummaryRow
@@ -741,13 +766,15 @@ export default function JournalEntry() {
         </Text>
       </View>
 
+      {/* KeyboardAvoidingView wraps both the scroll area AND the action button
+          so the button lifts above the keyboard when it appears. */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
         keyboardVerticalOffset={insets.top + 16}
       >
         <ScrollView
-          contentContainerStyle={{ paddingBottom: spacing.xxl }}
+          contentContainerStyle={{ paddingBottom: spacing.lg }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -765,17 +792,17 @@ export default function JournalEntry() {
             {renderStep()}
           </Animated.View>
         </ScrollView>
-      </KeyboardAvoidingView>
 
-      {/* Single action button - no duplicate Back below */}
-      <View style={{ paddingTop: spacing.sm }}>
-        <Button
-          label={isLastStep ? 'Save entry' : 'Continue'}
-          onPress={isLastStep ? requestCommit : goNext}
-          disabled={!canProceed()}
-          full
-        />
-      </View>
+        {/* Action button inside KAV so it lifts above the keyboard */}
+        <View style={{ paddingTop: spacing.sm }}>
+          <Button
+            label={isLastStep ? 'Save entry' : 'Continue'}
+            onPress={isLastStep ? requestCommit : goNext}
+            disabled={!canProceed()}
+            full
+          />
+        </View>
+      </KeyboardAvoidingView>
 
       {/* Confirmation modal - must live inside <Screen> so safe-area insets
           are available and the sheet slides up over the wizard content. */}
