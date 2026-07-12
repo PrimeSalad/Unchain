@@ -2,7 +2,8 @@
  * App sounds - tiny synthesized WAVs (generated in-house, no third-party audio).
  * Everything is fire-and-forget and failure-safe: if audio can't play we stay silent.
  */
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import { isExpoGo } from '@/application/expoGo';
+import type { AudioPlayer } from 'expo-audio';
 
 const SOURCES = {
   tap: require('../../assets/sounds/tap.wav'),
@@ -17,11 +18,26 @@ const SOURCES = {
 export type SoundName = keyof typeof SOURCES;
 
 let configured = false;
+let audioModule: typeof import('expo-audio') | null = null;
+
+async function loadAudioModule(): Promise<typeof import('expo-audio') | null> {
+  if (isExpoGo()) return null;
+  if (audioModule) return audioModule;
+  try {
+    audioModule = await import('expo-audio');
+    return audioModule;
+  } catch {
+    return null;
+  }
+}
+
 async function ensureMode() {
   if (configured) return;
   configured = true;
   try {
-    await setAudioModeAsync({ playsInSilentMode: true });
+    const mod = await loadAudioModule();
+    if (!mod) return;
+    await mod.setAudioModeAsync({ playsInSilentMode: true });
   } catch {
     /* keep silent */
   }
@@ -43,21 +59,25 @@ function safe(fn: () => unknown) {
 
 /** Play a short effect. Safe to call from anywhere, any number of times. */
 export function playSound(name: SoundName, volume = 1) {
-  try {
-    void ensureMode();
-    let p = players.get(name);
-    if (!p) {
-      p = createAudioPlayer(SOURCES[name]);
-      players.set(name, p);
+  void (async () => {
+    try {
+      if (isExpoGo()) return;
+      await ensureMode();
+      if (!audioModule) return;
+      let p = players.get(name);
+      if (!p) {
+        p = audioModule.createAudioPlayer(SOURCES[name]);
+        players.set(name, p);
+      }
+      p.volume = volume;
+      // seekTo is async native work - a rejection (e.g. still loading) must
+      // never surface as an unhandled error mid-game.
+      safe(() => p!.seekTo(0));
+      safe(() => p!.play());
+    } catch {
+      /* keep silent */
     }
-    p.volume = volume;
-    // seekTo is async native work - a rejection (e.g. still loading) must
-    // never surface as an unhandled error mid-game.
-    safe(() => p!.seekTo(0));
-    safe(() => p!.play());
-  } catch {
-    /* keep silent */
-  }
+  })();
 }
 
 // ── Calming music (Mindful Pause) ──────────────────────────────────────────
@@ -67,24 +87,29 @@ let fadeTimer: ReturnType<typeof setInterval> | null = null;
 
 /** Start the seamless ambient loop, fading in gently. */
 export function startCalmMusic() {
-  try {
-    void ensureMode();
-    stopFade();
-    if (!music) {
-      music = createAudioPlayer(require('../../assets/sounds/calm-loop.wav'));
-      music.loop = true;
+  void (async () => {
+    try {
+      if (isExpoGo()) return;
+      await ensureMode();
+      if (!audioModule) return;
+      stopFade();
+      if (!music) {
+        music = audioModule.createAudioPlayer(require('../../assets/sounds/calm-loop.wav'));
+        music.loop = true;
+      }
+      music.volume = 0;
+      safe(() => music!.seekTo(0));
+      safe(() => music!.play());
+      fadeTo(0.6, 2000);
+    } catch {
+      /* keep silent */
     }
-    music.volume = 0;
-    safe(() => music!.seekTo(0));
-    safe(() => music!.play());
-    fadeTo(0.6, 2000);
-  } catch {
-    /* keep silent */
-  }
+  })();
 }
 
 export function setCalmMusicPaused(paused: boolean) {
   try {
+    if (isExpoGo()) return;
     if (!music) return;
     if (paused) music.pause();
     else music.play();
@@ -95,6 +120,7 @@ export function setCalmMusicPaused(paused: boolean) {
 
 /** Fade out and release the music. */
 export function stopCalmMusic() {
+  if (isExpoGo()) return;
   const m = music;
   if (!m) return;
   music = null;
