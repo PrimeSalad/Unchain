@@ -299,20 +299,38 @@ export default function Checkers() {
           })}
         </View>
 
-        {/* Status line */}
-        <View style={{ alignItems: 'center', paddingVertical: spacing.md, minHeight: 44, justifyContent: 'center' }}>
-          {over ? (
-            <Text variant="callout" dim>{winner === 'r' ? 'You win! 🎉' : 'AI wins - rematch?'}</Text>
-          ) : thinking ? (
-            <ThinkingDots />
-          ) : popIdx != null ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFD70022', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.input }}>
-              <Foundation name="crown" size={15} color="#FFD700" />
-              <Text variant="callout" color="#C8A000">King!</Text>
-            </View>
-          ) : (
-            <Text variant="callout" dim>{flight ? '…' : 'Your move'}</Text>
-          )}
+        {/* Stats bar — Wins | Win Rate | Losses */}
+        <View style={{
+          flexDirection: 'row',
+          marginHorizontal: spacing.lg,
+          marginTop: spacing.sm,
+          borderRadius: radius.chip,
+          backgroundColor: theme.color.surfaceAlt,
+          overflow: 'hidden',
+        }}>
+          {/* Wins */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Wins</Text>
+            <Text variant="headline" color={games.checkersWins > 0 ? theme.color.success : theme.color.text}>{games.checkersWins}</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+          {/* Win Rate */}
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Win Rate</Text>
+            <Text variant="headline" color={theme.color.text}>{winRate}%</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+          {/* Losses */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Losses</Text>
+            <Text variant="headline" color={games.checkersLosses > 0 ? theme.color.danger : theme.color.text}>{games.checkersLosses}</Text>
+          </View>
         </View>
 
         {/* Board */}
@@ -383,19 +401,28 @@ export default function Checkers() {
           </View>
         </View>
 
-        {/* Record strip */}
-        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.xl, marginTop: spacing.lg }}>
-          <MiniStat label="Wins" value={`${games.checkersWins}`} />
-          <MiniStat label="Losses" value={`${games.checkersLosses}`} />
-          <MiniStat label="Win rate" value={`${winRate}%`} />
+        {/* Status line */}
+        <View style={{ alignItems: 'center', paddingVertical: spacing.sm, minHeight: 36, justifyContent: 'center' }}>
+          {over ? (
+            <Text variant="callout" dim>{winner === 'r' ? 'You win! 🎉' : 'AI wins - rematch?'}</Text>
+          ) : thinking ? (
+            <ThinkingDots />
+          ) : popIdx != null ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFD70022', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.input }}>
+              <Foundation name="crown" size={15} color="#FFD700" />
+              <Text variant="callout" color="#C8A000">King!</Text>
+            </View>
+          ) : (
+            <Text variant="callout" dim>{flight ? '…' : 'Your move'}</Text>
+          )}
         </View>
 
-        {/* Action row — sits below the stats, never in the header */}
+        {/* Action row */}
         <View style={{
           flexDirection: 'row',
           gap: spacing.sm,
           paddingHorizontal: spacing.lg,
-          paddingTop: spacing.md,
+          paddingTop: spacing.sm,
         }}>
           {/* Surrender — only shown mid-game */}
           {!over && (
@@ -427,7 +454,7 @@ export default function Checkers() {
             accessibilityRole="button"
             accessibilityLabel="Start a new game"
             style={({ pressed }) => ({
-              flex: over ? 1 : 1,
+              flex: 1,
               height: 44,
               borderRadius: radius.round,
               backgroundColor: theme.color.primary,
@@ -608,12 +635,4 @@ function Dot({ delay }: { delay: number }) {
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
-  const theme = useTheme();
-  return (
-    <View style={{ alignItems: 'center' }}>
-      <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
-      <Text variant="caption" dim>{label}</Text>
-    </View>
-  );
-}
+

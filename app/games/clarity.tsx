@@ -253,30 +253,82 @@ export default function Clarity() {
           <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
-        {/* Daily info / streak row */}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: 2 }}>
+        {/* Stats bar */}
+        <View style={{
+          flexDirection: 'row',
+          marginHorizontal: spacing.lg,
+          marginTop: spacing.xs ?? 4,
+          borderRadius: radius.chip,
+          backgroundColor: theme.color.surfaceAlt,
+          overflow: 'hidden',
+        }}>
           {mode === 'daily' ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <Text variant="caption" dim>Daily #{daily.day}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <Ionicons name="flame" size={11} color={theme.color.primary} />
-                <Text variant="caption" color={theme.color.primary}>Streak {games.clarityStreak}</Text>
+            <>
+              {/* Daily # */}
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+                <Text variant="caption" dim style={{ marginBottom: 2 }}>Puzzle</Text>
+                <Text variant="headline" color={theme.color.text}>#{daily.day}</Text>
               </View>
-            </View>
-          ) : doneRevealed ? (
-            <Pressable
-              onPress={newRound}
-              hitSlop={10}
-              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 })}
-            >
-              <Ionicons name="refresh" size={16} color={theme.color.primary} />
-              <Text variant="footnote" color={theme.color.primary}>New word</Text>
-            </Pressable>
-          ) : null}
+
+              {/* Divider */}
+              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+              {/* Streak */}
+              <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+                <Text variant="caption" dim style={{ marginBottom: 2 }}>Streak</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Ionicons name="flame" size={14} color={games.clarityStreak > 0 ? theme.color.primary : theme.color.textDim} />
+                  <Text variant="headline" color={games.clarityStreak > 0 ? theme.color.primary : theme.color.textDim}>{games.clarityStreak}</Text>
+                </View>
+              </View>
+
+              {/* Divider */}
+              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+              {/* Win rate */}
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+                <Text variant="caption" dim style={{ marginBottom: 2 }}>Win Rate</Text>
+                <Text variant="headline" color={theme.color.text}>{winRate}%</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Played */}
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+                <Text variant="caption" dim style={{ marginBottom: 2 }}>Played</Text>
+                <Text variant="headline" color={theme.color.text}>{games.clarityPracticePlayed}</Text>
+              </View>
+
+              {/* Divider */}
+              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+              {/* Win rate */}
+              <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+                <Text variant="caption" dim style={{ marginBottom: 2 }}>Win Rate</Text>
+                <Text variant="headline" color={theme.color.text}>{winRate}%</Text>
+              </View>
+
+              {/* Divider */}
+              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+              {/* New word — only visible once round is done */}
+              <Pressable
+                onPress={doneRevealed ? newRound : undefined}
+                hitSlop={8}
+                style={({ pressed }) => ({
+                  flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10,
+                  opacity: doneRevealed ? (pressed ? 0.6 : 1) : 0.35,
+                })}
+              >
+                <Ionicons name="refresh" size={14} color={theme.color.primary} />
+                <Text variant="caption" color={theme.color.primary} style={{ marginTop: 2 }}>New word</Text>
+              </Pressable>
+            </>
+          )}
         </View>
 
         {/* Mode toggle */}
-        <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.lg, paddingTop: spacing.sm }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
           {(['daily', 'practice'] as const).map((m) => {
             const on = mode === m;
             return (

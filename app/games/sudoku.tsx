@@ -187,11 +187,6 @@ export default function Sudoku() {
           <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
-        {/* Timer row */}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: 2 }}>
-          <Text variant="callout" dim style={{ fontVariant: ['tabular-nums'] }}>{mm}:{ss}</Text>
-        </View>
-
         {/* Difficulty */}
         <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           {LEVELS.map((l) => {
@@ -204,9 +199,39 @@ export default function Sudoku() {
           })}
         </View>
 
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
-          <Text variant="footnote" dim>Mistakes: {mistakes}</Text>
-          <Text variant="footnote" dim>Hints: {hints}/{HINT_LIMIT}</Text>
+        {/* Stats bar — Mistakes | Timer | Hints */}
+        <View style={{
+          flexDirection: 'row',
+          marginHorizontal: spacing.lg,
+          marginTop: spacing.sm,
+          marginBottom: spacing.xs ?? 4,
+          borderRadius: radius.chip,
+          backgroundColor: theme.color.surfaceAlt,
+          overflow: 'hidden',
+        }}>
+          {/* Mistakes */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Mistakes</Text>
+            <Text variant="headline" color={mistakes > 0 ? theme.color.danger : theme.color.text}>{mistakes}</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+          {/* Timer */}
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Time</Text>
+            <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{mm}:{ss}</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+          {/* Hints */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Hints</Text>
+            <Text variant="headline" color={hintsLeft <= 0 ? theme.color.textDim : theme.color.primary}>{hints}/{HINT_LIMIT}</Text>
+          </View>
         </View>
 
         {/* Board */}

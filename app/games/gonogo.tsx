@@ -20,7 +20,6 @@ import {
   ChallengeChip,
   ComboBadge,
   Countdown,
-  HudStat,
   LivesRow,
   PointsFloat,
 } from '@/presentation/components/games/InhibitionHUD';
@@ -332,11 +331,36 @@ export default function GoNoGo() {
           <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
-        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.xs }}>
-          <HudStat label="Score" value={score.toLocaleString()} />
-          <HudStat label="Level" value={`${level}`} />
-          <View style={{ flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card, padding: spacing.md, alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-            <Text variant="footnote" dim>Focus</Text>
+        {/* Stats bar — Score | Level | Focus */}
+        <View style={{
+          flexDirection: 'row',
+          marginHorizontal: spacing.lg,
+          marginTop: spacing.xs,
+          borderRadius: radius.chip,
+          backgroundColor: theme.color.surfaceAlt,
+          overflow: 'hidden',
+        }}>
+          {/* Score */}
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Score</Text>
+            <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{score.toLocaleString()}</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+          {/* Level */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Level</Text>
+            <Text variant="headline" color={theme.color.text}>{level}</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+          {/* Focus */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Focus</Text>
             <LivesRow lives={lives} />
           </View>
         </View>

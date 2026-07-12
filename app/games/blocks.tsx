@@ -236,11 +236,38 @@ export default function Blocks() {
           <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
-        {/* Score row */}
-        <View style={{ flexDirection: 'row', paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.md }}>
-          <Info label="Score" value={score.toLocaleString()} />
-          <Info label="Best" value={Math.max(best, score).toLocaleString()} />
-          <Info label="Combo" value={combo > 1 ? `×${combo}` : '-'} highlight={combo > 1} />
+        {/* Stats bar — Score | Best | Combo */}
+        <View style={{
+          flexDirection: 'row',
+          marginHorizontal: spacing.lg,
+          marginTop: spacing.sm,
+          borderRadius: radius.chip,
+          backgroundColor: theme.color.surfaceAlt,
+          overflow: 'hidden',
+        }}>
+          {/* Score */}
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Score</Text>
+            <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{score.toLocaleString()}</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+          {/* Best */}
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Best</Text>
+            <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{Math.max(best, score).toLocaleString()}</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+
+          {/* Combo */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+            <Text variant="caption" dim style={{ marginBottom: 2 }}>Combo</Text>
+            <Text variant="headline" color={combo > 1 ? theme.color.accent : theme.color.textDim}>{combo > 1 ? `×${combo}` : '—'}</Text>
+          </View>
         </View>
 
         {/* Board */}
@@ -386,26 +413,6 @@ function PiecePreview({ piece, cell, dim }: { piece: Piece; cell: number; dim?: 
           <View style={{ flex: 1, borderRadius: cell > 14 ? 5 : 3, backgroundColor: color, opacity: dim ? 0.4 : 1 }} />
         </View>
       ))}
-    </View>
-  );
-}
-
-function Info({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  const theme = useTheme();
-  const scale = useRef(new Animated.Value(1)).current;
-
-  // Pulse whenever the value changes (score ticks, combo bumps).
-  useEffect(() => {
-    scale.setValue(1.12);
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 220 }).start();
-  }, [value, scale]);
-
-  return (
-    <View style={{ flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card, padding: spacing.md, alignItems: 'center' }}>
-      <Text variant="footnote" dim>{label}</Text>
-      <Animated.View style={{ transform: [{ scale }] }}>
-        <Text variant="title2" color={highlight ? theme.color.accent : theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
-      </Animated.View>
     </View>
   );
 }
