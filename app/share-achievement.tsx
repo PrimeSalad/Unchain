@@ -4,13 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import { Text } from '@/presentation/components/Text';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore } from '@/application/store';
+import { captureShareRef, shareCapturedContent } from '@/application/shareMedia';
 import { achievementById, GAME_ACHIEVEMENTS, GAME_NAMES } from '@/domain/games/achievements';
 import { ALTERNATIVES, altAchievementById } from '@/domain/alternatives';
 
@@ -105,12 +104,8 @@ export default function ShareAchievement() {
   const shareImage = async () => {
     setBusy(true);
     try {
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share your achievement' });
-      } else {
-        await Share.share({ message: summary });
-      }
+      const uri = await captureShareRef(cardRef);
+      await shareCapturedContent({ uri: uri ?? '', summary, dialogTitle: 'Share your achievement' });
     } catch {
       await Share.share({ message: summary }).catch(() => {});
     } finally {

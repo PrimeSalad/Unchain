@@ -3,8 +3,6 @@ import { Alert, Image, ImageBackground, Platform, Pressable, Share, View } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import { Text } from '@/presentation/components/Text';
 import { Roadmap } from '@/presentation/components/Roadmap';
@@ -12,6 +10,7 @@ import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
+import { captureShareRef, shareCapturedContent } from '@/application/shareMedia';
 import { streakDays, moneySaved, formatMoney, addictionMeta, currentStreakStart } from '@/domain/gambling';
 import { computeStats, badgeProgress } from '@/domain/achievements';
 
@@ -87,12 +86,8 @@ export default function ShareCard() {
   const shareImage = async () => {
     setBusy(true);
     try {
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share your progress' });
-      } else {
-        await Share.share({ message: summary });
-      }
+      const uri = await captureShareRef(cardRef);
+      await shareCapturedContent({ uri: uri ?? '', summary, dialogTitle: 'Share your progress' });
     } catch {
       await Share.share({ message: summary }).catch(() => {});
     } finally {

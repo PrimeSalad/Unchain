@@ -4,13 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import { Text } from '@/presentation/components/Text';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
+import { captureShareRef, shareCapturedContent } from '@/application/shareMedia';
 import { currentStreakStart, streakDays } from '@/domain/gambling';
 import { ALTERNATIVES, WATER_GOAL_GLASSES, alternativeById, type AlternativeId } from '@/domain/alternatives';
 import { formatDistance, formatPace } from '@/domain/walk';
@@ -185,12 +184,8 @@ export default function ShareActivity() {
   const shareImage = async () => {
     setBusy(true);
     try {
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share your session' });
-      } else {
-        await Share.share({ message: summary });
-      }
+      const uri = await captureShareRef(cardRef);
+      await shareCapturedContent({ uri: uri ?? '', summary, dialogTitle: 'Share your session' });
     } catch {
       await Share.share({ message: summary }).catch(() => {});
     } finally {

@@ -4,7 +4,6 @@ import {
   Animated,
   Modal,
   Pressable,
-  Share,
   StyleSheet,
   TextInput,
   View,
@@ -12,7 +11,6 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
@@ -21,6 +19,7 @@ import { Pill } from '../components/Pill';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile, initialGames } from '@/application/store';
+import { shareCapturedContent } from '@/application/shareMedia';
 import { streakDays, addictionMeta, TRIGGERS, currentStreakStart } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
@@ -255,15 +254,12 @@ export function ProfileScreen() {
       const fileUri = `${dir}unchain-backup-${stamp}.json`;
       await FileSystem.writeAsStringAsync(fileUri, json);
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Save your Unchain backup',
-          UTI: 'public.json',
-        });
-      } else {
-        await Share.share({ message: json });
-      }
+      await shareCapturedContent({
+        uri: fileUri,
+        summary: json,
+        dialogTitle: 'Save your Unchain backup',
+        mimeType: 'application/json',
+      });
       showToast('Backup file ready');
     } catch {
       showToast('Export cancelled or failed', 'error');

@@ -12,8 +12,6 @@ import { Animated as RNAnimated, Easing, Modal, Pressable, View } from 'react-na
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as Location from 'expo-location';
-import { Pedometer } from 'expo-sensors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
@@ -28,6 +26,7 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useProfile, useStore, useTodayAnyJournal } from '@/application/store';
 import { startCalmMusic, stopCalmMusic } from '@/application/sound';
+import { isExpoGo } from '@/application/expoGo';
 import {
   ALT_ACHIEVEMENTS,
   ALTERNATIVES,
@@ -272,6 +271,7 @@ function WalkSheet({
   onShare: (m: WalkMetrics) => void;
 }) {
   const theme = useTheme();
+  const expoGo = isExpoGo();
   const [phase, setPhase] = useState<WalkPhase>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [steps, setSteps] = useState(0);
@@ -304,10 +304,12 @@ function WalkSheet({
   }, []);
 
   const startSensors = useCallback(async () => {
+    if (expoGo) return;
     const gen = sensorGenRef.current;
 
     // Steps - Motion & Fitness permission, requested only now, in context.
     try {
+      const { Pedometer } = await import('expo-sensors');
       if (await Pedometer.isAvailableAsync()) {
         const perm = await Pedometer.requestPermissionsAsync();
         if (perm.granted && gen === sensorGenRef.current) {
@@ -324,6 +326,7 @@ function WalkSheet({
 
     // Distance - while-in-use location, requested only now, in context.
     try {
+      const Location = await import('expo-location');
       const perm = await Location.requestForegroundPermissionsAsync();
       if (perm.granted) {
         const sub = await Location.watchPositionAsync(
@@ -354,7 +357,7 @@ function WalkSheet({
     } catch {
       /* distance is a bonus - the walk still works without it */
     }
-  }, []);
+  }, [expoGo]);
 
   // Fresh state on open; hard cleanup on close/unmount.
   useEffect(() => {
@@ -429,6 +432,13 @@ function WalkSheet({
   const pace = formatPace(elapsed, meters);
   const status =
     phase === 'running' ? 'Walking - stay with it' : phase === 'paused' ? 'Paused' : 'Ready when you are';
+  const hints: Array<[keyof typeof Ionicons.glyphMap, string]> = expoGo
+    ? [['stopwatch', 'Live stopwatch works in Expo Go.']]
+    : [
+        ['stopwatch', 'Live stopwatch - walk at your own pace'],
+        ['footsteps', 'Step counting via your phone’s motion sensor'],
+        ['navigate', 'GPS distance & pace, only while walking'],
+      ];
 
   return (
     <ActionSheet visible={visible} onClose={onClose} dismissable={phase === 'idle'}>
@@ -451,11 +461,7 @@ function WalkSheet({
             subtitle="Walk as long as you like - you decide when to stop. Time, steps, and distance are tracked live, all on this device."
           />
           <View style={{ gap: spacing.sm }}>
-            {([
-              ['stopwatch', 'Live stopwatch - walk at your own pace'],
-              ['footsteps', 'Step counting via your phone’s motion sensor'],
-              ['navigate', 'GPS distance & pace, only while walking'],
-            ] as [keyof typeof Ionicons.glyphMap, string][]).map(([icon, text]) => (
+            {hints.map(([icon, text]) => (
               <View
                 key={text}
                 style={{
@@ -1440,6 +1446,7 @@ export default function Alternatives() {
   const theme = useTheme();
   const router = useRouter();
   const safeBack = useSafeBack();
+  const expoGo = isExpoGo();
   const completions = useStore((s) => s.alternatives);
   const completeAlternative = useStore((s) => s.completeAlternative);
   const recordAltSession = useStore((s) => s.recordAltSession);
