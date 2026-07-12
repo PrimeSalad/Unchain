@@ -43,6 +43,7 @@ import type { BlockedSite } from '@/domain/protection';
 import { normalizeDomain } from '@/domain/protection';
 import type { DailyMissionState, MissionId } from '@/domain/missions';
 import { missionById, missionDayKey } from '@/domain/missions';
+import { challengeDayNumber, dailyChallengeTarget } from '@/domain/games/inhibition';
 
 /**
  * Single local store for the recovery companion. Offline-first: no accounts,
@@ -68,6 +69,13 @@ export interface GamesState {
   clarityWon: number;
   clarityPracticePlayed: number;
   clarityPracticeWon: number;
+  gonogoBest: number;
+  gonogoGames: number;
+  stopBest: number;
+  stopGames: number;
+  /** Daily-challenge completion day per game (challengeDayNumber), so each
+   *  game's challenge can only pay out once per local day. */
+  challengeDoneDay: Record<string, number>;
   /** Permanently unlocked game achievements: id → unlockedAt (ms). */
   achievements: Record<string, number>;
   /** Games whose "How to play" popup the user opted out of ("Don't show
@@ -91,6 +99,11 @@ export const initialGames: GamesState = {
   clarityWon: 0,
   clarityPracticePlayed: 0,
   clarityPracticeWon: 0,
+  gonogoBest: 0,
+  gonogoGames: 0,
+  stopBest: 0,
+  stopGames: 0,
+  challengeDoneDay: {},
   achievements: {},
   tutorialsHidden: {},
 };
@@ -141,6 +154,17 @@ interface RecoveryState {
   healthyHabitsCount: number;
   updateLastCheckedIn: () => void;
 
+  // ── Education Hub ────────────────────────────────────────────────────────
+  /** Bookmarked guide/resource ids. */
+  eduBookmarks: string[];
+  /** Reading progress per built-in guide: fraction read + scroll offset so
+   *  "Continue reading" reopens exactly where the user left off. */
+  eduProgress: Record<string, { pct: number; offset: number }>;
+  /** The last guide opened — powers the hub's Continue Reading card. */
+  eduLastGuideId: string | null;
+  toggleEduBookmark: (id: string) => void;
+  setEduProgress: (guideId: string, pct: number, offset: number) => void;
+
   // ── Focus Protection ────────────────────────────────────────────────────
   /** The user's permanent blocklist — every entry added explicitly by them,
    *  protected until manually removed. No timers, no expiry. Stored locally
@@ -174,6 +198,20 @@ interface RecoveryState {
     ctx: { mistakes: number; hints: number },
   ) => GameAchievement[];
   recordBlocks: (score: number, ctx: { maxCombo: number; maxLines: number }) => GameAchievement[];
+  /** Record an inhibition-game round. Awards Recovery Points scaled by the
+   *  score (plus a daily-challenge bonus the first time the day's target is
+   *  beaten) and returns everything the results screen needs. */
+  recordInhibition: (
+    game: 'gonogo' | 'stopsignal',
+    summary: {
+      score: number;
+      accuracy: number;
+      maxCombo: number;
+      avgReactionMs: number;
+      trials: number;
+      stopsCaught?: number;
+    },
+  ) => { unlocked: GameAchievement[]; pointsEarned: number; newBest: boolean; challengeCompleted: boolean };
   saveClarityProgress: (day: number, guesses: string[]) => void;
   /** Remember whether a game's "How to play" popup auto-shows on open. */
   setTutorialHidden: (game: string, hidden: boolean) => void;
@@ -344,8 +382,30 @@ export const useStore = create<RecoveryState>()(
       urgesResisted: 0,
       urgesResistedWeek: 0,
       healthyHabitsCount: 0,
+      eduBookmarks: [],
+      eduProgress: {},
+      eduLastGuideId: null,
 
       updateLastCheckedIn: () => set({ lastCheckedIn: Date.now() }),
+
+      toggleEduBookmark: (id) =>
+        set((s) => ({
+          eduBookmarks: s.eduBookmarks.includes(id)
+            ? s.eduBookmarks.filter((b) => b !== id)
+            : [id, ...s.eduBookmarks],
+        })),
+
+      setEduProgress: (guideId, pct, offset) =>
+        set((s) => {
+          const prev = s.eduProgress[guideId];
+          // Progress only moves forward; the offset always tracks the latest
+          // position so Continue Reading reopens where they actually were.
+          const nextPct = Math.max(prev?.pct ?? 0, Math.min(1, Math.max(0, pct)));
+          return {
+            eduProgress: { ...s.eduProgress, [guideId]: { pct: nextPct, offset: Math.max(0, offset) } },
+            eduLastGuideId: guideId,
+          };
+        }),
 
       logWater: (glasses) => {
         const n = Math.max(1, Math.min(24, Math.round(glasses)));
@@ -555,6 +615,60 @@ export const useStore = create<RecoveryState>()(
           return r.patch;
         });
         return unlocked;
+      },
+
+      recordInhibition: (game, summary) => {
+        let unlocked: GameAchievement[] = [];
+        let pointsEarned = 0;
+        let newBest = false;
+        let challengeCompleted = false;
+        set((s) => {
+          const prevBest = game === 'gonogo' ? s.games.gonogoBest : s.games.stopBest;
+          newBest = summary.score > prevBest;
+          const games: GamesState = {
+            ...s.games,
+            ...(game === 'gonogo'
+              ? {
+                  gonogoBest: Math.max(s.games.gonogoBest, summary.score),
+                  gonogoGames: s.games.gonogoGames + 1,
+                }
+              : {
+                  stopBest: Math.max(s.games.stopBest, summary.score),
+                  stopGames: s.games.stopGames + 1,
+                }),
+          };
+
+          const ev: GameEvent =
+            game === 'gonogo'
+              ? { game: 'gonogo', ...summary }
+              : { game: 'stopsignal', stopsCaught: summary.stopsCaught ?? 0, ...summary };
+          const r = withGameEvent(s, games, ev);
+          unlocked = r.unlocked;
+
+          // Recovery Points: a modest score-scaled award on top of the
+          // achievement points withGameEvent already granted.
+          pointsEarned = Math.max(2, Math.min(15, Math.round(summary.score / 150)));
+
+          // Daily challenge — beat today's target once per day for a bonus.
+          const day = challengeDayNumber();
+          const target = dailyChallengeTarget(prevBest, day);
+          const doneDay = s.games.challengeDoneDay[game] ?? -1;
+          if (doneDay !== day && summary.score >= target) {
+            challengeCompleted = true;
+            pointsEarned += 10;
+            r.patch.games = {
+              ...r.patch.games,
+              challengeDoneDay: { ...r.patch.games.challengeDoneDay, [game]: day },
+            };
+            r.patch.timeline = [
+              evt('achievement', `Daily challenge complete — ${game === 'gonogo' ? 'Go / No-Go' : 'Stop Signal'}`),
+              ...r.patch.timeline,
+            ];
+          }
+
+          return { ...r.patch, points: r.patch.points + pointsEarned };
+        });
+        return { unlocked, pointsEarned, newBest, challengeCompleted };
       },
 
       recordBlocks: (score, ctx) => {
@@ -971,6 +1085,9 @@ export const useStore = create<RecoveryState>()(
           urgesResisted: 0,
           urgesResistedWeek: 0,
           healthyHabitsCount: 0,
+          eduBookmarks: [],
+          eduProgress: {},
+          eduLastGuideId: null,
           blockedSites: [],
           favoriteQuotes: [],
           dailyQuote: null,

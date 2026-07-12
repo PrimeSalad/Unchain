@@ -17,7 +17,11 @@ export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/g
 
 interface GameDef {
   route: string;
-  icon: ImageSourcePropType;
+  /** Bundled artwork tile… */
+  icon?: ImageSourcePropType;
+  /** …or an Ionicons glyph tile for games without artwork. */
+  ionIcon?: keyof typeof Ionicons.glyphMap;
+  tint?: string;
   game: GameId;
   title: string;
   desc: string;
@@ -42,6 +46,8 @@ export default function GamesHub() {
     { route: '/games/checkers', game: 'checkers', icon: require('../../assets/game icon/Checkers.jpg'), title: 'Checkers', desc: 'Outsmart the AI', stat: games.checkersWins || games.checkersLosses ? `${games.checkersWins}W · ${games.checkersLosses}L` : '3 difficulties' },
     { route: '/games/sudoku', game: 'sudoku', icon: require('../../assets/game icon/Sodoku.jpg'), title: 'Sudoku', desc: 'Fill the grid, 1–9', stat: games.sudokuSolved ? `${games.sudokuSolved} solved` : '4 difficulties' },
     { route: '/games/blocks', game: 'blocks', icon: require('../../assets/game icon/Blocks Align.jpg'), title: 'Block Puzzle', desc: 'Place, clear, combo', stat: games.blocksBest ? `Best ${games.blocksBest.toLocaleString()}` : 'Beat your best' },
+    { route: '/games/gonogo', game: 'gonogo', ionIcon: 'flash', tint: '#4E9B5E', title: 'Go / No-Go', desc: 'Tap green, resist red', stat: games.gonogoBest ? `Best ${games.gonogoBest.toLocaleString()}` : 'Train impulse control' },
+    { route: '/games/stop-signal', game: 'stopsignal', ionIcon: 'hand-left', tint: '#4A6FA5', title: 'Stop Signal', desc: 'Tap fast, brake faster', stat: games.stopBest ? `Best ${games.stopBest.toLocaleString()}` : 'Train response inhibition' },
   ];
 
   return (
@@ -77,7 +83,19 @@ export default function GamesHub() {
                 style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
               >
                 <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
-                  <Image source={g.icon} style={{ width: 56, height: 56, borderRadius: radius.card }} />
+                  {g.icon ? (
+                    <Image source={g.icon} style={{ width: 56, height: 56, borderRadius: radius.card }} />
+                  ) : (
+                    <View
+                      style={{
+                        width: 56, height: 56, borderRadius: radius.card,
+                        backgroundColor: (g.tint ?? theme.color.primary) + '22',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <Ionicons name={g.ionIcon ?? 'game-controller'} size={28} color={g.tint ?? theme.color.primary} />
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text variant="headline">{g.title}</Text>
                     <Text variant="footnote" dim style={{ marginTop: 2 }}>{g.desc}</Text>

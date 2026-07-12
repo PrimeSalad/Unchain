@@ -5,7 +5,7 @@
  * event. Unlocks are stored (id → unlockedAt) and are permanent.
  */
 
-export type GameId = 'checkers' | 'clarity' | 'sudoku' | 'blocks';
+export type GameId = 'checkers' | 'clarity' | 'sudoku' | 'blocks' | 'gonogo' | 'stopsignal';
 
 /** The slice of game stats the tests need (structurally satisfied by the store's GamesState). */
 export interface GameStatsSnapshot {
@@ -20,13 +20,19 @@ export interface GameStatsSnapshot {
   clarityWon: number;
   clarityPracticePlayed: number;
   clarityPracticeWon: number;
+  gonogoBest: number;
+  gonogoGames: number;
+  stopBest: number;
+  stopGames: number;
 }
 
 export type GameEvent =
   | { game: 'checkers'; result: 'win' | 'loss'; difficulty: 'easy' | 'medium' | 'hard'; piecesLeft: number }
   | { game: 'sudoku'; level: 'easy' | 'medium' | 'hard' | 'expert'; ms: number; mistakes: number; hints: number }
   | { game: 'blocks'; score: number; maxCombo: number; maxLines: number }
-  | { game: 'clarity'; won: boolean; guessCount: number; daily: boolean };
+  | { game: 'clarity'; won: boolean; guessCount: number; daily: boolean }
+  | { game: 'gonogo'; score: number; accuracy: number; maxCombo: number; avgReactionMs: number; trials: number }
+  | { game: 'stopsignal'; score: number; accuracy: number; maxCombo: number; avgReactionMs: number; trials: number; stopsCaught: number };
 
 export interface GameAchievement {
   id: string;
@@ -47,6 +53,8 @@ export const GAME_NAMES: Record<GameId, string> = {
   clarity: 'Clarity',
   sudoku: 'Sudoku',
   blocks: 'Block Puzzle',
+  gonogo: 'Go / No-Go',
+  stopsignal: 'Stop Signal',
 };
 
 const clarityTotalWins = (s: GameStatsSnapshot) => s.clarityWon + s.clarityPracticeWon;
@@ -204,6 +212,83 @@ export const GAME_ACHIEVEMENTS: GameAchievement[] = [
     desc: 'Finish 10 games of Block Puzzle.',
     progress: (s) => ({ current: Math.min(s.blocksGames, 10), target: 10 }),
     test: (s) => s.blocksGames >= 10,
+  },
+
+  // ── Go / No-Go (inhibitory control training) ─────────────────────────────
+  {
+    id: 'gng-first', game: 'gonogo', title: 'First Reflex', icon: 'radio-button-on',
+    desc: 'Finish your first Go / No-Go round.',
+    progress: (s) => ({ current: Math.min(s.gonogoGames, 1), target: 1 }),
+    test: (s) => s.gonogoGames >= 1,
+  },
+  {
+    id: 'gng-750', game: 'gonogo', title: 'Steady Hand', icon: 'hand-left',
+    desc: 'Score 750 points in one round.',
+    progress: (s) => ({ current: Math.min(s.gonogoBest, 750), target: 750 }),
+    test: (s, ev) => ev.game === 'gonogo' && ev.score >= 750,
+  },
+  {
+    id: 'gng-2000', game: 'gonogo', title: 'Impulse Master', icon: 'shield-checkmark',
+    desc: 'Score 2,000 points in one round.',
+    progress: (s) => ({ current: Math.min(s.gonogoBest, 2000), target: 2000 }),
+    test: (s, ev) => ev.game === 'gonogo' && ev.score >= 2000,
+  },
+  {
+    id: 'gng-combo-15', game: 'gonogo', title: 'In the Zone', icon: 'flame',
+    desc: 'Reach a ×15 combo.',
+    test: (s, ev) => ev.game === 'gonogo' && ev.maxCombo >= 15,
+  },
+  {
+    id: 'gng-sharpshooter', game: 'gonogo', title: 'Sharpshooter', icon: 'locate',
+    desc: 'Finish a round of 30+ trials at 95% accuracy or better.',
+    test: (s, ev) => ev.game === 'gonogo' && ev.trials >= 30 && ev.accuracy >= 0.95,
+  },
+  {
+    id: 'gng-lightning', game: 'gonogo', title: 'Lightning Calm', icon: 'flash', secret: true,
+    desc: 'Average under 350 ms reactions across a 30+ trial round.',
+    test: (s, ev) => ev.game === 'gonogo' && ev.trials >= 30 && ev.avgReactionMs > 0 && ev.avgReactionMs < 350,
+  },
+  {
+    id: 'gng-10-games', game: 'gonogo', title: 'Training Habit', icon: 'calendar',
+    desc: 'Finish 10 Go / No-Go rounds.',
+    progress: (s) => ({ current: Math.min(s.gonogoGames, 10), target: 10 }),
+    test: (s) => s.gonogoGames >= 10,
+  },
+
+  // ── Stop Signal (response inhibition training) ────────────────────────────
+  {
+    id: 'ss-first', game: 'stopsignal', title: 'Quick Brake', icon: 'hand-left',
+    desc: 'Finish your first Stop Signal round.',
+    progress: (s) => ({ current: Math.min(s.stopGames, 1), target: 1 }),
+    test: (s) => s.stopGames >= 1,
+  },
+  {
+    id: 'ss-750', game: 'stopsignal', title: 'Poised Response', icon: 'shield-checkmark',
+    desc: 'Score 750 points in one round.',
+    progress: (s) => ({ current: Math.min(s.stopBest, 750), target: 750 }),
+    test: (s, ev) => ev.game === 'stopsignal' && ev.score >= 750,
+  },
+  {
+    id: 'ss-2000', game: 'stopsignal', title: 'Inhibition Mastery', icon: 'shield-checkmark',
+    desc: 'Score 2,000 points in one round.',
+    progress: (s) => ({ current: Math.min(s.stopBest, 2000), target: 2000 }),
+    test: (s, ev) => ev.game === 'stopsignal' && ev.score >= 2000,
+  },
+  {
+    id: 'ss-stops-50', game: 'stopsignal', title: 'Unstoppable', icon: 'checkmark',
+    desc: 'Catch 50 stops in one round.',
+    test: (s, ev) => ev.game === 'stopsignal' && ev.stopsCaught >= 50,
+  },
+  {
+    id: 'ss-perfection', game: 'stopsignal', title: 'Perfect Timing', icon: 'flash', secret: true,
+    desc: 'Complete 30+ trials at 95% accuracy or better.',
+    test: (s, ev) => ev.game === 'stopsignal' && ev.trials >= 30 && ev.accuracy >= 0.95,
+  },
+  {
+    id: 'ss-10-games', game: 'stopsignal', title: 'Disciplined', icon: 'calendar',
+    desc: 'Finish 10 Stop Signal rounds.',
+    progress: (s) => ({ current: Math.min(s.stopGames, 10), target: 10 }),
+    test: (s) => s.stopGames >= 10,
   },
 ];
 

@@ -90,6 +90,18 @@ export default function ShareAchievement() {
           { label: 'Games', value: `${games.blocksGames}` },
           { label: 'Unlocked', value: `${Object.keys(games.achievements).length}` },
         ];
+      case 'gonogo':
+        return [
+          { label: 'Best score', value: games.gonogoBest.toLocaleString() },
+          { label: 'Rounds', value: `${games.gonogoGames}` },
+          { label: 'Unlocked', value: `${Object.keys(games.achievements).length}` },
+        ];
+      case 'stopsignal':
+        return [
+          { label: 'Best score', value: games.stopBest.toLocaleString() },
+          { label: 'Rounds', value: `${games.stopGames}` },
+          { label: 'Unlocked', value: `${Object.keys(games.achievements).length}` },
+        ];
     }
   })();
 

@@ -238,6 +238,9 @@ export function ProfileScreen() {
           urgesResisted: s.urgesResisted,
           urgesResistedWeek: s.urgesResistedWeek,
           healthyHabitsCount: s.healthyHabitsCount,
+          eduBookmarks: s.eduBookmarks,
+          eduProgress: s.eduProgress,
+          eduLastGuideId: s.eduLastGuideId,
           blockedSites: s.blockedSites,
           dailyMissions: s.dailyMissions,
           missionXp: s.missionXp,
@@ -323,6 +326,9 @@ export function ProfileScreen() {
         urgesResisted: typeof data.urgesResisted === 'number' ? data.urgesResisted : 0,
         urgesResistedWeek: typeof data.urgesResistedWeek === 'number' ? data.urgesResistedWeek : 0,
         healthyHabitsCount: typeof data.healthyHabitsCount === 'number' ? data.healthyHabitsCount : 0,
+        eduBookmarks: arr(data.eduBookmarks),
+        eduProgress: obj(data.eduProgress, {}),
+        eduLastGuideId: typeof data.eduLastGuideId === 'string' ? data.eduLastGuideId : null,
         blockedSites: arr(data.blockedSites),
         dailyMissions:
           data.dailyMissions && typeof data.dailyMissions.day === 'string' && Array.isArray(data.dailyMissions.completed)

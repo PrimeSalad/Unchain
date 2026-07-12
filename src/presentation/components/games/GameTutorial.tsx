@@ -58,6 +58,28 @@ const TUTORIALS: Record<GameId, { title: string; steps: TutorialStep[] }> = {
       { icon: 'alert-circle-outline', text: 'The game ends when none of your pieces fit — plan ahead!' },
     ],
   },
+  gonogo: {
+    title: 'How to play Go / No-Go',
+    steps: [
+      { icon: 'radio-button-on', text: 'A GREEN circle means TAP — as fast as you can.' },
+      { icon: 'close-circle', text: 'A RED circle means DO NOT tap. Hold back, even mid-reach.' },
+      { icon: 'speedometer', text: 'The pace quickens every level — shorter windows, trickier timing.' },
+      { icon: 'flame', text: 'Consecutive correct answers build a combo multiplier (up to ×5).' },
+      { icon: 'heart', text: 'You have 3 focus points. A wrong tap or a miss costs one.' },
+      { icon: 'fitness', text: 'This trains real impulse control — the same "wait" muscle recovery uses.' },
+    ],
+  },
+  stopsignal: {
+    title: 'How to play Stop Signal',
+    steps: [
+      { icon: 'arrow-forward-circle', text: 'When the arrow appears, TAP it quickly.' },
+      { icon: 'stop-circle', text: 'If a red STOP flashes over it, cancel your tap — do nothing.' },
+      { icon: 'shuffle', text: 'The stop timing adapts to you, staying right at the edge of control.' },
+      { icon: 'flame', text: 'Correct taps and caught stops build a combo multiplier (up to ×5).' },
+      { icon: 'heart', text: 'You have 3 focus points. Tapping through a stop, or missing, costs one.' },
+      { icon: 'fitness', text: 'Built on the Stop-Signal Task used in cognitive-control research.' },
+    ],
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

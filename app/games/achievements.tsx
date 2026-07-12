@@ -18,7 +18,7 @@ import {
 // A crash inside the screen must never take navigation down with it.
 export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
 
-const GAME_ORDER: GameId[] = ['clarity', 'checkers', 'sudoku', 'blocks'];
+const GAME_ORDER: GameId[] = ['clarity', 'checkers', 'sudoku', 'blocks', 'gonogo', 'stopsignal'];
 
 export default function Achievements() {
   const theme = useTheme();

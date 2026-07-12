@@ -302,6 +302,33 @@ export default function Sos() {
             <ToolTile icon="create" label="Reflect" onPress={() => router.replace('/reflection')} />
           </View>
 
+          {/* Education Hub */}
+          <Pressable
+            onPress={() => router.push('/education' as Href)}
+            accessibilityRole="button"
+            accessibilityLabel="Open the Education Hub"
+            style={({ pressed }) => ({ marginTop: spacing.sm, opacity: pressed ? 0.8 : 1 })}
+          >
+            <GlassTile style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <View
+                style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  backgroundColor: 'rgba(185,143,214,0.18)',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="school" size={20} color={palette.grape300} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="callout" color={palette.fog}>Education Hub</Text>
+                <Text variant="caption" color={FOG_SOFT} style={{ marginTop: 1 }}>
+                  Understand it to beat it — guides & free reading
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={FOG_SOFT} />
+            </GlassTile>
+          </Pressable>
+
           {/* Today's reminder */}
           <GlassTile style={{ marginTop: spacing.lg, gap: spacing.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
