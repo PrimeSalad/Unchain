@@ -4,7 +4,7 @@
  * exact scroll position next time, powering the hub's Continue Reading card.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
@@ -31,6 +31,7 @@ export default function EducationReader() {
   const bookmarked = useStore((s) => (guide ? s.eduBookmarks.includes(guide.id) : false));
   const saved = useStore((s) => (guide ? s.eduProgress[guide.id] : undefined));
   const savedPct = saved?.pct ?? 0;
+  const [progress, setProgress] = useState(savedPct);
 
   const scrollRef = useRef<ScrollView>(null);
   const lastRef = useRef({ pct: savedPct, offset: saved?.offset ?? 0 });
@@ -55,6 +56,7 @@ export default function EducationReader() {
     const denom = Math.max(1, contentSize.height - layoutMeasurement.height);
     const pct = Math.min(1, Math.max(0, contentOffset.y / denom));
     lastRef.current = { pct, offset: contentOffset.y };
+    setProgress(pct);
   }, []);
 
   const persist = useCallback(() => {
@@ -83,7 +85,7 @@ export default function EducationReader() {
             <Ionicons name="chevron-back" size={22} color={theme.color.primary} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <ProgressBar progress={savedPct} height={6} />
+            <ProgressBar progress={progress} height={6} />
           </View>
           <Pressable
             onPress={() => {
@@ -115,6 +117,7 @@ export default function EducationReader() {
             if (!restoredRef.current && (saved?.offset ?? 0) > 0) {
               restoredRef.current = true;
               scrollRef.current?.scrollTo({ y: saved!.offset, animated: false });
+              setProgress(savedPct);
             }
           }}
           contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.huge }}

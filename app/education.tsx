@@ -1,14 +1,13 @@
 /**
  * Education Hub - evidence-based learning, personalized to the user's
- * addiction. Built-in guides are fully offline; the Free Reading shelf links
- * to public-domain and open-access sources (every outbound link is checked
- * against the user's Focus Protection blocklist first via openExternalUrl).
+ * addiction. Built-in guides and Reading Shelf resources are fully offline
+ * and open inside the app.
  * Categories, guides, and resources all derive from profile.addictionType,
  * so profile changes re-personalize the hub automatically.
  */
 
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -20,7 +19,6 @@ import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useProfile, useStore } from '@/application/store';
-import { openExternalUrl } from '@/application/links';
 import { addictionMeta } from '@/domain/gambling';
 import {
   categoriesFor,
@@ -33,15 +31,6 @@ import {
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
 
 type CategoryFilter = 'all' | 'bookmarks' | string;
-
-async function openLink(url: string) {
-  const result = await openExternalUrl(url);
-  if (result === 'blocked') {
-    Alert.alert('Link blocked', 'This site is on your Focus Protection blocklist.');
-  } else if (result === 'failed') {
-    Alert.alert('Could not open link', 'Please check your internet connection and try again.');
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Guide card - progress ring + bookmark
@@ -123,6 +112,7 @@ function GuideCard({ guide, index, onOpen }: { guide: Guide; index: number; onOp
 
 function ResourceCard({ res, index }: { res: Resource; index: number }) {
   const theme = useTheme();
+  const router = useRouter();
   const toggleEduBookmark = useStore((s) => s.toggleEduBookmark);
   const bookmarked = useStore((s) => s.eduBookmarks.includes(res.id));
   const initials = res.title.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
@@ -188,9 +178,9 @@ function ResourceCard({ res, index }: { res: Resource; index: number }) {
         {/* Actions */}
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <Pressable
-            onPress={() => openLink(res.readUrl)}
+            onPress={() => router.push({ pathname: '/education-resource', params: { id: res.id } } as never)}
             accessibilityRole="button"
-            accessibilityLabel={`Read ${res.title} online`}
+            accessibilityLabel={`Read about ${res.title} in the app`}
             style={({ pressed }) => ({
               flex: 1, height: 40, borderRadius: radius.button,
               backgroundColor: theme.color.primarySoft,
@@ -198,25 +188,9 @@ function ResourceCard({ res, index }: { res: Resource; index: number }) {
               opacity: pressed ? 0.7 : 1,
             })}
           >
-            <Ionicons name="globe-outline" size={15} color={theme.color.primary} />
-            <Text variant="footnote" color={theme.color.primary}>Read Online</Text>
+            <Ionicons name="reader-outline" size={15} color={theme.color.primary} />
+            <Text variant="footnote" color={theme.color.primary}>Read</Text>
           </Pressable>
-          {res.pdfUrl && (
-            <Pressable
-              onPress={() => openLink(res.pdfUrl!)}
-              accessibilityRole="button"
-              accessibilityLabel={`Download ${res.title} as PDF`}
-              style={({ pressed }) => ({
-                flex: 1, height: 40, borderRadius: radius.button,
-                backgroundColor: theme.color.surfaceAlt,
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Ionicons name="download-outline" size={15} color={theme.color.text} />
-              <Text variant="footnote">Download PDF</Text>
-            </Pressable>
-          )}
         </View>
       </View>
     </Animated.View>
@@ -403,11 +377,11 @@ export default function EducationHub() {
 
       {/* Free reading */}
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: spacing.xs }}>
-        <Text variant="headline" style={{ flex: 1 }}>Free Reading</Text>
-        <Text variant="caption" dim>Public domain & open access</Text>
+        <Text variant="headline" style={{ flex: 1 }}>Reading Shelf</Text>
+        <Text variant="caption" dim>Offline</Text>
       </View>
       <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-        Every link is a free, legal source. Opening a book uses your browser; the guides above never need internet.
+        Read curated books and recovery resources directly in the app. No browser handoff.
       </Text>
       {resources.length === 0 ? (
         <View

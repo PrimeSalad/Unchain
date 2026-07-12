@@ -5,9 +5,9 @@
  * Content principles:
  *  - Evidence-based and neutral: grounded in CBT, habit science, and the
  *    public-health literature. No moralising, no shame, no scare tactics.
- *  - Fully offline: every guide ships with the app. External resources are
- *    free, legal sources (public-domain books, open-access publications) and
- *    are clearly links - nothing is scraped or embedded.
+ *  - Fully offline: every guide and Reading Shelf resource ships with the app.
+ *    Resource entries are local recovery-focused readings based on
+ *    public-domain or open-access material.
  *  - Personalized: guides, resources, and categories derive from
  *    profile.addictionType, so changing the profile re-personalizes the hub
  *    automatically.
@@ -52,9 +52,7 @@ export interface Resource {
   audience: AddictionType[] | 'all';
   /** "220 pages" or "~15 min read". */
   length: string;
-  readUrl: string;
-  /** Only set when a legal, stable PDF download exists. */
-  pdfUrl?: string;
+  bookId: string;
   /** Generated cover tint (no remote images - offline + no rights issues). */
   tint: string;
 }
@@ -779,178 +777,171 @@ export function guideById(id: string): Guide | undefined {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Free reading - public-domain books and open-access resources. Every link is
-// a free, legal source. Gutenberg titles offer full online reading; PDF
-// downloads are only listed where the source provides one.
+// Embedded reading shelf. These are app-bundled reading notes and condensed
+// selections from public-domain or open-access material. No outbound link is
+// required to read them.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const RESOURCES: Resource[] = [
-  // Addiction-specific
   {
     id: 'r-gambler',
+    bookId: 'gambler',
     title: 'The Gambler',
     author: 'Fyodor Dostoevsky',
-    desc: 'The classic novel of compulsive gambling, written by an author who lived it - the psychology of chasing losses has never been drawn sharper.',
+    desc: 'A full public-domain novel about roulette, obsession, chasing losses, and the narrowing of attention around the next result.',
     category: 'gambling',
     audience: ['gambling'],
-    length: '~190 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/2197',
+    length: 'Full book',
     tint: '#B23A4B',
   },
   {
     id: 'r-money-getting',
+    bookId: 'money-getting',
     title: 'The Art of Money Getting',
     author: 'P. T. Barnum',
-    desc: 'A short, plain-spoken classic on keeping and growing money - useful scaffolding while rebuilding finances in recovery.',
+    desc: 'A full public-domain money book used here as a financial-reset counterweight to win-it-back thinking.',
     category: 'money',
     audience: ['gambling'],
-    length: '~60 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/8581',
+    length: 'Full book',
     tint: '#97591F',
   },
   {
     id: 'r-barleycorn',
+    bookId: 'john-barleycorn',
     title: 'John Barleycorn',
     author: 'Jack London',
-    desc: 'London\'s famous "alcoholic memoirs" - an unflinching first-person account of how drinking weaves into a life, decades ahead of its time.',
+    desc: 'A full public-domain autobiographical novel about alcohol, identity, ritual, and dependence.',
     category: 'alcohol',
     audience: ['alcohol'],
-    length: '~230 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/search/?query=john+barleycorn+jack+london',
+    length: 'Full book',
     tint: '#5A2E7A',
+  },
+  {
+    id: 'r-alcohol-dangerous',
+    bookId: 'alcohol-dangerous',
+    title: 'Alcohol: A Dangerous and Unnecessary Medicine',
+    author: 'Martha M. Allen',
+    desc: 'A full public-domain temperance-era medical argument against alcohol use, preserved as historical recovery reading.',
+    category: 'alcohol',
+    audience: ['alcohol'],
+    length: 'Full book',
+    tint: '#B23A4B',
   },
   {
     id: 'r-opium',
+    bookId: 'opium-eater',
     title: 'Confessions of an English Opium-Eater',
     author: 'Thomas De Quincey',
-    desc: 'The first great addiction memoir - dependence, withdrawal, and relapse described from the inside, still recognisable two centuries later.',
+    desc: 'A full public-domain first-person account of opium dependence, relief, tolerance, and withdrawal.',
     category: 'substances',
     audience: ['drugs'],
-    length: '~120 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/search/?query=confessions+of+an+english+opium+eater',
+    length: 'Full book',
     tint: '#43265C',
   },
   {
-    id: 'r-nida',
-    title: 'Drugs, Brains, and Behavior: The Science of Addiction',
-    author: 'National Institute on Drug Abuse',
-    desc: 'The definitive plain-language, open-access explainer of what addiction does in the brain and why it is treated as a health condition.',
+    id: 'r-opium-notebook',
+    bookId: 'opium-notebook',
+    title: 'The Note Book of an English Opium-Eater',
+    author: 'Thomas De Quincey',
+    desc: 'A full public-domain collection from De Quincey, useful as companion reading on memory, compulsion, and inner life.',
     category: 'substances',
-    audience: ['drugs', 'alcohol', 'smoking'],
-    length: '~30 pages',
-    readUrl: 'https://nida.nih.gov/publications/drugs-brains-behavior-science-addiction',
-    tint: '#4A6FA5',
-  },
-  {
-    id: 'r-smokefree',
-    title: 'Quit Smoking Resources',
-    author: 'Smokefree.gov (U.S. HHS)',
-    desc: 'Free, evidence-based quit plans, craving tools, and guides on nicotine replacement - the standard public-health toolkit, open to everyone.',
-    category: 'smoking',
-    audience: ['smoking'],
-    length: 'Guides & tools',
-    readUrl: 'https://smokefree.gov',
-    tint: '#4E7A5A',
-  },
-  {
-    id: 'r-walden',
-    title: 'Walden',
-    author: 'Henry David Thoreau',
-    desc: 'The original argument for deliberate living and less noise - startlingly relevant to reclaiming attention from feeds and screens.',
-    category: 'digital',
-    audience: ['social_media', 'pornography'],
-    length: '~350 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/205',
-    tint: '#4E7A5A',
-  },
-
-  // Universal
-  {
-    id: 'r-meditations',
-    title: 'Meditations',
-    author: 'Marcus Aurelius',
-    desc: 'Two thousand years of field-tested advice on urges, discomfort, and self-command - the Stoic handbook that modern CBT grew from.',
-    category: 'mindfulness',
-    audience: 'all',
-    length: '~250 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/2680',
+    audience: ['drugs'],
+    length: 'Full book',
     tint: '#5A2E7A',
   },
   {
-    id: 'r-thinketh',
-    title: 'As a Man Thinketh',
-    author: 'James Allen',
-    desc: 'A one-sitting classic on how thought patterns shape habits and circumstance - short enough to reread whenever resolve dips.',
-    category: 'growth',
-    audience: 'all',
-    length: '~30 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/4507',
-    tint: '#D0A070',
+    id: 'r-smoking-history',
+    bookId: 'social-history-smoking',
+    title: 'The Social History of Smoking',
+    author: 'George Latimer Apperson',
+    desc: 'A full public-domain history of smoking culture, useful for seeing tobacco as ritual and social habit.',
+    category: 'smoking',
+    audience: ['smoking'],
+    length: 'Full book',
+    tint: '#4E7A5A',
   },
   {
-    id: 'r-selfhelp',
-    title: 'Self-Help',
-    author: 'Samuel Smiles',
-    desc: 'The 1859 book that named the genre: perseverance, small daily disciplines, and character built one repetition at a time.',
-    category: 'habits',
-    audience: 'all',
-    length: '~380 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/935',
+    id: 'r-tobacco-alcohol',
+    bookId: 'tobacco-alcohol',
+    title: 'Tobacco and Alcohol',
+    author: 'John Fiske',
+    desc: 'A full public-domain text on tobacco and alcohol, included as historical reading on substance habits.',
+    category: 'smoking',
+    audience: ['smoking'],
+    length: 'Full book',
     tint: '#97591F',
   },
   {
-    id: 'r-franklin',
-    title: 'The Autobiography of Benjamin Franklin',
-    author: 'Benjamin Franklin',
-    desc: 'Contains history\'s most famous habit-tracking experiment - Franklin\'s thirteen-virtues chart - plus a life built on deliberate self-correction.',
-    category: 'habits',
-    audience: 'all',
-    length: '~230 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/148',
-    tint: '#4A6FA5',
-  },
-  {
-    id: 'r-james-habit',
-    title: 'Habit',
-    author: 'William James',
-    desc: 'The founding text of habit psychology: why repetition carves grooves, and how to lay new ones on purpose. Short and remarkably practical.',
-    category: 'impulse',
-    audience: 'all',
-    length: '~70 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/search/?query=habit+william+james',
-    tint: '#3E9C9C',
-  },
-  {
-    id: 'r-smart',
-    title: 'SMART Recovery Toolbox',
-    author: 'SMART Recovery',
-    desc: 'Free, science-based worksheets and exercises (CBT-rooted) for urges, beliefs, and lifestyle balance - used by recovery groups worldwide.',
-    category: 'recovery',
-    audience: 'all',
-    length: 'Worksheets & tools',
-    readUrl: 'https://smartrecovery.org/toolbox',
+    id: 'r-social-emergency',
+    bookId: 'social-emergency',
+    title: 'The Social Emergency',
+    author: 'William Trufant Foster, editor',
+    desc: 'A full public-domain social-hygiene volume, included for context around sexual education, secrecy, and public health.',
+    category: 'sexuality',
+    audience: ['pornography'],
+    length: 'Full book',
     tint: '#E8697A',
   },
   {
-    id: 'r-conduct',
-    title: 'The Conduct of Life',
-    author: 'Ralph Waldo Emerson',
-    desc: 'Essays on power, wealth, and behavior - Emerson on ruling appetite rather than being ruled, in prose worth underlining.',
-    category: 'growth',
-    audience: 'all',
-    length: '~280 pages',
-    readUrl: 'https://www.gutenberg.org/ebooks/search/?query=conduct+of+life+emerson',
-    tint: '#43265C',
+    id: 'r-sex-education',
+    bookId: 'sex-education',
+    title: 'Sex-Education',
+    author: 'Maurice A. Bigelow',
+    desc: 'A full public-domain lecture series on sex education and human life, included as historical healthy-intimacy reading.',
+    category: 'sexuality',
+    audience: ['pornography'],
+    length: 'Full book',
+    tint: '#5A2E7A',
+  },
+  {
+    id: 'r-walden',
+    bookId: 'walden',
+    title: 'Walden',
+    author: 'Henry David Thoreau',
+    desc: 'A full public-domain book on deliberate living, attention, simplicity, and reclaiming quiet from compulsive noise.',
+    category: 'digital',
+    audience: ['social_media'],
+    length: 'Full book',
+    tint: '#4E7A5A',
+  },
+  {
+    id: 'r-thinketh-social',
+    bookId: 'as-a-man-thinketh',
+    title: 'As a Man Thinketh',
+    author: 'James Allen',
+    desc: 'A full public-domain short book on repeated thought, self-direction, and the inner scripts that shape behavior.',
+    category: 'digital',
+    audience: ['social_media'],
+    length: 'Full book',
+    tint: '#D0A070',
+  },
+  {
+    id: 'r-talks-teachers',
+    bookId: 'talks-to-teachers',
+    title: 'Talks To Teachers On Psychology',
+    author: 'William James',
+    desc: 'A full public-domain psychology book with practical passages on attention, habit, training, and ideals.',
+    category: 'habits',
+    audience: ['other'],
+    length: 'Full book',
+    tint: '#3E9C9C',
+  },
+  {
+    id: 'r-selfhelp',
+    bookId: 'self-help',
+    title: 'Self-Help',
+    author: 'Samuel Smiles',
+    desc: 'A full public-domain book on discipline, repeated effort, and character built one action at a time.',
+    category: 'habits',
+    audience: ['other'],
+    length: 'Full book',
+    tint: '#97591F',
   },
 ];
 
-/** Resources visible to a user: their addiction's items plus universal ones,
- *  restricted to the categories that exist for them. */
+/** Resources visible to a user: exactly two full books for their active addiction type. */
 export function resourcesFor(type: AddictionType): Resource[] {
-  const cats = new Set(categoriesFor(type).map((c) => c.id));
-  return RESOURCES.filter(
-    (r) => cats.has(r.category) && (r.audience === 'all' || r.audience.includes(type)),
-  );
+  return RESOURCES.filter((r) => r.audience !== 'all' && r.audience.includes(type)).slice(0, 2);
 }
 
 export function resourceById(id: string): Resource | undefined {
