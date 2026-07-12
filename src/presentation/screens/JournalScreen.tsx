@@ -1,15 +1,6 @@
 /**
- * JournalScreen - premium iOS-native list view.
- *
- * Design highlights:
- * ─────────────────
- * • Full-bleed gradient header with large title + live subtitle.
- * • Animated search bar slides open from the FAB tray.
- * • Stat cards use soft glassmorphism tinted by meaning (green / red / purple).
- * • Entry cards have left accent stroke, animated expand chevron, mood emoji.
- * • Empty state has a gentle mascot-like illustration ring.
- * • FAB has a glow halo + spring press.
- * • All animations use react-native-reanimated for 60fps on the JS thread.
+ * JournalScreen - private recovery timeline with quick entry, search,
+ * filters, compact stats, and expandable day cards.
  */
 
 import { useMemo, useRef, useState, useCallback } from 'react';
@@ -26,7 +17,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
   FadeInDown,
   FadeIn,
 } from 'react-native-reanimated';
@@ -35,8 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
-import { Pill } from '../components/Pill';
-import { spacing, radius, palette, motion } from '../theme/tokens';
+import { elevation, spacing, radius, palette, motion } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
 import { recoveryAdjustedBalance } from '@/domain/gambling';
@@ -77,6 +66,7 @@ function StatCard({
   icon: string; value: string | number; label: string; color: string;
   entering?: any; delay?: number;
 }) {
+  const theme = useTheme();
   return (
     <Animated.View
       entering={FadeInDown.delay(delay ?? 0).springify().damping(16)}
@@ -84,29 +74,21 @@ function StatCard({
     >
       <View style={{
         flex: 1,
-        backgroundColor: color + '18',
-        borderRadius: radius.card,
-        padding: spacing.lg,
-        alignItems: 'center',
-        gap: spacing.xs,
+        backgroundColor: theme.color.surface,
+        borderRadius: radius.input,
+        padding: spacing.md,
+        alignItems: 'flex-start',
+        gap: 2,
         borderWidth: 1,
-        borderColor: color + '30',
+        borderColor: color + '24',
       }}>
-        <View style={{
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: color + '25',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: spacing.xs,
-        }}>
-          <Ionicons name={icon as any} size={18} color={color} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <Ionicons name={icon as any} size={15} color={color} />
+          <Text variant="caption" color={color}>{label}</Text>
         </View>
-        <Text variant="title2" color={color} style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+        <Text variant="title2" color={color} style={{ fontFamily: 'Nunito_900Black' }}>
           {value}
         </Text>
-        <Text variant="caption" dim>{label}</Text>
       </View>
     </Animated.View>
   );
@@ -197,13 +179,8 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
           backgroundColor: theme.color.surface,
           borderRadius: radius.card,
           overflow: 'hidden',
-          borderLeftWidth: 3,
-          borderLeftColor: accent,
-          shadowColor: palette.ink,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: theme.mode === 'dark' ? 0 : 0.06,
-          shadowRadius: 10,
-          elevation: 2,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
         }, cardStyle]}>
 
           {/* ── Header row ── */}
@@ -214,11 +191,10 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
             paddingVertical: spacing.lg,
             gap: spacing.md,
           }}>
-            {/* Status dot */}
             <View style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
+              width: 42,
+              height: 42,
+              borderRadius: 15,
               backgroundColor: accent + '18',
               alignItems: 'center',
               justifyContent: 'center',
@@ -231,9 +207,9 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }}>
                 <Text
-                  variant="footnote"
+                  variant="callout"
                   color={accent}
-                  style={{ fontFamily: 'Nunito_700Bold' }}
+                  style={{ fontFamily: 'Nunito_800ExtraBold' }}
                 >
                   {statusLabel}
                 </Text>
@@ -285,14 +261,20 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
               paddingHorizontal: spacing.lg,
               paddingBottom: expanded ? spacing.sm : spacing.lg,
             }}>
-              <Text
-                variant="callout"
-                dim
-                numberOfLines={expanded ? undefined : 2}
-                style={{ lineHeight: 21 }}
-              >
-                {entry.text}
-              </Text>
+              <View style={{
+                borderLeftWidth: 2,
+                borderLeftColor: accent,
+                paddingLeft: spacing.md,
+              }}>
+                <Text
+                  variant="callout"
+                  dim
+                  numberOfLines={expanded ? undefined : 2}
+                  style={{ lineHeight: 22 }}
+                >
+                  {entry.text}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -394,9 +376,53 @@ function DetailRow({ icon, color, label, value }: {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
       <Ionicons name={icon as any} size={14} color={color} style={{ marginTop: 2 }} />
-      <Text variant="caption" dim style={{ width: 54 }}>{label}</Text>
+      <Text variant="caption" dim style={{ width: 72 }}>{label}</Text>
       <Text variant="caption" style={{ flex: 1 }}>{value}</Text>
     </View>
+  );
+}
+
+function SectionHeader({ title, meta }: { title: string; meta?: string }) {
+  const theme = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md, marginBottom: spacing.md }}>
+      <Text variant="headline" style={{ flex: 1 }}>{title}</Text>
+      {meta ? <Text variant="caption" color={theme.color.textDim}>{meta}</Text> : null}
+    </View>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={({ pressed }) => ({
+        paddingVertical: spacing.xs,
+        paddingHorizontal: spacing.xs,
+        borderBottomWidth: 2,
+        borderBottomColor: active ? theme.color.primary : 'transparent',
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <Text
+        variant="callout"
+        color={active ? theme.color.primary : theme.color.textDim}
+        style={{ fontFamily: active ? 'Nunito_800ExtraBold' : 'Nunito_600SemiBold' }}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -452,47 +478,6 @@ function SearchBar({ query, onChange }: { query: string; onChange: (s: string) =
         </Pressable>
       )}
     </Animated.View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FAB - glowing add button
-// ─────────────────────────────────────────────────────────────────────────────
-function FAB({ onPress }: { onPress: () => void }) {
-  const theme = useTheme();
-  const press = useSharedValue(0);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withSpring(press.value ? 0.9 : 1, motion.spring) }],
-    shadowOpacity: withTiming(press.value ? 0.2 : 0.4, { duration: 100 }),
-  }));
-
-  return (
-    <Pressable
-      onPressIn={() => { press.value = 1; }}
-      onPressOut={() => { press.value = 0; }}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-        onPress();
-      }}
-      accessibilityLabel="Write new entry"
-      accessibilityRole="button"
-    >
-      <Animated.View style={[{
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: theme.color.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: theme.color.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 12,
-        elevation: 8,
-      }, animStyle]}>
-        <Ionicons name="add" size={26} color="#FFFFFF" />
-      </Animated.View>
-    </Pressable>
   );
 }
 
@@ -585,32 +570,72 @@ export function JournalScreen() {
   return (
     <Screen tabPadding>
 
-      {/* ── Header ── */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginTop: spacing.sm,
-        marginBottom: entries.length > 0 ? spacing.lg : spacing.xl,
-      }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="title1" style={{ fontFamily: 'Nunito_900Black' }}>Journal</Text>
-          <Text variant="footnote" dim style={{ marginTop: 3 }}>
-            {entries.length === 0
-              ? 'Start writing - every entry counts'
-              : `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · your private space`}
-          </Text>
+      {/* ── Hero ── */}
+      <View
+        style={{
+          marginTop: spacing.sm,
+          marginBottom: spacing.lg,
+          paddingBottom: spacing.lg,
+          gap: spacing.lg,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.color.hairline,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <View
+            style={{
+              width: 54,
+              height: 54,
+              borderRadius: 18,
+              backgroundColor: theme.color.primarySoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="book" size={25} color={theme.color.primary} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="title1" style={{ fontFamily: 'Nunito_900Black' }}>Journal</Text>
+            <Text variant="footnote" dim style={{ marginTop: 3, lineHeight: 18 }}>
+              {entries.length === 0
+                ? 'Start with one honest line today.'
+                : `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} saved in your private timeline.`}
+            </Text>
+          </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
-          {/* Search toggle */}
+
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+              router.push(isPorn ? '/porn-journal-entry' : '/journal-entry');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Write new entry"
+            style={({ pressed }) => ({
+              flex: 1,
+              minHeight: 48,
+              borderRadius: radius.button,
+              backgroundColor: theme.color.primary,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: spacing.sm,
+              opacity: pressed ? 0.82 : 1,
+            })}
+          >
+            <Ionicons name="create" size={18} color={theme.color.onPrimary} />
+            <Text variant="headline" color={theme.color.onPrimary}>Write entry</Text>
+          </Pressable>
           <Pressable
             onPress={toggleSearch}
-            hitSlop={8}
+            accessibilityRole="button"
             accessibilityLabel={searching ? 'Close search' : 'Search entries'}
             style={({ pressed }) => ({
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: searching ? theme.color.primary : theme.color.surfaceAlt,
+              width: 48,
+              minHeight: 48,
+              borderRadius: radius.button,
+              backgroundColor: searching ? theme.color.primarySoft : theme.color.surfaceAlt,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.75 : 1,
@@ -618,11 +643,10 @@ export function JournalScreen() {
           >
             <Ionicons
               name={searching ? 'close' : 'search'}
-              size={18}
-              color={searching ? '#FFF' : theme.color.textDim}
+              size={19}
+              color={searching ? theme.color.primary : theme.color.textDim}
             />
           </Pressable>
-          <FAB onPress={() => router.push(isPorn ? '/porn-journal-entry' : '/journal-entry')} />
         </View>
       </View>
 
@@ -633,7 +657,7 @@ export function JournalScreen() {
 
       {/* ── Stats row ── */}
       {isGambling && entries.length > 0 && (
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
           <StatCard
             icon="checkmark-circle"
             value={stats.clean}
@@ -661,7 +685,7 @@ export function JournalScreen() {
       )}
 
       {isPorn && entries.length > 0 && (
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
           <StatCard
             icon="checkmark-circle"
             value={stats.pornClean}
@@ -690,29 +714,32 @@ export function JournalScreen() {
 
       {/* ── Date-range filter (all users, always visible when entries exist) ── */}
       {entries.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.sm }}
-        >
-          {([
-            { key: 'all_time', label: 'All time'   },
-            { key: 'today',    label: 'Today'      },
-            { key: 'week',     label: 'This week'  },
-            { key: 'month',    label: 'This month' },
-            { key: 'year',     label: 'This year'  },
-          ] as { key: DateRange; label: string }[]).map(({ key, label }) => (
-            <Pill
-              key={key}
-              label={label}
-              active={dateRange === key}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setDateRange(key);
-              }}
-            />
-          ))}
-        </ScrollView>
+        <>
+          <SectionHeader title="Filters" meta={filtered.length === entries.length ? 'All visible' : `${filtered.length} shown`} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.sm }}
+          >
+            {([
+              { key: 'all_time', label: 'All time'   },
+              { key: 'today',    label: 'Today'      },
+              { key: 'week',     label: 'This week'  },
+              { key: 'month',    label: 'This month' },
+              { key: 'year',     label: 'This year'  },
+            ] as { key: DateRange; label: string }[]).map(({ key, label }) => (
+              <FilterChip
+                key={key}
+                label={label}
+                active={dateRange === key}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setDateRange(key);
+                }}
+              />
+            ))}
+          </ScrollView>
+        </>
       )}
 
       {/* ── Status filter pills (addiction-specific) ── */}
@@ -720,10 +747,10 @@ export function JournalScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.lg }}
+          contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}
         >
           {(['all', 'clean', 'gambled'] as Filter[]).map((f) => (
-            <Pill
+            <FilterChip
               key={f}
               label={f === 'all' ? 'All entries' : f === 'clean' ? 'Clean days' : 'Relapses'}
               active={filter === f}
@@ -737,10 +764,10 @@ export function JournalScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.lg }}
+          contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}
         >
           {(['all', 'clean', 'watched'] as Filter[]).map((f) => (
-            <Pill
+            <FilterChip
               key={f}
               label={f === 'all' ? 'All entries' : f === 'clean' ? 'Clean days' : 'Relapses'}
               active={filter === f}
@@ -752,7 +779,7 @@ export function JournalScreen() {
 
       {/* Spacer when no addiction pills are shown (e.g. social media, other) */}
       {!isGambling && !isPorn && entries.length > 0 && (
-        <View style={{ marginBottom: spacing.lg }} />
+        <View style={{ marginBottom: spacing.xl }} />
       )}
 
       {/* ── Empty state ── */}
@@ -832,12 +859,15 @@ export function JournalScreen() {
         </Animated.View>
       ) : (
         /* ── Entry list ── */
-        <View style={{ gap: spacing.md }}>
-          {filtered.map((e, i) => (
-            <EntryCard key={e.id} entry={e} index={i} currency={profile?.currency ?? '₱'} />
-          ))}
-          <View style={{ height: spacing.xl }} />
-        </View>
+        <>
+          <SectionHeader title="Timeline" meta={`${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`} />
+          <View style={{ gap: spacing.md }}>
+            {filtered.map((e, i) => (
+              <EntryCard key={e.id} entry={e} index={i} currency={profile?.currency ?? '₱'} />
+            ))}
+            <View style={{ height: spacing.xl }} />
+          </View>
+        </>
       )}
     </Screen>
   );
