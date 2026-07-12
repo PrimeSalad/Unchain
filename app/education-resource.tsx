@@ -42,6 +42,22 @@ const BOOKS: Record<string, BookPayload> = {
   'self-help': require('../assets/books/self-help.json'),
 };
 
+type ParagraphKind = 'body' | 'heading' | 'frontMatter';
+
+function paragraphKind(text: string, index: number): ParagraphKind {
+  const trimmed = text.trim();
+  const normalized = trimmed.replace(/[_"'.:,;!?()\[\]\s-]/g, '');
+  const hasLetters = /[A-Za-z]/.test(trimmed);
+  const isShort = trimmed.length <= 92;
+  const isUpper = hasLetters && normalized.length > 0 && normalized === normalized.toUpperCase();
+  const startsLikeHeading = /^(chapter|book|part|section|contents|preface|introduction|conclusion)\b/i.test(trimmed);
+  const romanHeading = /^[IVXLCDM]+\.?$/.test(trimmed);
+
+  if ((isUpper && isShort) || startsLikeHeading || romanHeading) return index < 8 ? 'frontMatter' : 'heading';
+  if (index < 6 && isShort) return 'frontMatter';
+  return 'body';
+}
+
 export default function EducationResource() {
   const theme = useTheme();
   const safeBack = useSafeBack();
@@ -77,7 +93,8 @@ export default function EducationResource() {
             <Ionicons name="chevron-back" size={22} color={theme.color.primary} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text variant="title2">Reading Shelf</Text>
+            <Text variant="caption" dim>Reading Shelf</Text>
+            <Text variant="callout" numberOfLines={1}>{resource.title}</Text>
             <ProgressBar progress={progress} height={6} />
           </View>
         </View>
@@ -88,37 +105,37 @@ export default function EducationResource() {
           onScroll={onScroll}
           scrollEventThrottle={32}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.huge }}
-          initialNumToRender={14}
-          maxToRenderPerBatch={18}
+          contentContainerStyle={{ alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.huge }}
+          initialNumToRender={18}
+          maxToRenderPerBatch={20}
           windowSize={9}
           removeClippedSubviews
           ListHeaderComponent={(
-            <View>
+            <View style={{ width: '100%', maxWidth: 680 }}>
               <View
                 style={{
                   alignSelf: 'flex-start',
-                  width: 68, height: 92, borderRadius: 10,
+                  width: 76, height: 104, borderRadius: 12,
                   backgroundColor: resource.tint,
                   alignItems: 'center', justifyContent: 'center',
-                  marginBottom: spacing.lg,
+                  marginBottom: spacing.xl,
                 }}
               >
-                <Ionicons name="book" size={26} color="#FFFFFF" />
+                <Ionicons name="book" size={30} color="#FFFFFF" />
               </View>
 
-              <Text variant="title1" style={{ lineHeight: 36 }}>{resource.title}</Text>
-              <Text variant="callout" dim style={{ marginTop: spacing.xs }}>
-                {resource.author} · {resource.length}
+              <Text variant="title1" style={{ lineHeight: 37 }}>{resource.title}</Text>
+              <Text variant="callout" dim style={{ marginTop: spacing.sm, lineHeight: 23 }}>
+                {resource.author}
               </Text>
-              <Text variant="caption" dim style={{ marginTop: spacing.sm }}>
-                {book.sourceId} · bundled for offline reading
+              <Text variant="caption" dim style={{ marginTop: spacing.xs }}>
+                Full book · Offline · {book.sourceId}
               </Text>
 
               <View
                 style={{
                   marginTop: spacing.xl,
-                  marginBottom: spacing.lg,
+                  marginBottom: spacing.xl,
                   padding: spacing.lg,
                   backgroundColor: theme.color.surface,
                   borderRadius: radius.card,
@@ -126,21 +143,69 @@ export default function EducationResource() {
                   borderColor: theme.color.hairline,
                 }}
               >
-                <Text variant="footnote" color={theme.color.primary}>Why this book is here</Text>
+                <Text variant="footnote" color={theme.color.primary}>Why it is in your shelf</Text>
                 <Text variant="callout" dim style={{ marginTop: spacing.xs, lineHeight: 22 }}>
                   {resource.desc}
                 </Text>
               </View>
             </View>
           )}
-          renderItem={({ item }) => (
-            <Text variant="body" style={{ lineHeight: 27, marginTop: spacing.md }}>
-              {item}
-            </Text>
-          )}
+          renderItem={({ item, index }) => {
+            const kind = paragraphKind(item, index);
+            if (kind === 'heading') {
+              return (
+                <Text
+                  variant="title2"
+                  style={{
+                    width: '100%',
+                    maxWidth: 680,
+                    marginTop: spacing.xxl,
+                    marginBottom: spacing.xs,
+                    lineHeight: 30,
+                  }}
+                >
+                  {item}
+                </Text>
+              );
+            }
+
+            if (kind === 'frontMatter') {
+              return (
+                <Text
+                  variant="callout"
+                  dim
+                  style={{
+                    width: '100%',
+                    maxWidth: 680,
+                    marginTop: spacing.sm,
+                    lineHeight: 23,
+                  }}
+                >
+                  {item}
+                </Text>
+              );
+            }
+
+            return (
+              <Text
+                variant="body"
+                style={{
+                  width: '100%',
+                  maxWidth: 680,
+                  fontSize: 18,
+                  lineHeight: 31,
+                  marginTop: spacing.lg,
+                }}
+              >
+                {item}
+              </Text>
+            );
+          }}
           ListFooterComponent={(
             <View
               style={{
+                width: '100%',
+                maxWidth: 680,
                 marginTop: spacing.xxl,
                 padding: spacing.lg,
                 backgroundColor: theme.color.primarySoft,

@@ -7,7 +7,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -21,7 +21,6 @@ import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useProfile, useStore } from '@/application/store';
 import { addictionMeta } from '@/domain/gambling';
 import {
-  categoriesFor,
   guidesFor,
   resourcesFor,
   type Guide,
@@ -29,8 +28,6 @@ import {
 } from '@/domain/education';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
-
-type CategoryFilter = 'all' | 'bookmarks' | string;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Guide card - progress ring + bookmark
@@ -209,27 +206,21 @@ export default function EducationHub() {
   const type = profile?.addictionType ?? 'other';
   const typeLabel = addictionMeta(type).label;
 
-  const eduBookmarks = useStore((s) => s.eduBookmarks);
   const eduLastGuideId = useStore((s) => s.eduLastGuideId);
   const eduProgress = useStore((s) => s.eduProgress);
 
   const [query, setQuery] = useState('');
-  const [cat, setCat] = useState<CategoryFilter>('all');
 
-  const categories = useMemo(() => categoriesFor(type), [type]);
   const allGuides = useMemo(() => guidesFor(type), [type]);
   const allResources = useMemo(() => resourcesFor(type), [type]);
 
   const q = query.trim().toLowerCase();
   const guides = allGuides.filter(
     (g) =>
-      (!q || g.title.toLowerCase().includes(q) || g.subtitle.toLowerCase().includes(q)) &&
-      (cat !== 'bookmarks' || eduBookmarks.includes(g.id)),
+      !q || g.title.toLowerCase().includes(q) || g.subtitle.toLowerCase().includes(q),
   );
   const resources = allResources.filter((r) => {
     if (q && !`${r.title} ${r.author} ${r.desc}`.toLowerCase().includes(q)) return false;
-    if (cat === 'bookmarks') return eduBookmarks.includes(r.id);
-    if (cat !== 'all') return r.category === cat;
     return true;
   });
 
@@ -296,43 +287,8 @@ export default function EducationHub() {
         )}
       </View>
 
-      {/* Category chips - adapt to the selected addiction */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing.sm, paddingVertical: spacing.md }}
-      >
-        {([
-          { id: 'all' as const, label: 'All', icon: 'apps' as const },
-          { id: 'bookmarks' as const, label: 'Bookmarked', icon: 'bookmark' as const },
-          ...categories,
-        ]).map((c) => {
-          const on = cat === c.id;
-          return (
-            <Pressable
-              key={c.id}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setCat(on && c.id !== 'all' ? 'all' : c.id);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`${c.label} category`}
-              accessibilityState={{ selected: on }}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 6,
-                paddingHorizontal: spacing.md, height: 36, borderRadius: radius.round,
-                backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
-              }}
-            >
-              <Ionicons name={c.icon as keyof typeof Ionicons.glyphMap} size={13} color={on ? theme.color.onPrimary : theme.color.textDim} />
-              <Text variant="footnote" color={on ? theme.color.onPrimary : theme.color.text}>{c.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
       {/* Continue reading */}
-      {lastGuide && !q && cat === 'all' && (
+      {lastGuide && !q && (
         <Pressable
           onPress={() => openGuide(lastGuide.id)}
           accessibilityRole="button"
@@ -393,7 +349,7 @@ export default function EducationHub() {
         >
           <Ionicons name="book-outline" size={26} color={theme.color.textDim} />
           <Text variant="callout" dim center>
-            {cat === 'bookmarks' ? 'No bookmarks yet - tap the bookmark icon on anything to save it.' : 'Nothing matches your search.'}
+            Nothing matches your search.
           </Text>
         </View>
       ) : (
