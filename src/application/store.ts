@@ -264,6 +264,8 @@ interface RecoveryState {
   updateProfile: (patch: Partial<RecoveryProfile>) => void;
   submitCheckIn: (data: Omit<DailyCheckIn, 'id' | 'at'>) => void;
   logUrge: (data: Omit<UrgeLog, 'id' | 'at'>) => void;
+  updateUrge: (id: string, data: Omit<UrgeLog, 'id' | 'at'>) => void;
+  deleteUrge: (id: string) => void;
   logRelapse: (data: Omit<RelapseEvent, 'id' | 'at'>) => void;
   addJournal: (data: Omit<JournalEntry, 'id' | 'at'>) => void;
   addReflection: (text: string) => void;
@@ -870,6 +872,14 @@ export const useStore = create<RecoveryState>()(
           timeline: [evt('urge', `Logged urge - intensity ${data.intensity}/10`), ...s.timeline],
         }));
       },
+
+      updateUrge: (id, data) => set((s) => ({
+        urges: s.urges.map((urge) => urge.id === id ? { ...urge, ...data } : urge),
+      })),
+
+      deleteUrge: (id) => set((s) => ({
+        urges: s.urges.filter((urge) => urge.id !== id),
+      })),
 
       logRelapse: (data) => {
         set((s) => {

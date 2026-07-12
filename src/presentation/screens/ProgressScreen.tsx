@@ -9,6 +9,7 @@ import { StatTile } from '../components/StatTile';
 import { ProgressBar } from '../components/ProgressBar';
 import { Roadmap } from '../components/Roadmap';
 import { Pill } from '../components/Pill';
+import { RecoveryInsightsSection } from '../components/RecoveryInsightsSection';
 import { elevation, spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
@@ -193,36 +194,7 @@ export function ProgressScreen() {
     return cells;
   }, [journal, urges, checkIns]);
 
-  // ---------------------------------------------------------------------------
-  // Trigger analysis
-  // ---------------------------------------------------------------------------
-  const analysis = useMemo(() => {
-    const counts: Record<string, number> = {};
-    const bump = (t?: string[]) => t?.forEach((x) => (counts[x] = (counts[x] ?? 0) + 1));
-    checkIns.forEach((c) => bump(c.triggers));
-    urges.forEach((u) => u.trigger && bump([u.trigger]));
-    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-
-    const byDow: Record<number, number> = {};
-    const byHour: Record<number, number> = {};
-    urges.forEach((u) => {
-      const d = new Date(u.at);
-      byDow[d.getDay()] = (byDow[d.getDay()] ?? 0) + 1;
-      byHour[d.getHours()] = (byHour[d.getHours()] ?? 0) + 1;
-    });
-    const topDow = Object.entries(byDow).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const topHour = Object.entries(byHour).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const avgUrge = urges.length
-      ? Math.round((urges.reduce((s, u) => s + u.intensity, 0) / urges.length) * 10) / 10
-      : 0;
-
-    return {
-      top,
-      day: topDow != null ? DOW[+topDow] : undefined,
-      hour: topHour != null ? formatHour(+topHour) : undefined,
-      avgUrge,
-    };
-  }, [checkIns, urges]);
+  // Trigger analysis is now handled by RecoveryInsightsSection (see below).
 
   const statusColor = (s: string) => {
     if (s === 'clean') return theme.color.success;
@@ -422,22 +394,10 @@ export function ProgressScreen() {
         </View>
       </Card>
 
-      {/* Trigger analysis */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Trigger Analysis
-      </Text>
-      <Card>
-        {urges.length === 0 && checkIns.length === 0 ? (
-          <Text variant="callout" dim>Log urges and check-ins to see your patterns.</Text>
-        ) : (
-          <>
-            <Row label="Most common trigger" value={analysis.top ?? '-'} />
-            <Row label="Highest-risk day" value={analysis.day ?? '-'} />
-            <Row label="Highest-risk time" value={analysis.hour ?? '-'} />
-            <Row label="Average urge" value={analysis.avgUrge ? `${analysis.avgUrge}/10` : '-'} />
-          </>
-        )}
-      </Card>
+      {/* Recovery Intelligence - Urge Heatmap + Insights + Trigger Prediction */}
+      <View style={{ marginTop: spacing.xl }}>
+        <RecoveryInsightsSection />
+      </View>
 
       {/* Add-goal modal */}
       <AddGoalModal
@@ -720,8 +680,3 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-function formatHour(h: number): string {
-  const ampm = h < 12 ? 'AM' : 'PM';
-  const hr = h % 12 === 0 ? 12 : h % 12;
-  return `${hr}${ampm}`;
-}

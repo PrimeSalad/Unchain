@@ -15,8 +15,12 @@ export interface UrgeLog {
   at: number;
   intensity: number; // 1..10
   trigger?: string;
+  /** Multiple selected triggers. `trigger` is retained for older local data. */
+  triggers?: string[];
   notes?: string;
   resisted: boolean;
+  /** Mood rating at the time of the urge (1–10, optional - older entries won't have this). */
+  mood?: number;
 }
 
 export interface RelapseEvent {

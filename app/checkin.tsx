@@ -161,7 +161,7 @@ export default function CheckIn() {
       {gambled === false && (
         <View style={{ marginTop: spacing.xl, gap: spacing.xl }}>
           <Card><Slider label="How was your mood today?" value={mood} onChange={setMood} /></Card>
-          <Card><Slider label="How strong were the urges?" value={urge} onChange={setUrge} /></Card>
+          <Card><Slider kind="urge" label="How strong were the urges?" value={urge} onChange={setUrge} /></Card>
           <View>
             <Text variant="headline" style={{ marginBottom: spacing.md }}>What triggered them?</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>

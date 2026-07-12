@@ -18,6 +18,7 @@ interface SliderProps {
   onChange: (v: number) => void;
   max?: number;
   label?: string;
+  kind?: 'mood' | 'urge';
 }
 
 function moodEmoji(v: number): string {
@@ -46,6 +47,21 @@ function moodColor(v: number, danger: string, celebrate: string, primary: string
   if (v <= 5) return celebrate;
   if (v <= 7) return primary;
   return success;
+}
+
+function urgeLabel(v: number): string {
+  if (v <= 2) return 'Very mild';
+  if (v <= 4) return 'Mild';
+  if (v <= 6) return 'Moderate';
+  if (v <= 8) return 'Strong';
+  return 'Very strong';
+}
+
+function urgeColor(v: number, danger: string, celebrate: string, primary: string, success: string): string {
+  if (v <= 3) return success;
+  if (v <= 5) return primary;
+  if (v <= 7) return celebrate;
+  return danger;
 }
 
 interface SegmentProps {
@@ -109,10 +125,12 @@ function Segment({ n, value, label, max, onChange, activeColor, inactiveColor }:
  * This means even the fastest swipe on any device advances exactly one
  * segment per ~stepPx of travel, never jumping multiple steps at once.
  */
-export function Slider({ value, onChange, max = 10, label }: SliderProps) {
+export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: SliderProps) {
   const theme = useTheme();
   const c = theme.color;
-  const color = moodColor(value, c.danger, c.celebrate, c.primary, c.success);
+  const color = kind === 'urge'
+    ? urgeColor(value, c.danger, c.celebrate, c.primary, c.success)
+    : moodColor(value, c.danger, c.celebrate, c.primary, c.success);
 
   const barRowWidth = useSharedValue(0);
 
@@ -181,12 +199,12 @@ export function Slider({ value, onChange, max = 10, label }: SliderProps) {
       <View collapsable={false}>
         {/* Emoji + label — swiping here also works */}
         <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
-          <Text style={{ fontSize: 52, lineHeight: 60 }}>{moodEmoji(value)}</Text>
+          {kind === 'mood' && <Text style={{ fontSize: 52, lineHeight: 60 }}>{moodEmoji(value)}</Text>}
           <Text variant="title2" color={color} style={{ marginTop: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
             {value} / {max}
           </Text>
           <Text variant="footnote" dim style={{ marginTop: spacing.xs }}>
-            {moodLabel(value)}
+            {kind === 'urge' ? urgeLabel(value) : moodLabel(value)}
           </Text>
         </View>
 
@@ -201,7 +219,7 @@ export function Slider({ value, onChange, max = 10, label }: SliderProps) {
               key={n}
               n={n}
               value={value}
-              label={label ?? 'Mood'}
+              label={label ?? (kind === 'urge' ? 'Urge intensity' : 'Mood')}
               max={max}
               onChange={onChange}
               activeColor={color}

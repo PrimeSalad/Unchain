@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, type AppStateStatus } from 'react-native';
+import { ActivityIndicator, AppState, Platform, Text as NativeText, View, type AppStateStatus } from 'react-native';
 import {
   useFonts,
   Nunito_600SemiBold,
@@ -14,6 +14,10 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider, useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
+import {
+  syncPredictionNotifications,
+  registerPredictionNotificationHandler,
+} from '@/application/triggerPrediction';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -42,21 +46,29 @@ function useStoreHydrated(): boolean {
       return;
     }
     const unsub = useStore.persist.onFinishHydration(() => setHydrated(true));
-    return unsub;
+    // Corrupt/blocked browser storage must not leave the root returning null
+    // forever. Native hydration normally completes long before this fallback.
+    const fallback = setTimeout(() => setHydrated(true), 5000);
+    return () => {
+      unsub();
+      clearTimeout(fallback);
+    };
   }, []);
   return hydrated;
 }
 
 export default function RootLayout() {
   const hydrated = useStoreHydrated();
-  const [loaded] = useFonts({
+  const [loaded, fontError] = useFonts({
     Nunito_600SemiBold,
     Nunito_700Bold,
     Nunito_800ExtraBold,
     Nunito_900Black,
   });
 
-  const ready = loaded && hydrated;
+  // A font-loading failure should fall back to the system font, never a blank
+  // application. This is especially important for browser URL testing.
+  const ready = (loaded || fontError != null) && hydrated;
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
@@ -76,13 +88,50 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [updateLastCheckedIn]);
 
-  if (!ready) return null;
+  // ── Trigger Prediction Scheduler ──────────────────────────────────────────
+  // Re-syncs notification schedule whenever the urges array changes.
+  // Gracefully no-ops if expo-notifications is not installed or permission
+  // is not granted. All data stays 100 % local.
+  const urges = useStore((s) => s.urges);
+  useEffect(() => {
+    // Debounce slightly so rapid consecutive log actions don't spawn multiple
+    // scheduling runs (e.g., two urges logged within the same second).
+    const timer = setTimeout(() => {
+      syncPredictionNotifications(urges).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [urges]);
+
+  // Also re-sync whenever the app returns to the foreground.
+  const urgesRef = useRef(urges);
+  urgesRef.current = urges;
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        syncPredictionNotifications(urgesRef.current).catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  if (!ready) {
+    // iOS keeps the native splash visible. Web has no equivalent guarantee,
+    // so render an explicit startup state instead of a white page.
+    if (Platform.OS !== 'web') return null;
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1A1420' }}>
+        <ActivityIndicator color="#B98FD6" />
+        <NativeText style={{ marginTop: 12, color: '#ECE6F2', fontFamily: 'system-ui' }}>Opening Unchain…</NativeText>
+      </View>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
           <ThemedStatusBar />
+          <NotificationHandlerSetup />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="onboarding" />
@@ -109,4 +158,19 @@ export default function RootLayout() {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+/**
+ * Mounts the notification tap handler inside the navigation tree so the
+ * router is available. Renders nothing - side effects only.
+ */
+function NotificationHandlerSetup() {
+  const router = useRouter();
+  useEffect(() => {
+    const unsub = registerPredictionNotificationHandler(router);
+    return unsub;
+  // router is stable; exhaustive-deps would make this re-register on every render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
 }

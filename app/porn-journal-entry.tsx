@@ -381,7 +381,7 @@ export default function PornJournalEntry() {
           <>
             <StepHeading title="How strong were your urges today?" subtitle="1 = none at all, 10 = overwhelming." />
             <View style={{ backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.xl }}>
-              <Slider label="Urge intensity" value={urgeIntensity} onChange={setUrgeIntensity} />
+              <Slider kind="urge" label="Urge intensity" value={urgeIntensity} onChange={setUrgeIntensity} />
             </View>
           </>
         );

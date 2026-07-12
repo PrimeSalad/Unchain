@@ -11,7 +11,7 @@ import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useProfile, useStore } from '@/application/store';
-import { recoveryTimer, moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
+import { recoveryTimer, journalMoneyStats, formatMoney, currentStreakStart, type AddictionType } from '@/domain/gambling';
 import { QUOTES } from '@/domain/quotes';
 
 const GLASS = 'rgba(255,255,255,0.07)';
@@ -116,6 +116,25 @@ function Anchor({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; 
   );
 }
 
+function recoveryAnchor(addictionType: AddictionType, resistedUrges: number, healthyHabits: number): {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+} {
+  switch (addictionType) {
+    case 'pornography':
+      return { icon: 'shield-checkmark', label: 'Urges resisted', value: `${resistedUrges}` };
+    case 'social_media':
+      return { icon: 'leaf', label: 'Healthy habits', value: `${healthyHabits}` };
+    case 'smoking':
+    case 'alcohol':
+    case 'drugs':
+      return { icon: 'fitness', label: 'Cravings resisted', value: `${resistedUrges}` };
+    default:
+      return { icon: 'checkmark-circle', label: 'Urges resisted', value: `${resistedUrges}` };
+  }
+}
+
 function ToolTile({
   icon, label, onPress,
 }: {
@@ -182,6 +201,8 @@ export default function Sos() {
 
   // The blocklist is permanent - in a moment of crisis this is reassurance.
   const protectedCount = useStore((s) => s.blockedSites.length);
+  const urgesResisted = useStore((s) => s.urges.filter((urge) => urge.resisted).length);
+  const healthyHabits = useStore((s) => s.healthyHabitsCount);
 
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
@@ -189,9 +210,11 @@ export default function Sos() {
   // never overstate recovery after a relapse - honesty matters most in crisis.
   const streakStart = profile ? currentStreakStart(profile.startedAt, relapses, journal) : 0;
   const timer = profile ? recoveryTimer(streakStart) : { days: 0, hours: 0, minutes: 0 };
-  const money = profile
-    ? moneySaved({ ...profile, startedAt: streakStart })
-    : { today: 0, week: 0, month: 0, total: 0 };
+  // Same recovery-adjusted journal source used by Home and Progress.
+  const moneyStats = journalMoneyStats(journal);
+  const secondaryAnchor = profile && profile.addictionType !== 'gambling'
+    ? recoveryAnchor(profile.addictionType, urgesResisted, healthyHabits)
+    : null;
   const currency = profile?.currency ?? '₱';
 
   return (
@@ -262,7 +285,11 @@ export default function Sos() {
           {/* Anchors */}
           <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg }}>
             <Anchor icon="time" label="Recovery" value={`${timer.days}d ${timer.hours}h`} />
-            <Anchor icon="wallet" label="Money saved" value={formatMoney(money.total, currency)} />
+            {profile?.addictionType === 'gambling' ? (
+              <Anchor icon="wallet" label="Money saved" value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '-'} />
+            ) : secondaryAnchor ? (
+              <Anchor {...secondaryAnchor} />
+            ) : null}
           </View>
 
           {/* Your reason */}
@@ -289,12 +316,55 @@ export default function Sos() {
             </GlassTile>
           )}
 
+          {/* ── I'm having an urge - primary quick-log CTA ── */}
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              router.push('/log-urge' as Href);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="I'm having an urge — log it now"
+            style={({ pressed }) => ({
+              marginTop: spacing.xl,
+              borderRadius: radius.card,
+              backgroundColor: GLASS,
+              borderWidth: 1.5,
+              borderColor: palette.grape300,
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: spacing.lg,
+              paddingHorizontal: spacing.lg,
+              gap: spacing.md,
+              opacity: pressed ? 0.8 : 1,
+              transform: [{ scale: pressed ? 0.99 : 1 }],
+            })}
+          >
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                backgroundColor: 'rgba(185,143,214,0.22)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="pulse" size={22} color={palette.grape300} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="callout" color={palette.fog}>I'm having an urge</Text>
+              <Text variant="caption" color={FOG_SOFT} style={{ marginTop: 2 }}>
+                Log it now — awareness is recovery
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={palette.grape300} />
+          </Pressable>
+
           {/* Tools */}
           <Text variant="headline" color={palette.fog} style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
             Steady yourself
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            <ToolTile icon="pulse" label="Log Urge" onPress={() => router.replace('/log-urge')} />
             <ToolTile icon="book" label="Journal" onPress={() => router.replace('/(tabs)/journal')} />
             <ToolTile icon="game-controller" label="Games" onPress={() => router.push('/games' as Href)} />
             <ToolTile icon="walk" label="Habits" onPress={() => router.push('/alternatives' as Href)} />

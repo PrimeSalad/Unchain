@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '@/presentation/components/Screen';
@@ -16,22 +16,130 @@ import { useStore, useProfile } from '@/application/store';
 import { TRIGGERS, urgeLevel } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
+// ---------------------------------------------------------------------------
+// Mood label helpers
+// ---------------------------------------------------------------------------
+
+function moodLabel(mood: number): string {
+  if (mood <= 2) return 'Very low';
+  if (mood <= 4) return 'Low';
+  if (mood <= 6) return 'Moderate';
+  if (mood <= 8) return 'Good';
+  return 'Great';
+}
+
+function moodEmoji(mood: number): string {
+  if (mood <= 2) return '😔';
+  if (mood <= 4) return '😕';
+  if (mood <= 6) return '😐';
+  if (mood <= 8) return '🙂';
+  return '😊';
+}
+
+// ---------------------------------------------------------------------------
+// Mood picker - 10 tap-able dots
+// ---------------------------------------------------------------------------
+
+function MoodPicker({
+  value,
+  onChange,
+}: {
+  value: number | undefined;
+  onChange: (n: number) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text variant="caption" dim>Low</Text>
+        <Text variant="caption" dim>High</Text>
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 4 }}>
+        {Array.from({ length: 10 }, (_, i) => {
+          const n = i + 1;
+          const active = value === n;
+          return (
+            <Pressable
+              key={n}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                onChange(n);
+              }}
+              accessibilityRole="radio"
+              accessibilityLabel={`Mood ${n}: ${moodLabel(n)}`}
+              accessibilityState={{ selected: active }}
+              style={({ pressed }) => ({
+                flex: 1,
+                aspectRatio: 1,
+                borderRadius: radius.chip,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: active
+                  ? theme.color.primary
+                  : theme.color.surfaceAlt,
+                opacity: pressed ? 0.75 : 1,
+                borderWidth: active ? 0 : 1,
+                borderColor: theme.color.hairline,
+              })}
+            >
+              <Text
+                variant="caption"
+                style={{ fontSize: 11, fontVariant: ['tabular-nums'] }}
+                color={active ? theme.color.onPrimary : theme.color.textDim}
+              >
+                {n}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {value != null && (
+        <Text variant="caption" dim center>
+          {moodEmoji(value)} {moodLabel(value)} mood ({value}/10)
+        </Text>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
 export default function LogUrge() {
   const theme = useTheme();
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const safeBack = useSafeBack();
   const logUrge = useStore((s) => s.logUrge);
+  const updateUrge = useStore((s) => s.updateUrge);
+  const existing = useStore((s) => id ? s.urges.find((urge) => urge.id === id) : undefined);
   const profile = useProfile();
 
-  const [intensity, setIntensity] = useState(5);
-  const [trigger, setTrigger] = useState<string>();
-  const [notes, setNotes] = useState('');
+  const [intensity, setIntensity] = useState(existing?.intensity ?? 5);
+  const [triggers, setTriggers] = useState<string[]>(existing?.triggers ?? (existing?.trigger ? [existing.trigger] : []));
+  const [mood, setMood] = useState(existing?.mood ?? 5);
+  const [notes, setNotes] = useState(existing?.notes ?? '');
   const [saved, setSaved] = useState(false);
 
   const level = urgeLevel(intensity);
 
   const save = () => {
-    logUrge({ intensity, trigger, notes: notes.trim() || undefined, resisted: true });
+    const data = {
+      intensity,
+      trigger: triggers[0],
+      triggers,
+      notes: notes.trim() || undefined,
+      resisted: true,
+      mood,
+    };
+    if (existing) {
+      updateUrge(existing.id, data);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      safeBack();
+      return;
+    }
+    logUrge(data);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setSaved(true);
   };
@@ -54,7 +162,7 @@ export default function LogUrge() {
                 <ActionBtn icon="leaf" label="Take a Mindful Pause" onPress={() => router.replace('/mindful-pause' as Href)} />
                 <ActionBtn icon="book" label="Open Journal" onPress={() => router.replace('/(tabs)/journal')} />
                 {profile?.reason ? (
-                  <Card tone="primarySoft"><Text variant="footnote" dim>Your reason</Text><Text variant="callout" style={{ marginTop: 4 }}>“{profile.reason}”</Text></Card>
+                  <Card tone="primarySoft"><Text variant="footnote" dim>Your reason</Text><Text variant="callout" style={{ marginTop: 4 }}>"{profile.reason}"</Text></Card>
                 ) : null}
               </View>
             </>
@@ -69,7 +177,7 @@ export default function LogUrge() {
                 <ActionBtn icon="book" label="Journal it out" onPress={() => router.replace('/(tabs)/journal')} />
               </View>
               {profile?.reason ? (
-                <Card tone="primarySoft" style={{ marginTop: spacing.lg }}><Text variant="footnote" dim>Remember why</Text><Text variant="callout" style={{ marginTop: 4 }}>“{profile.reason}”</Text></Card>
+                <Card tone="primarySoft" style={{ marginTop: spacing.lg }}><Text variant="footnote" dim>Remember why</Text><Text variant="callout" style={{ marginTop: 4 }}>"{profile.reason}"</Text></Card>
               ) : null}
             </>
           )}
@@ -86,37 +194,92 @@ export default function LogUrge() {
           <Ionicons name="close" size={26} color={theme.color.textDim} />
         </Pressable>
       </View>
-      <Text variant="title1" style={{ marginTop: spacing.sm }}>Log an urge</Text>
+      <Text variant="title1" style={{ marginTop: spacing.sm }}>{existing ? 'Edit urge' : 'Log an urge'}</Text>
       <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
         Logging it before acting is a win in itself.
       </Text>
 
-      <Card><Slider label="How strong is the urge?" value={intensity} onChange={setIntensity} /></Card>
+      {/* Urge intensity */}
+      <Card>
+        <Slider kind="urge" label="How strong is the urge?" value={intensity} onChange={setIntensity} />
+      </Card>
 
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>What triggered it?</Text>
+      {/* Trigger */}
+      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+        What triggered it?
+      </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         {(profile?.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => (
-          <Pill key={t} label={t} active={trigger === t} onPress={() => setTrigger(trigger === t ? undefined : t)} />
+          <Pill
+            key={t}
+            label={t}
+            active={triggers.includes(t)}
+            onPress={() => setTriggers((current) => current.includes(t) ? current.filter((value) => value !== t) : [...current, t])}
+          />
         ))}
       </View>
 
+      {/* Mood */}
+      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>
+        How's your mood right now?
+      </Text>
+      <Text variant="caption" dim style={{ marginBottom: spacing.md }}>
+        Tracking mood helps identify patterns in your urges.
+      </Text>
+      <Card>
+        <Slider kind="mood" label="Mood" value={mood} onChange={setMood} />
+      </Card>
+
+      {/* Notes */}
       <TextInput
-        value={notes} onChangeText={setNotes} placeholder="Notes (optional)" placeholderTextColor={theme.color.textDim} multiline
-        style={{ marginTop: spacing.xl, minHeight: 80, borderRadius: radius.input, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.lg, color: theme.color.text, fontSize: 16, textAlignVertical: 'top' }}
+        value={notes}
+        onChangeText={setNotes}
+        placeholder="Notes (optional)"
+        placeholderTextColor={theme.color.textDim}
+        multiline
+        style={{
+          marginTop: spacing.xl,
+          minHeight: 80,
+          borderRadius: radius.input,
+          backgroundColor: theme.color.surface,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
+          padding: spacing.lg,
+          color: theme.color.text,
+          fontSize: 16,
+          textAlignVertical: 'top',
+        }}
       />
 
-      <Button label="Save" onPress={save} full style={{ marginTop: spacing.xl }} />
+      <Button label={existing ? 'Save changes' : 'Save'} onPress={save} full style={{ marginTop: spacing.xl }} />
     </Screen>
   );
 }
 
-function ActionBtn({ icon, label, onPress, accent }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; accent?: boolean }) {
+function ActionBtn({
+  icon,
+  label,
+  onPress,
+  accent,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  accent?: boolean;
+}) {
   const theme = useTheme();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+    >
       <Card tone={accent ? 'accentSoft' : 'surface'} style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Ionicons name={icon} size={22} color={accent ? theme.color.accentText : theme.color.primary} />
-        <Text variant="headline" style={{ flex: 1, marginLeft: spacing.md }} color={accent ? theme.color.accentText : theme.color.text}>{label}</Text>
+        <Text variant="headline" style={{ flex: 1, marginLeft: spacing.md }} color={accent ? theme.color.accentText : theme.color.text}>
+          {label}
+        </Text>
         <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
       </Card>
     </Pressable>
