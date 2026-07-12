@@ -72,7 +72,7 @@ const MODE_CONFIG: Record<Mode, {
 }> = {
   standard: {
     label: 'Standard',
-    sublabel: 'Balanced reflex training',
+    sublabel: 'Normal timing',
     startLevel: 1,
     windowShiftMs: 0,
     gapShiftMs: 0,
@@ -81,7 +81,7 @@ const MODE_CONFIG: Record<Mode, {
   },
   extreme: {
     label: 'Extreme',
-    sublabel: 'Faster pace, more red traps',
+    sublabel: 'Faster timing',
     startLevel: 4,
     windowShiftMs: -170,
     gapShiftMs: -130,
@@ -110,7 +110,7 @@ export default function GoNoGo() {
   const [stimulus, setStimulus] = useState<'go' | 'nogo' | null>(null);
   const [float, setFloat] = useState<{ amount: number; id: number } | null>(null);
   const [verdict, setVerdict] = useState<'good' | 'bad' | null>(null);
-  const [status, setStatus] = useState('Choose a mode and start when ready.');
+  const [status, setStatus] = useState('Choose a mode.');
   const [celebrate, setCelebrate] = useState(false);
   const [result, setResult] = useState<{
     unlocked: GameAchievement[]; pointsEarned: number; newBest: boolean; challengeCompleted: boolean;
@@ -230,7 +230,7 @@ export default function GoNoGo() {
       const windowMs = Math.max(420, gonogoWindowMs(lvl) + activeConfig.windowShiftMs);
       trialRef.current = { isGo, shownAt: Date.now(), windowMs, handled: false };
       setStimulus(isGo ? 'go' : 'nogo');
-      setStatus(isGo ? 'Tap now.' : 'Hold back.');
+      setStatus(isGo ? 'Tap.' : 'Do not tap.');
       pop.setValue(0.3);
       Animated.spring(pop, { toValue: 1, useNativeDriver: true, damping: 11, stiffness: 260 }).start();
       windowMeter.setValue(1);
@@ -248,11 +248,11 @@ export default function GoNoGo() {
         t.handled = true;
         trialsRef.current += 1;
         if (t.isGo) {
-          setStatus('Missed green.');
+          setStatus('Miss.');
           loseLife();
         } else {
           const points = Math.round(holdPoints(comboRef.current) * MODE_CONFIG[modeRef.current].scoreBoost);
-          setStatus('Clean hold.');
+          setStatus('Correct hold.');
           scoreCorrect(points, 'clear');
         }
         hideStimulus();
@@ -272,10 +272,10 @@ export default function GoNoGo() {
       const rt = Date.now() - t.shownAt;
       reactionsRef.current.push(rt);
       const points = Math.round(goPoints(rt, t.windowMs, comboRef.current) * MODE_CONFIG[modeRef.current].scoreBoost);
-      setStatus(rt < 320 ? 'Lightning tap.' : 'Good tap.');
+      setStatus('Correct tap.');
       scoreCorrect(points, 'place');
     } else {
-      setStatus('False tap on red.');
+      setStatus('Wrong tap.');
       loseLife();
     }
     hideStimulus();
@@ -375,7 +375,7 @@ export default function GoNoGo() {
                 <View style={{ width: '100%', gap: spacing.sm }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}>
                     <Text variant="footnote" color={activeColor} style={{ fontFamily: 'Nunito_800ExtraBold' }}>
-                      {stimulus === 'nogo' ? 'NO-GO SIGNAL' : stimulus === 'go' ? 'GO SIGNAL' : 'READY'}
+                      {stimulus === 'nogo' ? 'NO-GO' : stimulus === 'go' ? 'GO' : 'WAIT'}
                     </Text>
                     <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'] }}>
                       Best {games.gonogoBest.toLocaleString()}
@@ -420,7 +420,7 @@ export default function GoNoGo() {
                     shadowOffset: { width: 0, height: 10 }, shadowOpacity: stimulus ? 0.32 : 0.08, shadowRadius: 20, elevation: stimulus ? 10 : 2,
                   }}
                 >
-                    <Ionicons name={stimulus === 'go' ? 'flash' : stimulus === 'nogo' ? 'close' : 'radio-button-on'} size={isCompact ? 46 : 58} color={stimulus ? '#FFFFFF' : theme.color.textDim} />
+                    <Ionicons name={stimulus === 'go' ? 'radio-button-on' : stimulus === 'nogo' ? 'close' : 'ellipse-outline'} size={isCompact ? 46 : 58} color={stimulus ? '#FFFFFF' : theme.color.textDim} />
                     <Text variant="title2" color={stimulus ? '#FFFFFF' : theme.color.textDim} style={{ marginTop: 4, fontFamily: 'Nunito_900Black' }}>
                     {stimulus === 'go' ? 'TAP' : stimulus === 'nogo' ? 'HOLD' : 'WAIT'}
                   </Text>
@@ -443,7 +443,7 @@ export default function GoNoGo() {
                     </Text>
                   </View>
                   <Text variant="caption" dim center>
-                    Tap anywhere on the arena for green. Keep your finger off for red.
+                    Tap anywhere for green. Do nothing for red.
                   </Text>
                 </View>
               {float && <PointsFloat amount={float.amount} id={float.id} />}
@@ -465,15 +465,15 @@ export default function GoNoGo() {
                   }}
                 >
                   <View style={{ width: '58%', height: '58%', borderRadius: 999, backgroundColor: GO_COLOR, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="flash" size={42} color="#FFFFFF" />
+                    <Ionicons name="radio-button-on" size={42} color="#FFFFFF" />
                   </View>
                 </View>
                 <View style={{ alignItems: 'center', gap: spacing.xs }}>
                   <Text variant="display" center style={{ fontSize: isCompact ? 34 : 40, lineHeight: isCompact ? 38 : 46 }}>
-                    Reflex Arena
+                    Go / No-Go
                   </Text>
                   <Text variant="callout" dim center style={{ maxWidth: 340 }}>
-                    Green means tap. Red means freeze. One mistake costs focus.
+                    Tap green. Do not tap red. One mistake costs focus.
                   </Text>
                 </View>
               </View>
@@ -488,7 +488,7 @@ export default function GoNoGo() {
                         key={m}
                         onPress={() => {
                           setMode(m);
-                          setStatus(`${MODE_CONFIG[m].label} mode selected.`);
+                          setStatus(`${MODE_CONFIG[m].label} selected.`);
                           Haptics.selectionAsync().catch(() => {});
                         }}
                         accessibilityRole="button"
@@ -507,7 +507,7 @@ export default function GoNoGo() {
                         })}
                       >
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }}>
-                          <Ionicons name={hard ? 'flame' : 'leaf'} size={20} color={hard ? NOGO_COLOR : GO_COLOR} />
+                          <Ionicons name={hard ? 'speedometer' : 'radio-button-on'} size={20} color={hard ? NOGO_COLOR : GO_COLOR} />
                           {selected && <Ionicons name="checkmark-circle" size={18} color={hard ? NOGO_COLOR : GO_COLOR} />}
                         </View>
                         <View>
@@ -530,7 +530,7 @@ export default function GoNoGo() {
                     padding: spacing.md,
                   }}
                 >
-                  <SignalKey color={GO_COLOR} icon="flash" label="Tap green" />
+                  <SignalKey color={GO_COLOR} icon="radio-button-on" label="Tap green" />
                   <SignalKey color={NOGO_COLOR} icon="close" label="Hold red" />
                   <SignalKey color={theme.color.primary} icon="heart" label="3 focus" />
                 </View>
@@ -549,7 +549,7 @@ export default function GoNoGo() {
               >
                 <Ionicons name="play" size={18} color={theme.color.onPrimary} />
                 <Text variant="headline" color={theme.color.onPrimary}>
-                  {phase === 'over' ? 'Run it back' : `Start ${modeConfig.label}`}
+                  {phase === 'over' ? 'Play again' : `Start ${modeConfig.label}`}
                 </Text>
               </Pressable>
             </View>

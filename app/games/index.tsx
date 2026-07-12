@@ -46,7 +46,7 @@ export default function GamesHub() {
     { route: '/games/checkers', game: 'checkers', icon: require('../../assets/game icon/Checkers.jpg'), title: 'Checkers', desc: 'Outsmart the AI', stat: games.checkersWins || games.checkersLosses ? `${games.checkersWins}W · ${games.checkersLosses}L` : '3 difficulties' },
     { route: '/games/sudoku', game: 'sudoku', icon: require('../../assets/game icon/Sodoku.jpg'), title: 'Sudoku', desc: 'Fill the grid, 1–9', stat: games.sudokuSolved ? `${games.sudokuSolved} solved` : '4 difficulties' },
     { route: '/games/blocks', game: 'blocks', icon: require('../../assets/game icon/Blocks Align.jpg'), title: 'Block Puzzle', desc: 'Place, clear, combo', stat: games.blocksBest ? `Best ${games.blocksBest.toLocaleString()}` : 'Beat your best' },
-    { route: '/games/gonogo', game: 'gonogo', ionIcon: 'flash', tint: '#4E9B5E', title: 'Go / No-Go', desc: 'Tap green, resist red', stat: games.gonogoBest ? `Best ${games.gonogoBest.toLocaleString()}` : 'Train impulse control' },
+    { route: '/games/gonogo', game: 'gonogo', icon: require('../../assets/game icon/gonogo.png'), title: 'Go / No-Go', desc: 'Tap green, resist red', stat: games.gonogoBest ? `Best ${games.gonogoBest.toLocaleString()}` : 'Train impulse control' },
   ];
 
   return (
