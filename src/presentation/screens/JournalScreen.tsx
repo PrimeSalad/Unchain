@@ -5,8 +5,9 @@
 
 import { useMemo, useRef, useState, useCallback } from 'react';
 import {
+  Modal,
   Pressable,
-  ScrollView,
+  StyleSheet,
   TextInput,
   View,
   LayoutAnimation,
@@ -392,39 +393,7 @@ function SectionHeader({ title, meta }: { title: string; meta?: string }) {
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => ({
-        paddingVertical: spacing.xs,
-        paddingHorizontal: spacing.xs,
-        borderBottomWidth: 2,
-        borderBottomColor: active ? theme.color.primary : 'transparent',
-        opacity: pressed ? 0.7 : 1,
-      })}
-    >
-      <Text
-        variant="callout"
-        color={active ? theme.color.primary : theme.color.textDim}
-        style={{ fontFamily: active ? 'Nunito_800ExtraBold' : 'Nunito_600SemiBold' }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Search bar - slides down when active
@@ -482,6 +451,91 @@ function SearchBar({ query, onChange }: { query: string; onChange: (s: string) =
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PickerSheet — iOS-style bottom sheet with radio options
+// ─────────────────────────────────────────────────────────────────────────────
+function PickerSheet<T extends string>({
+  visible,
+  title,
+  options,
+  value,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  title: string;
+  options: { key: T; label: string }[];
+  value: T;
+  onSelect: (key: T) => void;
+  onClose: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        {/* Scrim */}
+        <Pressable
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]}
+          onPress={onClose}
+          accessibilityLabel="Close"
+        />
+        {/* Sheet */}
+        <View style={{
+          backgroundColor: theme.color.surface,
+          borderTopLeftRadius: radius.sheet,
+          borderTopRightRadius: radius.sheet,
+          paddingBottom: 34,
+          ...elevation.e2,
+        }}>
+          {/* Handle */}
+          <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.color.hairline, alignSelf: 'center', marginTop: spacing.md, marginBottom: spacing.lg }} />
+          {/* Title */}
+          <Text variant="footnote" dim style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+            {title}
+          </Text>
+          {/* Options */}
+          {options.map(({ key, label }, i) => {
+            const active = value === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => { Haptics.selectionAsync().catch(() => {}); onSelect(key); onClose(); }}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: spacing.xl,
+                  paddingVertical: spacing.md + 2,
+                  borderTopWidth: i === 0 ? 1 : 0,
+                  borderBottomWidth: 1,
+                  borderColor: theme.color.hairline,
+                  backgroundColor: pressed ? theme.color.surfaceAlt : 'transparent',
+                })}
+              >
+                <Text
+                  variant="callout"
+                  style={{ flex: 1, fontFamily: active ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
+                  color={active ? theme.color.primary : theme.color.text}
+                >
+                  {label}
+                </Text>
+                {active && <Ionicons name="checkmark" size={18} color={theme.color.primary} />}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main screen
 // ─────────────────────────────────────────────────────────────────────────────
 export function JournalScreen() {
@@ -497,6 +551,8 @@ export function JournalScreen() {
   const [filter, setFilter]       = useState<Filter>('all');
   const [dateRange, setDateRange] = useState<DateRange>('all_time');
   const [searching, setSearching] = useState(false);
+  const [showDateSheet, setShowDateSheet]     = useState(false);
+  const [showStatusSheet, setShowStatusSheet] = useState(false);
 
   const toggleSearch = useCallback(() => {
     setSearching((v) => {
@@ -566,108 +622,82 @@ export function JournalScreen() {
       .sort((a, b) => b.at - a.at);
   }, [entries, query, filter, dateRange, isGambling, isPorn]);
 
+  // Status filter options per addiction type
+  const statusFilters: { key: Filter; label: string }[] =
+    isGambling ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
+    : isPorn   ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'watched', label: 'Relapses' }]
+    : [];
+
+  // Date ranges
+  const DATE_RANGES: { key: DateRange; label: string }[] = [
+    { key: 'all_time', label: 'All time'   },
+    { key: 'today',    label: 'Today'      },
+    { key: 'week',     label: 'This week'  },
+    { key: 'month',    label: 'This month' },
+    { key: 'year',     label: 'This year'  },
+  ];
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <Screen tabPadding>
 
-      {/* ── Hero ── */}
-      <View
-        style={{
-          marginTop: spacing.sm,
-          marginBottom: spacing.lg,
-          paddingBottom: spacing.lg,
-          gap: spacing.lg,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.color.hairline,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <View
-            style={{
-              width: 54,
-              height: 54,
-              borderRadius: 18,
-              backgroundColor: theme.color.primarySoft,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="book" size={25} color={theme.color.primary} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="title1" style={{ fontFamily: 'Nunito_900Black' }}>Journal</Text>
-            <Text variant="footnote" dim style={{ marginTop: 3, lineHeight: 18 }}>
-              {entries.length === 0
-                ? 'Start with one honest line today.'
-                : `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} saved in your private timeline.`}
-            </Text>
-          </View>
-        </View>
+      {/* ── Header: just the title + two icon buttons ── */}
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: spacing.sm,
+        marginBottom: spacing.xl,
+      }}>
+        <Text variant="title1" style={{ flex: 1, fontFamily: 'Nunito_900Black' }}>Journal</Text>
 
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-              router.push(isPorn ? '/porn-journal-entry' : '/journal-entry');
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Write new entry"
-            style={({ pressed }) => ({
-              flex: 1,
-              minHeight: 48,
-              borderRadius: radius.button,
-              backgroundColor: theme.color.primary,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: spacing.sm,
-              opacity: pressed ? 0.82 : 1,
-            })}
-          >
-            <Ionicons name="create" size={18} color={theme.color.onPrimary} />
-            <Text variant="headline" color={theme.color.onPrimary}>Write entry</Text>
-          </Pressable>
-          <Pressable
-            onPress={toggleSearch}
-            accessibilityRole="button"
-            accessibilityLabel={searching ? 'Close search' : 'Search entries'}
-            style={({ pressed }) => ({
-              width: 48,
-              minHeight: 48,
-              borderRadius: radius.button,
-              backgroundColor: searching ? theme.color.primarySoft : theme.color.surfaceAlt,
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: pressed ? 0.75 : 1,
-            })}
-          >
-            <Ionicons
-              name={searching ? 'close' : 'search'}
-              size={19}
-              color={searching ? theme.color.primary : theme.color.textDim}
-            />
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={toggleSearch}
+          accessibilityRole="button"
+          accessibilityLabel={searching ? 'Close search' : 'Search entries'}
+          hitSlop={12}
+          style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, padding: spacing.xs })}
+        >
+          <Ionicons
+            name={searching ? 'close-outline' : 'search-outline'}
+            size={22}
+            color={searching ? theme.color.primary : theme.color.textDim}
+          />
+        </Pressable>
+
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            router.push(isPorn ? '/porn-journal-entry' : '/journal-entry');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Write new entry"
+          hitSlop={12}
+          style={({ pressed }) => ({
+            marginLeft: spacing.md,
+            opacity: pressed ? 0.5 : 1,
+            padding: spacing.xs,
+          })}
+        >
+          <Ionicons name="create-outline" size={22} color={theme.color.primary} />
+        </Pressable>
       </View>
 
-      {/* ── Search bar (animated slide-in) ── */}
-      {searching && (
-        <SearchBar query={query} onChange={setQuery} />
-      )}
+      {/* ── Search bar ── */}
+      {searching && <SearchBar query={query} onChange={setQuery} />}
 
-      {/* ── Stats row ── */}
-      {isGambling && entries.length > 0 && (
+      {/* ── Stats: three compact tiles, only when there are entries ── */}
+      {(isGambling || isPorn) && entries.length > 0 && (
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
           <StatCard
             icon="checkmark-circle"
-            value={stats.clean}
-            label="Clean days"
+            value={isGambling ? stats.clean : stats.pornClean}
+            label="Clean"
             color={theme.color.success}
             delay={0}
           />
           <StatCard
             icon="alert-circle"
-            value={stats.relapses}
+            value={isGambling ? stats.relapses : stats.pornRelapses}
             label="Relapses"
             color={theme.color.danger}
             delay={60}
@@ -676,7 +706,7 @@ export function JournalScreen() {
             <StatCard
               icon="happy"
               value={stats.avgMood}
-              label="Avg mood"
+              label="Mood"
               color={theme.color.primary}
               delay={120}
             />
@@ -684,183 +714,134 @@ export function JournalScreen() {
         </View>
       )}
 
-      {isPorn && entries.length > 0 && (
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
-          <StatCard
-            icon="checkmark-circle"
-            value={stats.pornClean}
-            label="Clean days"
-            color={theme.color.success}
-            delay={0}
-          />
-          <StatCard
-            icon="alert-circle"
-            value={stats.pornRelapses}
-            label="Relapses"
-            color={theme.color.danger}
-            delay={60}
-          />
-          {stats.avgMood != null && (
-            <StatCard
-              icon="happy"
-              value={stats.avgMood}
-              label="Avg mood"
-              color={theme.color.primary}
-              delay={120}
-            />
-          )}
-        </View>
-      )}
-
-      {/* ── Date-range filter (all users, always visible when entries exist) ── */}
+      {/* ── Filter row — two compact selector buttons ── */}
       {entries.length > 0 && (
-        <>
-          <SectionHeader title="Filters" meta={filtered.length === entries.length ? 'All visible' : `${filtered.length} shown`} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.sm }}
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
+
+          {/* Date range selector */}
+          <Pressable
+            onPress={() => setShowDateSheet(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Period: ${DATE_RANGES.find(d => d.key === dateRange)?.label}`}
+            style={({ pressed }) => ({
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm + 2,
+              borderRadius: radius.input,
+              backgroundColor: theme.color.surface,
+              borderWidth: 1,
+              borderColor: dateRange !== 'all_time' ? theme.color.primary : theme.color.hairline,
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
-            {([
-              { key: 'all_time', label: 'All time'   },
-              { key: 'today',    label: 'Today'      },
-              { key: 'week',     label: 'This week'  },
-              { key: 'month',    label: 'This month' },
-              { key: 'year',     label: 'This year'  },
-            ] as { key: DateRange; label: string }[]).map(({ key, label }) => (
-              <FilterChip
-                key={key}
-                label={label}
-                active={dateRange === key}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setDateRange(key);
-                }}
-              />
-            ))}
-          </ScrollView>
-        </>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Ionicons name="calendar-outline" size={14} color={dateRange !== 'all_time' ? theme.color.primary : theme.color.textDim} />
+              <Text
+                variant="footnote"
+                color={dateRange !== 'all_time' ? theme.color.primary : theme.color.textDim}
+                style={{ fontFamily: dateRange !== 'all_time' ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
+              >
+                {DATE_RANGES.find(d => d.key === dateRange)?.label ?? 'All time'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-down" size={13} color={dateRange !== 'all_time' ? theme.color.primary : theme.color.textDim} />
+          </Pressable>
+
+          {/* Status selector (only for gambling/porn) */}
+          {statusFilters.length > 0 && (
+            <Pressable
+              onPress={() => setShowStatusSheet(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Status: ${statusFilters.find(s => s.key === filter)?.label}`}
+              style={({ pressed }) => ({
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm + 2,
+                borderRadius: radius.input,
+                backgroundColor: theme.color.surface,
+                borderWidth: 1,
+                borderColor: filter !== 'all' ? theme.color.primary : theme.color.hairline,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                <Ionicons name="filter-outline" size={14} color={filter !== 'all' ? theme.color.primary : theme.color.textDim} />
+                <Text
+                  variant="footnote"
+                  color={filter !== 'all' ? theme.color.primary : theme.color.textDim}
+                  style={{ fontFamily: filter !== 'all' ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
+                >
+                  {statusFilters.find(s => s.key === filter)?.label ?? 'All'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-down" size={13} color={filter !== 'all' ? theme.color.primary : theme.color.textDim} />
+            </Pressable>
+          )}
+        </View>
       )}
 
-      {/* ── Status filter pills (addiction-specific) ── */}
-      {isGambling && entries.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}
-        >
-          {(['all', 'clean', 'gambled'] as Filter[]).map((f) => (
-            <FilterChip
-              key={f}
-              label={f === 'all' ? 'All entries' : f === 'clean' ? 'Clean days' : 'Relapses'}
-              active={filter === f}
-              onPress={() => { Haptics.selectionAsync().catch(() => {}); setFilter(f); }}
-            />
-          ))}
-        </ScrollView>
-      )}
+      {/* Date range picker sheet */}
+      <PickerSheet
+        visible={showDateSheet}
+        title="Period"
+        options={DATE_RANGES}
+        value={dateRange}
+        onSelect={setDateRange}
+        onClose={() => setShowDateSheet(false)}
+      />
 
-      {isPorn && entries.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}
-        >
-          {(['all', 'clean', 'watched'] as Filter[]).map((f) => (
-            <FilterChip
-              key={f}
-              label={f === 'all' ? 'All entries' : f === 'clean' ? 'Clean days' : 'Relapses'}
-              active={filter === f}
-              onPress={() => { Haptics.selectionAsync().catch(() => {}); setFilter(f); }}
-            />
-          ))}
-        </ScrollView>
-      )}
-
-      {/* Spacer when no addiction pills are shown (e.g. social media, other) */}
-      {!isGambling && !isPorn && entries.length > 0 && (
-        <View style={{ marginBottom: spacing.xl }} />
-      )}
+      {/* Status picker sheet */}
+      <PickerSheet
+        visible={showStatusSheet}
+        title="Status"
+        options={statusFilters}
+        value={filter}
+        onSelect={setFilter}
+        onClose={() => setShowStatusSheet(false)}
+      />
 
       {/* ── Empty state ── */}
       {filtered.length === 0 ? (
         <Animated.View
           entering={FadeIn.duration(400)}
-          style={{
-            alignItems: 'center',
-            paddingVertical: spacing.xxxl,
-            gap: spacing.lg,
-          }}
+          style={{ alignItems: 'center', paddingVertical: spacing.xxxl, gap: spacing.lg }}
         >
-          {/* Stacked rings illustration */}
-          <View style={{ position: 'relative', width: 100, height: 100, alignItems: 'center', justifyContent: 'center' }}>
-            <View style={{
-              position: 'absolute',
-              width: 100,
-              height: 100,
-              borderRadius: 50,
-              backgroundColor: theme.color.primary + '08',
-              borderWidth: 1,
-              borderColor: theme.color.primary + '20',
-            }} />
-            <View style={{
-              position: 'absolute',
-              width: 74,
-              height: 74,
-              borderRadius: 37,
-              backgroundColor: theme.color.primary + '10',
-              borderWidth: 1,
-              borderColor: theme.color.primary + '30',
-            }} />
-            <View style={{
-              width: 52,
-              height: 52,
-              borderRadius: 26,
-              backgroundColor: theme.color.primarySoft,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Ionicons name="book-outline" size={26} color={theme.color.primary} />
-            </View>
+          <View style={{
+            width: 52, height: 52, borderRadius: 26,
+            backgroundColor: theme.color.primarySoft,
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons name="book-outline" size={24} color={theme.color.primary} />
           </View>
-
           <View style={{ alignItems: 'center', gap: spacing.sm }}>
             <Text variant="headline" center style={{ fontFamily: 'Nunito_700Bold' }}>
-              {entries.length === 0 ? 'Your journal is empty' : 'No entries match'}
+              {entries.length === 0 ? 'No entries yet' : 'No entries match'}
             </Text>
             <Text variant="callout" dim center style={{ paddingHorizontal: spacing.xl, lineHeight: 22 }}>
               {entries.length === 0
-                ? 'Your first entry is the hardest.\nEven one sentence counts.'
-                : 'Try a different filter, date range, or search term.'}
+                ? 'Your first entry is the hardest. Even one sentence counts.'
+                : 'Try adjusting the filters or search term.'}
             </Text>
           </View>
-
-          {entries.length === 0 && (
-            <Pressable
-              onPress={() => router.push(isPorn ? '/porn-journal-entry' : '/journal-entry')}
-              style={({ pressed }) => ({
-                paddingHorizontal: spacing.xxl,
-                paddingVertical: spacing.md + 2,
-                borderRadius: radius.button,
-                backgroundColor: theme.color.primary,
-                opacity: pressed ? 0.8 : 1,
-                shadowColor: theme.color.primary,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.35,
-                shadowRadius: 12,
-                elevation: 6,
-              })}
-            >
-              <Text variant="headline" color="#FFFFFF" style={{ fontFamily: 'Nunito_700Bold' }}>
-                Write first entry
-              </Text>
-            </Pressable>
-          )}
         </Animated.View>
       ) : (
         /* ── Entry list ── */
         <>
-          <SectionHeader title="Timeline" meta={`${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`} />
+          {/* Timeline header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
+            <Text variant="headline" style={{ flex: 1 }}>Timeline</Text>
+            {filtered.length < entries.length && (
+              <Text variant="caption" color={theme.color.textDim}>
+                {filtered.length} of {entries.length}
+              </Text>
+            )}
+          </View>
           <View style={{ gap: spacing.md }}>
             {filtered.map((e, i) => (
               <EntryCard key={e.id} entry={e} index={i} currency={profile?.currency ?? '₱'} />

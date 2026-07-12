@@ -1,4 +1,11 @@
-import { ScrollView, View, type ViewStyle } from 'react-native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { useResponsive } from '../hooks/useResponsive';
@@ -17,19 +24,25 @@ interface ScreenProps {
  * Safe-area screen wrapper. Adapts gutters to device size and centers the
  * content in a capped reading column on tablets/web.
  *
- * scroll=true  → SafeAreaView + ScrollView (most screens)
- * scroll=false → SafeAreaView for top only + manual bottom inset so the
- *                content and buttons never hide behind the iOS home indicator.
+ * Keyboard handling
+ * ─────────────────
+ * KeyboardAvoidingView is placed INSIDE SafeAreaView on both paths so it
+ * only compensates for the keyboard height — never for the safe-area inset.
+ * behavior="padding" on iOS pushes the content up by exactly the keyboard
+ * height. keyboardVerticalOffset=0 is correct because KAV is already below
+ * the safe area.
  *
- * iOS layout notes
- * ────────────────
- * • The inner View on the non-scroll path uses overflow:"hidden" so that
- *   animated children (e.g. the journal slide animation) can never bleed
- *   outside the gutter on small devices like iPhone SE.
- * • hPad is applied to the inner View (not SafeAreaView) so maxWidth
- *   centering works correctly without fighting the safe-area insets.
- * • paddingHorizontal comes from useResponsive().gutter (16 on phones,
- *   20 on tablets) - never hardcoded.
+ * scroll=true
+ *   KAV → ScrollView.
+ *   keyboardDismissMode="on-drag" dismisses the keyboard when the user scrolls.
+ *   keyboardShouldPersistTaps="handled" keeps buttons tappable while the
+ *   keyboard is open.
+ *
+ * scroll=false
+ *   KAV → View with onTouchStart.
+ *   onTouchStart calls Keyboard.dismiss() only when the keyboard is visible,
+ *   without claiming the responder, so child TextInputs still receive taps
+ *   and open the keyboard normally.
  */
 export function Screen({
   children,
@@ -44,7 +57,6 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const bg = background ?? theme.color.bg;
 
-  // Horizontal padding + reading-column cap, centred on wide screens.
   const hPad: ViewStyle = {
     paddingHorizontal: gutter,
     width: '100%',
@@ -52,6 +64,7 @@ export function Screen({
     alignSelf: 'center',
   };
 
+  // ── Scroll path ───────────────────────────────────────────────────────────
   if (scroll) {
     const scrollPad: ViewStyle = {
       ...hPad,
@@ -59,40 +72,52 @@ export function Screen({
     };
     return (
       <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg }}>
-        <ScrollView
-          contentContainerStyle={[scrollPad, contentStyle]}
-          showsVerticalScrollIndicator={false}
-          style={{ alignSelf: 'stretch' }}
+        {/* KAV inside SafeAreaView → only keyboard height, not safe-area */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={0}
         >
-          {children}
-        </ScrollView>
+          <ScrollView
+            contentContainerStyle={[scrollPad, contentStyle]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            style={{ alignSelf: 'stretch' }}
+          >
+            {children}
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
 
-  // Non-scroll: use top-only SafeAreaView and add the bottom inset manually
-  // so buttons/content are never hidden behind the iOS home indicator.
-  // Math.max(insets.bottom, 16) ensures a minimum breathing room even on
-  // devices with no home indicator (iPhone SE, older iPads).
+  // ── Non-scroll path ───────────────────────────────────────────────────────
   const bottomInset = Math.max(insets.bottom, 16);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: bg }}>
-      <View
-        style={[
-          {
-            flex: 1,
-            paddingBottom: bottomInset,
-            // overflow:hidden prevents animated children from painting
-            // outside the screen gutter on narrow devices (iPhone SE).
-            overflow: 'hidden',
-          },
-          hPad,
-          contentStyle,
-        ]}
+      {/* KAV inside SafeAreaView → only keyboard height, not safe-area */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={0}
       >
-        {children}
-      </View>
+        <View
+          style={[
+            { flex: 1, paddingBottom: bottomInset, overflow: 'hidden' },
+            hPad,
+            contentStyle,
+          ]}
+          onTouchStart={() => {
+            // Fires before children claim the touch — does NOT block them.
+            // Only dismisses when the keyboard is actually visible.
+            if (Keyboard.isVisible()) Keyboard.dismiss();
+          }}
+        >
+          {children}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

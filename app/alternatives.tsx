@@ -1356,7 +1356,7 @@ function ActivityCard({
           : theme.color.primarySoft;
 
   return (
-    <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 60).springify().damping(18)}>
+    <View>
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -1428,7 +1428,7 @@ function ActivityCard({
           )}
         </View>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }
 

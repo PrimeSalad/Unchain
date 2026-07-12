@@ -251,8 +251,12 @@ export default function Clarity() {
           <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Clarity</Text>
           <TutorialInfoButton onPress={tutorial.open} />
+        </View>
+
+        {/* Daily info / streak row */}
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: 2 }}>
           {mode === 'daily' ? (
-            <View style={{ alignItems: 'flex-end' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
               <Text variant="caption" dim>Daily #{daily.day}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                 <Ionicons name="flame" size={11} color={theme.color.primary} />
@@ -272,7 +276,7 @@ export default function Clarity() {
         </View>
 
         {/* Mode toggle */}
-        <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.lg, paddingTop: spacing.md }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.lg, paddingTop: spacing.sm }}>
           {(['daily', 'practice'] as const).map((m) => {
             const on = mode === m;
             return (

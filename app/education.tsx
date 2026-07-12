@@ -54,48 +54,59 @@ function GuideCard({ guide, index, onOpen }: { guide: Guide; index: number; onOp
     <Animated.View
       entering={FadeInDown.delay(Math.min(index, 8) * 50).springify().damping(18)}
     >
-      <Pressable
-        onPress={onOpen}
-        accessibilityRole="button"
-        accessibilityLabel={`${guide.title}, ${guide.minutes} minute read${done ? ', finished' : pct > 0 ? `, ${Math.round(pct * 100)}% read` : ''}`}
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-          backgroundColor: theme.color.surface,
-          borderRadius: radius.card,
-          borderWidth: 1,
-          borderColor: theme.color.hairline,
-          padding: spacing.md,
-          opacity: pressed ? 0.8 : 1,
-        })}
-      >
-        <View style={{
-          width: 42, height: 42, borderRadius: 13,
-          backgroundColor: done ? theme.color.successSoft : theme.color.primarySoft,
-          alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Ionicons
-            name={(done ? 'checkmark' : guide.icon) as keyof typeof Ionicons.glyphMap}
-            size={20}
-            color={done ? theme.color.success : theme.color.primary}
-          />
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="callout" numberOfLines={1}>{guide.title}</Text>
-              <Text variant="caption" dim numberOfLines={1} style={{ marginTop: 2 }}>{guide.subtitle}</Text>
-            </View>
-            <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'] }}>
-              {done ? 'Read' : pct > 0 ? `${Math.round(pct * 100)}%` : `${guide.minutes} min`}
-            </Text>
-          </View>
-          <ProgressBar progress={pct} height={4} color={done ? theme.color.success : undefined} />
-        </View>
+      {/*
+        Bookmark and card-tap are SIBLINGS inside a relative View.
+        The card Pressable has paddingRight large enough to never sit under
+        the bookmark button — so both hit-areas are distinct and neither
+        is nested inside the other. This avoids <button> inside <button>.
+      */}
+      <View style={{ position: 'relative' }}>
+        {/* Card tap area */}
         <Pressable
-          onPress={(e) => {
-            e.stopPropagation();
+          onPress={onOpen}
+          accessibilityRole="button"
+          accessibilityLabel={`${guide.title}, ${guide.minutes} minute read${done ? ', finished' : pct > 0 ? `, ${Math.round(pct * 100)}% read` : ''}`}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            backgroundColor: theme.color.surface,
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: theme.color.hairline,
+            padding: spacing.md,
+            paddingRight: 52, // reserve space for the absolute bookmark button
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <View style={{
+            width: 42, height: 42, borderRadius: 13,
+            backgroundColor: done ? theme.color.successSoft : theme.color.primarySoft,
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons
+              name={(done ? 'checkmark' : guide.icon) as keyof typeof Ionicons.glyphMap}
+              size={20}
+              color={done ? theme.color.success : theme.color.primary}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="callout" numberOfLines={1}>{guide.title}</Text>
+                <Text variant="caption" dim numberOfLines={1} style={{ marginTop: 2 }}>{guide.subtitle}</Text>
+              </View>
+              <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'] }}>
+                {done ? 'Read' : pct > 0 ? `${Math.round(pct * 100)}%` : `${guide.minutes} min`}
+              </Text>
+            </View>
+            <ProgressBar progress={pct} height={4} color={done ? theme.color.success : undefined} />
+          </View>
+        </Pressable>
+
+        {/* Bookmark button — absolutely positioned, sibling to the card Pressable */}
+        <Pressable
+          onPress={() => {
             Haptics.selectionAsync().catch(() => {});
             toggleEduBookmark(guide.id);
           }}
@@ -103,9 +114,11 @@ function GuideCard({ guide, index, onOpen }: { guide: Guide; index: number; onOp
           accessibilityRole="button"
           accessibilityLabel={bookmarked ? `Remove bookmark from ${guide.title}` : `Bookmark ${guide.title}`}
           style={({ pressed }) => ({
+            position: 'absolute',
+            right: spacing.md,
+            top: 0,
+            bottom: 0,
             width: 32,
-            height: 32,
-            borderRadius: radius.round,
             alignItems: 'center',
             justifyContent: 'center',
             opacity: pressed ? 0.6 : 1,
@@ -117,7 +130,7 @@ function GuideCard({ guide, index, onOpen }: { guide: Guide; index: number; onOp
             color={bookmarked ? theme.color.primary : theme.color.textDim}
           />
         </Pressable>
-      </Pressable>
+      </View>
     </Animated.View>
   );
 }
@@ -135,72 +148,84 @@ function ResourceCard({ res, index }: { res: Resource; index: number }) {
 
   return (
     <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 50).springify().damping(18)}>
-      <Pressable
-        onPress={() => router.push({ pathname: '/education-resource', params: { id: res.id } } as never)}
-        accessibilityRole="button"
-        accessibilityLabel={`Read ${res.title} in the app`}
-        style={({ pressed }) => ({
-          backgroundColor: theme.color.surface,
-          borderRadius: radius.card,
-          borderWidth: 1,
-          borderColor: theme.color.hairline,
-          padding: spacing.lg,
-          opacity: pressed ? 0.82 : 1,
-        })}
-      >
-        <View style={{ flexDirection: 'row', gap: spacing.lg }}>
-          <View
-            accessibilityLabel={`Cover for ${res.title}`}
-            style={{
-              width: 74,
-              height: 104,
-              borderRadius: 12,
-              backgroundColor: res.tint,
-              alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden',
-            }}
-          >
-            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 36, backgroundColor: 'rgba(255,255,255,0.14)' }} />
-            <Text color="#FFFFFF" style={{ fontSize: 22, fontFamily: 'Nunito_900Black' }}>{initials}</Text>
-            <Ionicons name="book" size={15} color="rgba(255,255,255,0.82)" style={{ marginTop: 4 }} />
-          </View>
+      {/*
+        Same sibling pattern as GuideCard. The card Pressable and the bookmark
+        Pressable are siblings inside a relative View — never nested.
+      */}
+      <View style={{ position: 'relative' }}>
+        {/* Card tap area */}
+        <Pressable
+          onPress={() => router.push({ pathname: '/education-resource', params: { id: res.id } } as never)}
+          accessibilityRole="button"
+          accessibilityLabel={`Read ${res.title} in the app`}
+          style={({ pressed }) => ({
+            backgroundColor: theme.color.surface,
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: theme.color.hairline,
+            padding: spacing.lg,
+            opacity: pressed ? 0.82 : 1,
+          })}
+        >
+          <View style={{ flexDirection: 'row', gap: spacing.lg }}>
+            <View
+              accessibilityLabel={`Cover for ${res.title}`}
+              style={{
+                width: 74,
+                height: 104,
+                borderRadius: 12,
+                backgroundColor: res.tint,
+                alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 36, backgroundColor: 'rgba(255,255,255,0.14)' }} />
+              <Text color="#FFFFFF" style={{ fontSize: 22, fontFamily: 'Nunito_900Black' }}>{initials}</Text>
+              <Ionicons name="book" size={15} color="rgba(255,255,255,0.82)" style={{ marginTop: 4 }} />
+            </View>
 
-          <View style={{ flex: 1, minWidth: 0, justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-              <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, minWidth: 0, justifyContent: 'space-between', paddingRight: 28 }}>
+              <View>
                 <Text variant="caption" color={theme.color.primary}>FULL BOOK · OFFLINE</Text>
                 <Text variant="headline" numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 23 }}>
                   {res.title}
                 </Text>
                 <Text variant="caption" dim style={{ marginTop: spacing.xs }}>{res.author}</Text>
               </View>
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  Haptics.selectionAsync().catch(() => {});
-                  toggleEduBookmark(res.id);
-                }}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={bookmarked ? `Remove bookmark from ${res.title}` : `Bookmark ${res.title}`}
-              >
-                <Ionicons
-                  name={bookmarked ? 'bookmark' : 'bookmark-outline'}
-                  size={18}
-                  color={bookmarked ? theme.color.primary : theme.color.textDim}
-                />
-              </Pressable>
-            </View>
-            <Text variant="footnote" dim numberOfLines={3} style={{ marginTop: spacing.md, lineHeight: 18 }}>
-              {res.desc}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md }}>
-              <Text variant="footnote" color={theme.color.primary}>Read now</Text>
-              <Ionicons name="chevron-forward" size={14} color={theme.color.primary} />
+              <Text variant="footnote" dim numberOfLines={3} style={{ marginTop: spacing.md, lineHeight: 18 }}>
+                {res.desc}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md }}>
+                <Text variant="footnote" color={theme.color.primary}>Read now</Text>
+                <Ionicons name="chevron-forward" size={14} color={theme.color.primary} />
+              </View>
             </View>
           </View>
-        </View>
-      </Pressable>
+        </Pressable>
+
+        {/* Bookmark button — absolutely positioned, sibling to the card Pressable */}
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            toggleEduBookmark(res.id);
+          }}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={bookmarked ? `Remove bookmark from ${res.title}` : `Bookmark ${res.title}`}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            top: spacing.lg,
+            right: spacing.lg,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Ionicons
+            name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+            size={18}
+            color={bookmarked ? theme.color.primary : theme.color.textDim}
+          />
+        </Pressable>
+      </View>
     </Animated.View>
   );
 }

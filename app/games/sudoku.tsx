@@ -185,11 +185,15 @@ export default function Sudoku() {
           <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Sudoku</Text>
           <TutorialInfoButton onPress={tutorial.open} />
+        </View>
+
+        {/* Timer row */}
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: 2 }}>
           <Text variant="callout" dim style={{ fontVariant: ['tabular-nums'] }}>{mm}:{ss}</Text>
         </View>
 
         {/* Difficulty */}
-        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
           {LEVELS.map((l) => {
             const on = level === l;
             return (

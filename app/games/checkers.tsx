@@ -277,28 +277,6 @@ export default function Checkers() {
           <BackButton fallback="/games" />
           <Text variant="title2" style={{ flex: 1 }}>Checkers</Text>
           <TutorialInfoButton onPress={tutorial.open} />
-          {!over && (
-            <Pressable
-              onPress={surrender}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Surrender this game"
-              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 })}
-            >
-              <Ionicons name="flag-outline" size={16} color={theme.color.danger} />
-              <Text variant="footnote" color={theme.color.danger}>Surrender</Text>
-            </Pressable>
-          )}
-          <Pressable
-            onPress={newGame}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Start a new game"
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 })}
-          >
-            <Ionicons name="refresh" size={16} color={theme.color.primary} />
-            <Text variant="footnote" color={theme.color.primary}>New game</Text>
-          </Pressable>
         </View>
 
         {/* Difficulty */}
@@ -364,17 +342,13 @@ export default function Checkers() {
                         backgroundColor: dark ? (theme.mode === 'dark' ? '#2A2233' : '#E4D7EE') : (theme.mode === 'dark' ? '#1F1926' : '#F7F1FA'),
                       }}
                     >
-                      {/* last-move tint */}
                       {isLast && (
                         <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: theme.color.primary, opacity: 0.16 }} />
                       )}
-                      {/* selection ring */}
                       {isSel && <PulseRing color={theme.color.accent} />}
-                      {/* legal destination dot */}
                       {isDest && !piece && (
                         <View style={{ width: '26%', height: '26%', borderRadius: 999, backgroundColor: theme.color.success, opacity: 0.85 }} />
                       )}
-                      {/* piece (hidden while it flies; fading while captured) */}
                       {piece && !flying && (
                         captured && flight ? (
                           <Animated.View style={{ width: '74%', height: '74%', opacity: captureFade }}>
@@ -392,7 +366,6 @@ export default function Checkers() {
               </View>
             ))}
 
-            {/* Flying piece overlay - native-driver transforms, stable values */}
             {flight && cell > 0 && (
               <Animated.View
                 pointerEvents="none"
@@ -415,6 +388,59 @@ export default function Checkers() {
           <MiniStat label="Wins" value={`${games.checkersWins}`} />
           <MiniStat label="Losses" value={`${games.checkersLosses}`} />
           <MiniStat label="Win rate" value={`${winRate}%`} />
+        </View>
+
+        {/* Action row — sits below the stats, never in the header */}
+        <View style={{
+          flexDirection: 'row',
+          gap: spacing.sm,
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+        }}>
+          {/* Surrender — only shown mid-game */}
+          {!over && (
+            <Pressable
+              onPress={surrender}
+              accessibilityRole="button"
+              accessibilityLabel="Surrender this game"
+              style={({ pressed }) => ({
+                flex: 1,
+                height: 44,
+                borderRadius: radius.round,
+                borderWidth: 1,
+                borderColor: theme.color.danger + '60',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: spacing.xs,
+                opacity: pressed ? 0.7 : 1,
+                backgroundColor: theme.color.surface,
+              })}
+            >
+              <Ionicons name="flag-outline" size={15} color={theme.color.danger} />
+              <Text variant="footnote" color={theme.color.danger}>Surrender</Text>
+            </Pressable>
+          )}
+          {/* New game — always available */}
+          <Pressable
+            onPress={newGame}
+            accessibilityRole="button"
+            accessibilityLabel="Start a new game"
+            style={({ pressed }) => ({
+              flex: over ? 1 : 1,
+              height: 44,
+              borderRadius: radius.round,
+              backgroundColor: theme.color.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: spacing.xs,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Ionicons name="refresh" size={15} color={theme.color.onPrimary} />
+            <Text variant="footnote" color={theme.color.onPrimary}>New game</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
 
