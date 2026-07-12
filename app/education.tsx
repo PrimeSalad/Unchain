@@ -2,8 +2,8 @@
  * Education Hub - evidence-based learning, personalized to the user's
  * addiction. Built-in guides and Reading Shelf resources are fully offline
  * and open inside the app.
- * Categories, guides, and resources all derive from profile.addictionType,
- * so profile changes re-personalize the hub automatically.
+ * Guides and resources derive from profile.addictionType, so profile changes
+ * re-personalize the hub automatically.
  */
 
 import { useMemo, useState } from 'react';
@@ -15,7 +15,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
 import { ProgressBar } from '@/presentation/components/ProgressBar';
-import { radius, spacing } from '@/presentation/theme/tokens';
+import { elevation, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useProfile, useStore } from '@/application/store';
@@ -28,6 +28,16 @@ import {
 } from '@/domain/education';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
+
+function SectionHeader({ title, meta }: { title: string; meta?: string }) {
+  const theme = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md, marginBottom: spacing.md }}>
+      <Text variant="headline" style={{ flex: 1 }}>{title}</Text>
+      {meta ? <Text variant="caption" color={theme.color.textDim}>{meta}</Text> : null}
+    </View>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Guide card - progress ring + bookmark
@@ -43,24 +53,25 @@ function GuideCard({ guide, index, onOpen }: { guide: Guide; index: number; onOp
   return (
     <Animated.View
       entering={FadeInDown.delay(Math.min(index, 8) * 50).springify().damping(18)}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
     >
       <Pressable
         onPress={onOpen}
         accessibilityRole="button"
         accessibilityLabel={`${guide.title}, ${guide.minutes} minute read${done ? ', finished' : pct > 0 ? `, ${Math.round(pct * 100)}% read` : ''}`}
         style={({ pressed }) => ({
-          flex: 1,
-          flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.md,
           backgroundColor: theme.color.surface,
           borderRadius: radius.card,
-          borderWidth: 1, borderColor: theme.color.hairline,
-          padding: spacing.lg,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
+          padding: spacing.md,
           opacity: pressed ? 0.8 : 1,
         })}
       >
         <View style={{
-          width: 44, height: 44, borderRadius: 13,
+          width: 42, height: 42, borderRadius: 13,
           backgroundColor: done ? theme.color.successSoft : theme.color.primarySoft,
           alignItems: 'center', justifyContent: 'center',
         }}>
@@ -70,34 +81,42 @@ function GuideCard({ guide, index, onOpen }: { guide: Guide; index: number; onOp
             color={done ? theme.color.success : theme.color.primary}
           />
         </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-          <Text variant="callout" numberOfLines={1}>{guide.title}</Text>
-          <Text variant="caption" dim numberOfLines={1}>{guide.subtitle}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <View style={{ flex: 1 }}>
-              <ProgressBar progress={pct} height={4} color={done ? theme.color.success : undefined} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="callout" numberOfLines={1}>{guide.title}</Text>
+              <Text variant="caption" dim numberOfLines={1} style={{ marginTop: 2 }}>{guide.subtitle}</Text>
             </View>
             <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'] }}>
               {done ? 'Read' : pct > 0 ? `${Math.round(pct * 100)}%` : `${guide.minutes} min`}
             </Text>
           </View>
+          <ProgressBar progress={pct} height={4} color={done ? theme.color.success : undefined} />
         </View>
-      </Pressable>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {});
-          toggleEduBookmark(guide.id);
-        }}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel={bookmarked ? `Remove bookmark from ${guide.title}` : `Bookmark ${guide.title}`}
-        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
-      >
-        <Ionicons
-          name={bookmarked ? 'bookmark' : 'bookmark-outline'}
-          size={20}
-          color={bookmarked ? theme.color.primary : theme.color.textDim}
-        />
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            Haptics.selectionAsync().catch(() => {});
+            toggleEduBookmark(guide.id);
+          }}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={bookmarked ? `Remove bookmark from ${guide.title}` : `Bookmark ${guide.title}`}
+          style={({ pressed }) => ({
+            width: 32,
+            height: 32,
+            borderRadius: radius.round,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Ionicons
+            name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+            size={18}
+            color={bookmarked ? theme.color.primary : theme.color.textDim}
+          />
+        </Pressable>
       </Pressable>
     </Animated.View>
   );
@@ -215,6 +234,7 @@ export default function EducationHub() {
     if (q && !`${r.title} ${r.author} ${r.desc}`.toLowerCase().includes(q)) return false;
     return true;
   });
+  const completedGuides = allGuides.filter((g) => (eduProgress[g.id]?.pct ?? 0) >= 0.97).length;
 
   // Continue Reading - the last opened guide, when unfinished.
   const lastGuide = allGuides.find(
@@ -225,7 +245,7 @@ export default function EducationHub() {
     router.push({ pathname: '/education-reader', params: { id } } as never);
 
   return (
-    <Screen edges={['top', 'bottom']}>
+    <Screen edges={['top', 'bottom']} contentStyle={{ paddingBottom: spacing.huge }}>
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm }}>
         <View style={{ flex: 1 }}>
@@ -250,13 +270,61 @@ export default function EducationHub() {
         </Pressable>
       </View>
 
+      <View
+        style={{
+          marginTop: spacing.lg,
+          backgroundColor: theme.color.surface,
+          borderRadius: radius.sheet,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
+          padding: spacing.lg,
+          gap: spacing.lg,
+          ...elevation.e1,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <View
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 18,
+              backgroundColor: theme.color.primarySoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="library" size={24} color={theme.color.primary} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="title2">Learn what breaks the loop</Text>
+            <Text variant="footnote" dim style={{ marginTop: 2, lineHeight: 18 }}>
+              Short guides first, then two full books picked for {typeLabel.toLowerCase()} recovery.
+            </Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <View style={{ flex: 1, backgroundColor: theme.color.primarySoft, borderRadius: radius.input, padding: spacing.md }}>
+            <Text variant="title2" color={theme.color.primary}>{allGuides.length}</Text>
+            <Text variant="caption" color={theme.color.primary}>Guides</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: theme.color.celebrateSoft, borderRadius: radius.input, padding: spacing.md }}>
+            <Text variant="title2" color={theme.color.celebrateText}>{allResources.length}</Text>
+            <Text variant="caption" color={theme.color.celebrateText}>Books</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: theme.color.successSoft, borderRadius: radius.input, padding: spacing.md }}>
+            <Text variant="title2" color={theme.color.success}>{completedGuides}</Text>
+            <Text variant="caption" color={theme.color.success}>Done</Text>
+          </View>
+        </View>
+      </View>
+
       {/* Search */}
       <View
         style={{
           flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
           backgroundColor: theme.color.surface, borderRadius: radius.input,
           borderWidth: 1, borderColor: theme.color.hairline,
-          paddingHorizontal: spacing.md, marginTop: spacing.lg,
+          paddingHorizontal: spacing.md, marginTop: spacing.md,
         }}
       >
         <Ionicons name="search" size={15} color={theme.color.textDim} />
@@ -285,7 +353,7 @@ export default function EducationHub() {
           onPress={() => openGuide(lastGuide.id)}
           accessibilityRole="button"
           accessibilityLabel={`Continue reading ${lastGuide.title}, ${Math.round((eduProgress[lastGuide.id]?.pct ?? 0) * 100)}% done`}
-          style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1, marginBottom: spacing.lg })}
+          style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1, marginTop: spacing.lg, marginBottom: spacing.xl })}
         >
           <View
             style={{
@@ -312,10 +380,8 @@ export default function EducationHub() {
       {/* Guides */}
       {guides.length > 0 ? (
         <>
-          <Text variant="headline" style={{ marginBottom: spacing.md }}>
-            Guides for {typeLabel} Recovery
-          </Text>
-          <View style={{ gap: spacing.sm, marginBottom: spacing.xl }}>
+          <SectionHeader title={`${typeLabel} guides`} meta={`${guides.length} items`} />
+          <View style={{ gap: spacing.sm, marginBottom: spacing.xxl }}>
             {guides.map((g, i) => (
               <GuideCard key={g.id} guide={g} index={i} onOpen={() => openGuide(g.id)} />
             ))}
@@ -324,13 +390,7 @@ export default function EducationHub() {
       ) : null}
 
       {/* Free reading */}
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: spacing.xs }}>
-        <Text variant="headline" style={{ flex: 1 }}>Reading Shelf</Text>
-        <Text variant="caption" dim>Offline</Text>
-      </View>
-      <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-        Read curated books and recovery resources directly in the app. No browser handoff.
-      </Text>
+      <SectionHeader title="Reading Shelf" meta="Offline" />
       {resources.length === 0 ? (
         <View
           style={{
@@ -345,7 +405,7 @@ export default function EducationHub() {
           </Text>
         </View>
       ) : (
-        <View style={{ gap: spacing.md, marginBottom: spacing.xl }}>
+        <View style={{ gap: spacing.md, marginBottom: spacing.xxl }}>
           {resources.map((r, i) => (
             <ResourceCard key={r.id} res={r} index={i} />
           ))}
@@ -355,15 +415,22 @@ export default function EducationHub() {
       {/* Tone note */}
       <View
         style={{
-          backgroundColor: theme.color.primarySoft, borderRadius: radius.card,
-          padding: spacing.lg, marginBottom: spacing.xl,
+          backgroundColor: theme.color.primarySoft,
+          borderRadius: radius.card,
+          padding: spacing.lg,
+          marginBottom: spacing.xl,
+          flexDirection: 'row',
+          gap: spacing.md,
+          alignItems: 'flex-start',
         }}
       >
-        <Text variant="footnote" color={theme.color.primary}>Evidence-based, judgment-free</Text>
-        <Text variant="callout" dim style={{ marginTop: 4, lineHeight: 22 }}>
-          Everything here is grounded in habit science and public-health research, written to inform -
-          never to shame. Understanding the mechanics is part of beating them.
-        </Text>
+        <Ionicons name="shield-checkmark" size={20} color={theme.color.primary} />
+        <View style={{ flex: 1 }}>
+          <Text variant="footnote" color={theme.color.primary}>Evidence-based, judgment-free</Text>
+          <Text variant="callout" dim style={{ marginTop: 4, lineHeight: 22 }}>
+            Written to inform, never to shame. Understanding the mechanics is part of beating them.
+          </Text>
+        </View>
       </View>
     </Screen>
   );
