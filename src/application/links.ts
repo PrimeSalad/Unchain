@@ -1,10 +1,10 @@
 /**
- * Guarded URL opening — the ONLY way the app may open or load a URL.
+ * Guarded URL opening - the ONLY way the app may open or load a URL.
  *
  * Audit note: as of this writing the app opens zero external URLs (no
  * WebView, no Linking calls, no in-app browser). Any future feature that
- * opens a link MUST go through `openExternalUrl` below — never call
- * `Linking.openURL` directly — so the user's Focus Protection blocklist is
+ * opens a link MUST go through `openExternalUrl` below - never call
+ * `Linking.openURL` directly - so the user's Focus Protection blocklist is
  * always consulted first. Blocking covers protocol/www/case variants,
  * subdomains, ports, paths, queries, fragments, encoded URLs, and trailing
  * dots (see isUrlBlocked in the protection domain).

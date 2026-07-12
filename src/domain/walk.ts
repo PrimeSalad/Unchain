@@ -1,5 +1,5 @@
 /**
- * Walk-session math — pure TS, zero framework deps.
+ * Walk-session math - pure TS, zero framework deps.
  *
  * The walk activity is open-ended (the user decides when to stop) and tracks
  * live metrics on-device only: elapsed time (wall clock), steps (pedometer)
@@ -29,7 +29,7 @@ export function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: 
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
-/** The distance a new GPS fix adds — 0 when the fix should be discarded. */
+/** The distance a new GPS fix adds - 0 when the fix should be discarded. */
 export function gpsDelta(
   last: { lat: number; lon: number } | null,
   next: { lat: number; lon: number; accuracy?: number | null },
@@ -45,7 +45,7 @@ export function formatDistance(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`;
 }
 
-/** Average pace as 12'30" per km — null until the walk is long enough to be
+/** Average pace as 12'30" per km - null until the walk is long enough to be
  *  meaningful (100 m), so garbage paces never show. */
 export function formatPace(seconds: number, meters: number): string | null {
   if (meters < 100 || seconds <= 0) return null;

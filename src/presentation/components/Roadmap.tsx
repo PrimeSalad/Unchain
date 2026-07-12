@@ -17,7 +17,7 @@ interface RoadmapProps {
 }
 
 /**
- * A Strava-style recovery "route" — the road of milestones the user is
+ * A Strava-style recovery "route" - the road of milestones the user is
  * travelling. Reached nodes are filled, the next target glows, the rest wait
  * ahead. Horizontally scrollable so the whole 365-day journey is visible.
  */

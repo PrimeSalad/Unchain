@@ -1,5 +1,5 @@
 /**
- * Shared HUD pieces for the inhibition-training games (Go/No-Go, Stop Signal):
+ * Shared HUD pieces for the Go/No-Go inhibition-training game:
  * score/combo tiles, focus (lives) hearts, the 3-2-1 countdown overlay,
  * floating "+N" score pops, and the daily-challenge chip.
  */
@@ -34,7 +34,7 @@ export function HudStat({ label, value, highlight }: { label: string; value: str
   );
 }
 
-/** Focus hearts — lose one per mistake; the last one pulses as a warning. */
+/** Focus hearts - lose one per mistake; the last one pulses as a warning. */
 export function LivesRow({ lives }: { lives: number }) {
   const theme = useTheme();
   const pulse = useRef(new Animated.Value(1)).current;
@@ -160,7 +160,7 @@ export function PointsFloat({ amount, id }: { amount: number; id: number }) {
   );
 }
 
-/** Today's target — turns into a "complete" state once beaten. */
+/** Today's target - turns into a "complete" state once beaten. */
 export function ChallengeChip({ target, done }: { target: number; done: boolean }) {
   const theme = useTheme();
   return (

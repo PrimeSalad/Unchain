@@ -29,7 +29,7 @@ interface ScreenProps {
  * • hPad is applied to the inner View (not SafeAreaView) so maxWidth
  *   centering works correctly without fighting the safe-area insets.
  * • paddingHorizontal comes from useResponsive().gutter (16 on phones,
- *   20 on tablets) — never hardcoded.
+ *   20 on tablets) - never hardcoded.
  */
 export function Screen({
   children,

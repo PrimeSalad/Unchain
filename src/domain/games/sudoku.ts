@@ -1,5 +1,5 @@
 /**
- * Sudoku — generator, solver & validation. Pure TS, offline.
+ * Sudoku - generator, solver & validation. Pure TS, offline.
  * Grid is a flat array of 81 numbers (0 = empty), index = row*9 + col.
  */
 
@@ -92,7 +92,7 @@ export function generate(level: SudokuLevel): Puzzle {
     puzzle[i] = 0;
     // Uniqueness check on a copy so we don't mutate `puzzle`'s zeros away.
     if (countSolutions(puzzle.slice(), 2) !== 1) {
-      puzzle[i] = backup; // removing broke uniqueness — keep it
+      puzzle[i] = backup; // removing broke uniqueness - keep it
     } else {
       givens--;
     }

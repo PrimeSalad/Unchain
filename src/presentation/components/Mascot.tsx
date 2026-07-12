@@ -11,9 +11,9 @@ import Animated, {
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 /**
- * Maria — the sheep. State-driven, with a gentle idle bob for life (calm, not
+ * Maria - the sheep. State-driven, with a gentle idle bob for life (calm, not
  * hyperactive). Honors Reduce Motion. Ethics (docs/plan.md §3.4): Maria mirrors
- * the user's state with compassion — she never shames or drives re-engagement.
+ * the user's state with compassion - she never shames or drives re-engagement.
  */
 
 export type MascotState = 'happy' | 'celebrate' | 'comfort' | 'braced';

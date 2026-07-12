@@ -25,7 +25,7 @@ export default function ShareCard() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Navigation is a side effect — never call it during render.
+  // Navigation is a side effect - never call it during render.
   useEffect(() => {
     if (!profile) safeBack();
   }, [profile, safeBack]);
@@ -54,17 +54,17 @@ export default function ShareCard() {
   const summary =
     `${days} days ${freeLabel.toLowerCase()} 💜\n` +
     `${formatMoney(money.total, currency)} saved · ${stats.urgesResisted} urges resisted · ${earned} badges\n` +
-    `My recovery, one day at a time. — Unchain`;
+    `My recovery, one day at a time. - Unchain`;
 
   const pickPhoto = async () => {
     try {
       // iOS uses the system photo picker (PHPicker) which needs NO library
-      // permission — asking anyway shows a needless prompt and blocks the
+      // permission - asking anyway shows a needless prompt and blocks the
       // feature when declined. Older Androids may still need the permission.
       if (Platform.OS === 'android') {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!perm.granted) {
-          // Explain instead of failing silently — the user tapped for a reason.
+          // Explain instead of failing silently - the user tapped for a reason.
           Alert.alert(
             'Photo access needed',
             'Allow photo access in Settings to use one of your pictures as the card background.',
@@ -80,7 +80,7 @@ export default function ShareCard() {
       });
       if (!res.canceled && res.assets[0]) setPhoto(res.assets[0].uri);
     } catch {
-      /* ignore — user can still share the default card */
+      /* ignore - user can still share the default card */
     }
   };
 
@@ -158,7 +158,7 @@ export default function ShareCard() {
         </View>
 
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl }}>
-          {/* The capture target — a 4:5 shareable card */}
+          {/* The capture target - a 4:5 shareable card */}
           <View
             ref={cardRef}
             collapsable={false}

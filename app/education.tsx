@@ -1,5 +1,5 @@
 /**
- * Education Hub — evidence-based learning, personalized to the user's
+ * Education Hub - evidence-based learning, personalized to the user's
  * addiction. Built-in guides are fully offline; the Free Reading shelf links
  * to public-domain and open-access sources (every outbound link is checked
  * against the user's Focus Protection blocklist first via openExternalUrl).
@@ -44,7 +44,7 @@ async function openLink(url: string) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Guide card — progress ring + bookmark
+// Guide card - progress ring + bookmark
 // ─────────────────────────────────────────────────────────────────────────────
 
 function GuideCard({ guide, index, onOpen }: { guide: Guide; index: number; onOpen: () => void }) {
@@ -118,7 +118,7 @@ function GuideCard({ guide, index, onOpen }: { guide: Guide; index: number; onOp
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Resource card — generated cover (offline, no rights issues), meta, actions
+// Resource card - generated cover (offline, no rights issues), meta, actions
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ResourceCard({ res, index }: { res: Resource; index: number }) {
@@ -259,7 +259,7 @@ export default function EducationHub() {
     return true;
   });
 
-  // Continue Reading — the last opened guide, when unfinished.
+  // Continue Reading - the last opened guide, when unfinished.
   const lastGuide = allGuides.find(
     (g) => g.id === eduLastGuideId && (eduProgress[g.id]?.pct ?? 0) > 0.02 && (eduProgress[g.id]?.pct ?? 0) < 0.97,
   );
@@ -322,7 +322,7 @@ export default function EducationHub() {
         )}
       </View>
 
-      {/* Category chips — adapt to the selected addiction */}
+      {/* Category chips - adapt to the selected addiction */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -419,7 +419,7 @@ export default function EducationHub() {
         >
           <Ionicons name="book-outline" size={26} color={theme.color.textDim} />
           <Text variant="callout" dim center>
-            {cat === 'bookmarks' ? 'No bookmarks yet — tap the bookmark icon on anything to save it.' : 'Nothing matches your search.'}
+            {cat === 'bookmarks' ? 'No bookmarks yet - tap the bookmark icon on anything to save it.' : 'Nothing matches your search.'}
           </Text>
         </View>
       ) : (
@@ -439,7 +439,7 @@ export default function EducationHub() {
       >
         <Text variant="footnote" color={theme.color.primary}>Evidence-based, judgment-free</Text>
         <Text variant="callout" dim style={{ marginTop: 4, lineHeight: 22 }}>
-          Everything here is grounded in habit science and public-health research, written to inform —
+          Everything here is grounded in habit science and public-health research, written to inform -
           never to shame. Understanding the mechanics is part of beating them.
         </Text>
       </View>

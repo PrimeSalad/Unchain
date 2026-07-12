@@ -1,5 +1,5 @@
 /**
- * Recovery domain — pure TS, zero framework dependencies.
+ * Recovery domain - pure TS, zero framework dependencies.
  * Offline-first: everything here is computed from locally-stored data.
  */
 
@@ -88,7 +88,7 @@ export interface RecoveryProfile {
   /**
    * The LOCAL midnight timestamp of the day they last used.
    * Stored as local-calendar midnight (00:00:00) so calendar
-   * arithmetic is always exact — no fractional-day drift.
+   * arithmetic is always exact - no fractional-day drift.
    */
   startedAt: number;
   expenseAmount: number;
@@ -112,7 +112,7 @@ const MS_PER_DAY = 86_400_000;
  *     where `gambled === true`.
  *  2. Find the MOST RECENT one (if any).  That event's LOCAL calendar midnight
  *     is the start of the current streak window.
- *  3. If there are no relapse events, fall back to `profile.startedAt` —
+ *  3. If there are no relapse events, fall back to `profile.startedAt` -
  *     meaning the user has been clean since they first set up the app.
  *
  * This makes the calendar and streak counter independent of `profile.startedAt`
@@ -131,7 +131,7 @@ export function currentStreakStart(
   ];
 
   if (relapseTimestamps.length === 0) {
-    // No relapses ever — use the original setup date.
+    // No relapses ever - use the original setup date.
     return profileStartedAt;
   }
 
@@ -191,7 +191,7 @@ export function formatMoney(amount: number, currency = '₱'): string {
 // Journal-based financial stats
 //
 // Recovery-adjusted money rule (single source of truth for the app's balance):
-//   - The journal asks "How much money do you have today?" — that answer is
+//   - The journal asks "How much money do you have today?" - that answer is
 //     the day's raw balance (moneyToday).
 //   - If the user gambled AND lost the wager, the WAGER AMOUNT is subtracted:
 //         remainingMoney = moneyToday - wagerAmount
@@ -199,7 +199,7 @@ export function formatMoney(amount: number, currency = '₱'): string {
 //     tiles, Progress tracker, trends) is computed from.
 //   - If the user gambled and WON, nothing is added:
 //         remainingMoney = moneyToday
-//     This app tracks addiction recovery, not gambling performance — a win
+//     This app tracks addiction recovery, not gambling performance - a win
 //     must never improve any metric, progress figure, or trend.
 //   - Financial data never influences streak, calendar, or achievement logic.
 // ---------------------------------------------------------------------------

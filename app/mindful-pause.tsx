@@ -14,7 +14,7 @@ import { BREATHING_TIPS } from '@/domain/content';
 const DURATIONS = [5, 10, 15, 20, 30];
 
 /**
- * Mindful Pause — a guided breathing session the user commits to. Once started,
+ * Mindful Pause - a guided breathing session the user commits to. Once started,
  * the session locks (no close button, hardware-back blocked) until the chosen
  * duration completes, so the pause is protected from distraction.
  */
@@ -31,7 +31,7 @@ export default function MindfulPause() {
   const [tip, setTip] = useState(0);
   const [muted, setMuted] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  // Absolute end time — remaining is derived from the clock, not decremented,
+  // Absolute end time - remaining is derived from the clock, not decremented,
   // so backgrounding the app never stretches the session.
   const endAtRef = useRef(0);
 
@@ -46,7 +46,7 @@ export default function MindfulPause() {
     : ({ total: 0 } as ReturnType<typeof moneySaved>);
   const currency = profile?.currency ?? '₱';
 
-  // Countdown — driven by the wall clock so time spent backgrounded counts.
+  // Countdown - driven by the wall clock so time spent backgrounded counts.
   useEffect(() => {
     if (minutes == null || finished) return;
     timerRef.current = setInterval(() => {
@@ -129,7 +129,7 @@ export default function MindfulPause() {
           <View style={{ flex: 1, justifyContent: 'center', padding: spacing.xl }}>
             <Text variant="title1" center color={palette.fog}>Mindful Pause</Text>
             <Text variant="body" center color={palette.fogDim} style={{ marginTop: spacing.md, marginBottom: spacing.xxl, paddingHorizontal: spacing.md }}>
-              Choose how long to breathe. Once you begin, stay with it until the timer ends — no exits, just you and your breath.
+              Choose how long to breathe. Once you begin, stay with it until the timer ends - no exits, just you and your breath.
             </Text>
             <View style={{ gap: spacing.md }}>
               {DURATIONS.map((m) => (
@@ -164,7 +164,7 @@ export default function MindfulPause() {
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xl }}>
               <Ionicons name="lock-closed" size={13} color={palette.fogDim} />
-              <Text variant="caption" color={palette.fogDim}>Stay with your breath — the pause is protected</Text>
+              <Text variant="caption" color={palette.fogDim}>Stay with your breath - the pause is protected</Text>
             </View>
           </View>
         )}
@@ -177,7 +177,7 @@ export default function MindfulPause() {
               You stayed with it.
             </Text>
             <Text variant="body" center color={palette.fogDim} style={{ marginTop: spacing.md, paddingHorizontal: spacing.md }}>
-              {minutes} minutes of calm — the urge you felt earlier has already softened. That's the skill.
+              {minutes} minutes of calm - the urge you felt earlier has already softened. That's the skill.
             </Text>
             <Text variant="callout" center color={palette.fogDim} style={{ marginTop: spacing.lg }}>
               Money saved so far: {formatMoney(money.total, currency)}

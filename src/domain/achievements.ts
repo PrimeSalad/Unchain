@@ -1,5 +1,5 @@
 /**
- * Achievements, goals & recovery stats — pure TS, no framework deps.
+ * Achievements, goals & recovery stats - pure TS, no framework deps.
  *
  * This is what gives the app *purpose* beyond breathing: measurable goals to
  * strive for and badges to collect. Everything is derived locally from the
@@ -52,7 +52,7 @@ export interface StatsInput {
 export function computeStats(i: StatsInput): RecoveryStats {
   const now = i.now ?? Date.now();
   // The current streak is derived from the event log (relapses + gambled
-  // journal entries), exactly like the Home and Progress screens — never from
+  // journal entries), exactly like the Home and Progress screens - never from
   // profile.startedAt alone, which would keep counting through a relapse.
   const currentStreak = streakDays(
     currentStreakStart(i.profile.startedAt, i.relapses, i.journal),
@@ -62,7 +62,7 @@ export function computeStats(i: StatsInput): RecoveryStats {
     currentStreak,
     longestStreak: Math.max(i.longestStreak, currentStreak),
     // moneyTotal is used exclusively for the "money saved" achievement badges.
-    // It is computed as (daily expense rate × streak days) — i.e. money the
+    // It is computed as (daily expense rate × streak days) - i.e. money the
     // user did NOT spend on their addiction by staying abstinent.
     //
     // This is a RECOVERY metric, not a financial tracking metric. It must
@@ -157,7 +157,7 @@ export function earnedBadgeIds(stats: RecoveryStats): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Goals — the "commitment" the user sets for themselves ("bitaw")
+// Goals - the "commitment" the user sets for themselves ("bitaw")
 // ---------------------------------------------------------------------------
 
 export type GoalKind = 'streak' | 'money' | 'checkins';

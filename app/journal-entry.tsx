@@ -161,7 +161,7 @@ function YesNoToggle({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AmountInput — identical to the onboarding expense step
+// AmountInput - identical to the onboarding expense step
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AmountInput({
@@ -238,7 +238,7 @@ function SummaryRow({
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ConfirmModal — native iOS sheet style, no emoji
+// ConfirmModal - native iOS sheet style, no emoji
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ConfirmModal({
@@ -261,7 +261,7 @@ function ConfirmModal({
       statusBarTranslucent
       onRequestClose={onCancel}
     >
-      {/* Scrim and sheet are siblings — nesting the sheet inside a Pressable
+      {/* Scrim and sheet are siblings - nesting the sheet inside a Pressable
           would nest every button inside a button (invalid on web, confusing
           for screen readers). */}
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -359,7 +359,7 @@ export default function JournalEntry() {
   const currentStep = steps[stepIdx];
   const totalSteps  = steps.length;
 
-  // Slide animation — clamped ±12px, no overflow:hidden needed
+  // Slide animation - clamped ±12px, no overflow:hidden needed
   const slideAnim = useRef(new Animated.Value(0)).current;
   function slide(dir: 'forward' | 'back', cb: () => void) {
     slideAnim.setValue(dir === 'forward' ? 12 : -12);
@@ -400,7 +400,7 @@ export default function JournalEntry() {
     if (stepIdx === 0) { safeBack(); return; }
     Haptics.selectionAsync().catch(() => {});
     // If we're on the step immediately after did_gamble, going back means
-    // the user wants to change their yes/no answer — unfreeze the step list
+    // the user wants to change their yes/no answer - unfreeze the step list
     // so buildSteps runs fresh on the next Continue press.
     const active = frozenSteps.current ?? steps;
     const prevStep = active[stepIdx - 1];
@@ -416,7 +416,7 @@ export default function JournalEntry() {
     setConfirmVisible(true);
   }
 
-  // Called only after the user confirms in the modal — debounced against double-tap
+  // Called only after the user confirms in the modal - debounced against double-tap
   function finalCommit() {
     if (submitting.current) return;
     submitting.current = true;
@@ -447,7 +447,7 @@ export default function JournalEntry() {
   // ── Already-submitted gate ────────────────────────────────────────────────
   // Show a friendly "come back tomorrow" screen instead of the wizard when
   // the user has already written today's entry. The journal list still shows
-  // every historical entry — this only blocks creating a second one today.
+  // every historical entry - this only blocks creating a second one today.
   if (alreadySubmitted) {
     const todayStr = new Date().toLocaleDateString('en-PH', {
       weekday: 'long', month: 'long', day: 'numeric',
@@ -538,7 +538,7 @@ export default function JournalEntry() {
     );
   }
 
-  // Shared input style — identical to onboarding
+  // Shared input style - identical to onboarding
   const inputStyle = {
     borderRadius: radius.input,
     backgroundColor: theme.color.surface,
@@ -557,7 +557,7 @@ export default function JournalEntry() {
       case 'did_gamble':
         return (
           <>
-            <StepHeading title="Did you gamble today?" subtitle="Be honest — this is just for you. No judgment here." />
+            <StepHeading title="Did you gamble today?" subtitle="Be honest - this is just for you. No judgment here." />
             <YesNoToggle value={gambled} onChange={setGambled} yesLabel="Yes, I did" noLabel="No, I didn't" />
             {gambled === false && (
               <Card tone="successSoft" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, borderLeftWidth: 3, borderLeftColor: theme.color.success }}>
@@ -647,7 +647,7 @@ export default function JournalEntry() {
       case 'reflection':
         return (
           <>
-            <StepHeading title="Any reflections?" subtitle="Optional — anything on your mind today?" />
+            <StepHeading title="Any reflections?" subtitle="Optional - anything on your mind today?" />
             <TextInput
               value={notes}
               onChangeText={setNotes}
@@ -714,7 +714,7 @@ export default function JournalEntry() {
 
   return (
     <Screen scroll={false}>
-      {/* Header — matches onboarding: circular back + ProgressBar component + counter */}
+      {/* Header - matches onboarding: circular back + ProgressBar component + counter */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs, marginBottom: spacing.xl }}>
         <Pressable
           onPress={goBack}
@@ -767,7 +767,7 @@ export default function JournalEntry() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Single action button — no duplicate Back below */}
+      {/* Single action button - no duplicate Back below */}
       <View style={{ paddingTop: spacing.sm }}>
         <Button
           label={isLastStep ? 'Save entry' : 'Continue'}
@@ -777,7 +777,7 @@ export default function JournalEntry() {
         />
       </View>
 
-      {/* Confirmation modal — must live inside <Screen> so safe-area insets
+      {/* Confirmation modal - must live inside <Screen> so safe-area insets
           are available and the sheet slides up over the wizard content. */}
       <ConfirmModal
         visible={confirmVisible}

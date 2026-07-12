@@ -10,8 +10,8 @@ import { useTheme } from '../../theme/ThemeProvider';
 /**
  * Per-route error boundary for the game screens (expo-router picks this up
  * via each route's `export { GamesErrorBoundary as ErrorBoundary }`). If a
- * game ever throws during render, the player lands here — with working
- * navigation — instead of a dead app.
+ * game ever throws during render, the player lands here - with working
+ * navigation - instead of a dead app.
  */
 export function GamesErrorBoundary({ retry }: { error: Error; retry: () => Promise<void> }) {
   const router = useRouter();

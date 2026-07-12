@@ -1,9 +1,9 @@
 /**
- * Daily Missions — gamified recovery habits that reset every local calendar day.
+ * Daily Missions - gamified recovery habits that reset every local calendar day.
  *
  * Design principles:
  *  - "Make a Daily Log Entry" is always first (journaling is the core feature).
- *  - Missions are encouraging, not punishing — never shame-based.
+ *  - Missions are encouraging, not punishing - never shame-based.
  *  - Completion state resets automatically at local midnight (same pattern as
  *    Healthy Alternatives: store a timestamp and use sameDay() to derive
  *    done-today without a scheduler).
@@ -13,7 +13,7 @@
  */
 
 export type MissionId =
-  | 'daily_log'       // always first — journal entry
+  | 'daily_log'       // always first - journal entry
   | 'mindful_pause'   // mindful-pause screen
   | 'play_game'       // any recreational game session
   | 'breathing'       // breathing exercise
@@ -41,7 +41,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'daily_log',
     title: 'Make a Daily Log Entry',
-    subtitle: 'Write in your journal — reflection builds resilience',
+    subtitle: 'Write in your journal - reflection builds resilience',
     icon: 'book',
     xp: 20,
     tint: 'primary',
@@ -102,7 +102,7 @@ export function missionDayKey(): string {
 
 /**
  * Completion state per day. The store persists this and checks on hydration
- * whether the stored day matches today — if not, it resets automatically.
+ * whether the stored day matches today - if not, it resets automatically.
  */
 export interface DailyMissionState {
   /** Local "YYYY-MM-DD" key for the day this state belongs to. */

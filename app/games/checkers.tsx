@@ -36,7 +36,7 @@ const BLACK = '#5A2E7A';
 const DIFFS: Difficulty[] = ['easy', 'medium', 'hard'];
 const HOP_MS = 190;
 
-/** Plain data only — the Animated values live in stable refs. */
+/** Plain data only - the Animated values live in stable refs. */
 interface Flight {
   move: Move;
   nextBoard: Board;
@@ -70,13 +70,13 @@ export default function Checkers() {
   const cell = boardW / 8;
   const tutorial = useGameTutorial('checkers');
 
-  // Stable animation plumbing — values are created once and reused for every
+  // Stable animation plumbing - values are created once and reused for every
   // move, so no Animated node is ever torn down mid-animation.
   const flightPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const captureFade = useRef(new Animated.Value(1)).current;
   /** Bumped on new game / unmount; stale animation callbacks bail out. */
   const genRef = useRef(0);
-  /** false while a flight is uncommitted — makes the commit idempotent. */
+  /** false while a flight is uncommitted - makes the commit idempotent. */
   const committedRef = useRef(true);
   const mountedRef = useRef(true);
 
@@ -217,12 +217,12 @@ export default function Checkers() {
       // Failsafe: even if the animation callback is dropped, the move lands.
       setTimeout(() => commitFlight(gen, move, nextBoard, mover, promoted), HOP_MS * move.path.length + 450);
     } catch {
-      // Animation setup failed — play the move instantly instead of crashing.
+      // Animation setup failed - play the move instantly instead of crashing.
       commitFlight(gen, move, nextBoard, mover, promoted);
     }
   };
 
-  /** Concede the game — recorded as a real loss, behind a confirmation.
+  /** Concede the game - recorded as a real loss, behind a confirmation.
    *  Guarded against a mid-flight animation so the board can't half-commit. */
   const surrender = () => {
     if (over || flight) return;
@@ -233,7 +233,7 @@ export default function Checkers() {
     ]);
   };
 
-  // AI turn — brief natural "thinking" beat, then an animated reply.
+  // AI turn - brief natural "thinking" beat, then an animated reply.
   useEffect(() => {
     if (turn !== 'b' || over || flight) return;
     setThinking(true);
@@ -324,7 +324,7 @@ export default function Checkers() {
         {/* Status line */}
         <View style={{ alignItems: 'center', paddingVertical: spacing.md, minHeight: 44, justifyContent: 'center' }}>
           {over ? (
-            <Text variant="callout" dim>{winner === 'r' ? 'You win! 🎉' : 'AI wins — rematch?'}</Text>
+            <Text variant="callout" dim>{winner === 'r' ? 'You win! 🎉' : 'AI wins - rematch?'}</Text>
           ) : thinking ? (
             <ThinkingDots />
           ) : popIdx != null ? (
@@ -392,7 +392,7 @@ export default function Checkers() {
               </View>
             ))}
 
-            {/* Flying piece overlay — native-driver transforms, stable values */}
+            {/* Flying piece overlay - native-driver transforms, stable values */}
             {flight && cell > 0 && (
               <Animated.View
                 pointerEvents="none"
@@ -457,7 +457,7 @@ function PieceDot({ piece, highlight, pop, shadow }: { piece: Piece; highlight: 
   const scale = useRef(new Animated.Value(1)).current;
   const crownScale = useRef(new Animated.Value(piece.king ? 1 : 0)).current;
 
-  // Promotion pop — a proud swell when a man becomes a king.
+  // Promotion pop - a proud swell when a man becomes a king.
   useEffect(() => {
     if (!pop) return;
     scale.setValue(1);
@@ -498,7 +498,7 @@ function PieceDot({ piece, highlight, pop, shadow }: { piece: Piece; highlight: 
           : undefined),
       }}
     >
-      {/* Subtle inner highlight ring — gives pieces a 3-D button feel */}
+      {/* Subtle inner highlight ring - gives pieces a 3-D button feel */}
       <View
         style={{
           position: 'absolute', top: 4, left: 4, right: 4, bottom: 4,
@@ -509,7 +509,7 @@ function PieceDot({ piece, highlight, pop, shadow }: { piece: Piece; highlight: 
         pointerEvents="none"
       />
 
-      {/* King crown — animates in on promotion */}
+      {/* King crown - animates in on promotion */}
       {isKing && (
         <Animated.View style={{ transform: [{ scale: crownScale.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }}>
           <Foundation name="crown" size={18} color="#FFD700" />

@@ -10,7 +10,7 @@ interface StatTileProps {
   tone?: 'surface' | 'celebrateSoft' | 'successSoft' | 'primarySoft';
 }
 
-/** Compact metric tile — monospaced-feel numerals so live counters don't jitter. */
+/** Compact metric tile - monospaced-feel numerals so live counters don't jitter. */
 export function StatTile({ value, label, emoji, tone = 'surface' }: StatTileProps) {
   return (
     <Card tone={tone} padding={spacing.lg} style={{ flex: 1 }}>

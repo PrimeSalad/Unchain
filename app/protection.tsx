@@ -1,9 +1,9 @@
 /**
- * Focus Protection — a permanent, consent-first website blocklist.
+ * Focus Protection - a permanent, consent-first website blocklist.
  *
  * Blocking model: a website on the list is protected the moment it is added
  * and stays protected indefinitely. There are no timers, no sessions, no
- * expiry, and no pause switch — the ONLY way a site stops being protected is
+ * expiry, and no pause switch - the ONLY way a site stops being protected is
  * the user deleting it, behind a destructive confirmation. The user builds
  * the whole list themselves; suggestions require an explicit Add tap. No
  * browsing data is read or collected, and the list never leaves the device.
@@ -39,7 +39,7 @@ function fmtDate(ts: number): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Cross-platform confirmation dialog
 //
-// React Native's Alert.alert is a no-op on web — this custom Modal works on
+// React Native's Alert.alert is a no-op on web - this custom Modal works on
 // iOS, Android, AND web. It blocks interaction behind a dark scrim and shows
 // a centred card with Cancel + Remove buttons.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ function ConfirmDialog({ visible, siteName, onCancel, onConfirm }: ConfirmDialog
           paddingHorizontal: spacing.xl,
         }}
       >
-        {/* Dialog card — stopPropagation so taps inside don't hit the scrim */}
+        {/* Dialog card - stopPropagation so taps inside don't hit the scrim */}
         <Animated.View
           entering={FadeIn.duration(150)}
           style={{
@@ -290,9 +290,9 @@ function AddSiteSheet({ visible, onClose }: { visible: boolean; onClose: () => v
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Edit sheet — subscribes to the live store entry by id (never a stale copy),
+// Edit sheet - subscribes to the live store entry by id (never a stale copy),
 // so every change is reflected instantly and deletion closes cleanly.
-// The "Remove from Blocklist" button has been intentionally removed here —
+// The "Remove from Blocklist" button has been intentionally removed here -
 // the only deletion path is the trash icon on each row in the list.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -387,10 +387,10 @@ function EditSiteSheet({ siteId, onClose }: { siteId: string | null; onClose: ()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Site row — always Protected; tap card to edit, tap trash to remove directly.
+// Site row - always Protected; tap card to edit, tap trash to remove directly.
 //
 // Web / nested-button fix: the trash icon must NOT be a Pressable nested
-// inside another Pressable — that produces the "button cannot contain a
+// inside another Pressable - that produces the "button cannot contain a
 // nested button" warning on React Native Web.  Instead both interactive
 // zones are SIBLINGS inside the Animated.View:
 //   [ Pressable:card-content ]  [ Pressable:trash ]
@@ -426,7 +426,7 @@ function SiteRow({
       entering={FadeInDown.delay(Math.min(index, 8) * 40).springify().damping(18)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
     >
-      {/* Card — tapping opens the edit sheet */}
+      {/* Card - tapping opens the edit sheet */}
       <Pressable
         onPress={() => { Haptics.selectionAsync().catch(() => {}); onEdit(); }}
         accessibilityRole="button"
@@ -458,7 +458,7 @@ function SiteRow({
         </View>
       </Pressable>
 
-      {/* Trash — sibling of the card Pressable, never nested inside it */}
+      {/* Trash - sibling of the card Pressable, never nested inside it */}
       <Pressable
         onPress={() => onRemove(site.id, siteLabel(site))}
         hitSlop={10}
@@ -501,7 +501,7 @@ export default function Protection() {
 
   // ── Deletion confirmation dialog ───────────────────────────────────────────
   // We use a custom Modal instead of Alert.alert because Alert is a no-op on
-  // React Native Web — the Modal works identically on iOS, Android, and web.
+  // React Native Web - the Modal works identically on iOS, Android, and web.
   const [confirmPending, setConfirmPending] = useState<{ id: string; label: string } | null>(null);
 
   const handleRemove = (id: string, label: string) => {
@@ -553,7 +553,7 @@ export default function Protection() {
         <View style={{ flex: 1 }}>
           <Text variant="title1">Focus Protection</Text>
           <Text variant="footnote" dim style={{ marginTop: 2 }}>
-            Permanent by design — protection only ends when you remove a website.
+            Permanent by design - protection only ends when you remove a website.
           </Text>
         </View>
         <Pressable
@@ -594,7 +594,7 @@ export default function Protection() {
             </Text>
             <Text variant="footnote" dim style={{ marginTop: 1 }}>
               {hasSites
-                ? `${blockedSites.length} website${blockedSites.length === 1 ? '' : 's'} protected — no timers, no expiry`
+                ? `${blockedSites.length} website${blockedSites.length === 1 ? '' : 's'} protected - no timers, no expiry`
                 : 'Add websites below to start protecting yourself'}
             </Text>
           </View>
@@ -703,14 +703,14 @@ export default function Protection() {
         </View>
       )}
 
-      {/* Suggestions — optional, never auto-added */}
+      {/* Suggestions - optional, never auto-added */}
       {suggestions.length > 0 && (
         <>
           <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.xs }}>
             Suggested Gambling Websites
           </Text>
           <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 19 }}>
-            Common gambling sites people choose to block. These are only suggestions — nothing is added unless you tap Add.
+            Common gambling sites people choose to block. These are only suggestions - nothing is added unless you tap Add.
           </Text>
           <Card padding={0}>
             {suggestions.map((d, i) => (
@@ -757,7 +757,7 @@ export default function Protection() {
       <AddSiteSheet visible={addOpen} onClose={() => setAddOpen(false)} />
       <EditSiteSheet siteId={editingId} onClose={() => setEditingId(null)} />
 
-      {/* Deletion confirmation — cross-platform Modal (Alert.alert is a no-op on web) */}
+      {/* Deletion confirmation - cross-platform Modal (Alert.alert is a no-op on web) */}
       <ConfirmDialog
         visible={confirmPending !== null}
         siteName={confirmPending?.label ?? ''}

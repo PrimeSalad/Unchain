@@ -18,7 +18,7 @@ const GLASS = 'rgba(255,255,255,0.07)';
 const GLASS_BORDER = 'rgba(255,255,255,0.12)';
 const FOG_SOFT = 'rgba(236,230,242,0.75)';
 
-/** Slow double-ring pulse behind the mascot — a visual breath to sync with. */
+/** Slow double-ring pulse behind the mascot - a visual breath to sync with. */
 function PulseHero({ reduce }: { reduce: boolean }) {
   const a = useRef(new Animated.Value(0)).current;
   const b = useRef(new Animated.Value(0)).current;
@@ -170,23 +170,23 @@ export default function Sos() {
   const reduce = useReducedMotion();
   const profile = useProfile();
 
-  // The same daily quote shown on Home — consistent all day, offline.
+  // The same daily quote shown on Home - consistent all day, offline.
   const dailyQuote = useStore((s) => s.dailyQuote);
   const ensureDailyQuote = useStore((s) => s.ensureDailyQuote);
   useEffect(() => {
     ensureDailyQuote();
   }, [ensureDailyQuote]);
-  // A persisted index can outlive a shrunken quote pool after an update —
+  // A persisted index can outlive a shrunken quote pool after an update -
   // never index blindly.
   const motivation = (QUOTES[dailyQuote?.index ?? 0] ?? QUOTES[0]).text;
 
-  // The blocklist is permanent — in a moment of crisis this is reassurance.
+  // The blocklist is permanent - in a moment of crisis this is reassurance.
   const protectedCount = useStore((s) => s.blockedSites.length);
 
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
   // Streak start comes from the event log (same as Home) so the anchors here
-  // never overstate recovery after a relapse — honesty matters most in crisis.
+  // never overstate recovery after a relapse - honesty matters most in crisis.
   const streakStart = profile ? currentStreakStart(profile.startedAt, relapses, journal) : 0;
   const timer = profile ? recoveryTimer(streakStart) : { days: 0, hours: 0, minutes: 0 };
   const money = profile
@@ -234,7 +234,7 @@ export default function Sos() {
             Take a deep breath.
           </Text>
           <Text variant="body" center color={FOG_SOFT} style={{ marginTop: spacing.sm, paddingHorizontal: spacing.lg }}>
-            You're safe. Don't decide anything yet — the urge will pass.
+            You're safe. Don't decide anything yet - the urge will pass.
           </Text>
 
           {/* Primary action */}
@@ -284,7 +284,7 @@ export default function Sos() {
             >
               <Ionicons name="shield-checkmark" size={18} color="#77B58A" />
               <Text variant="callout" color={palette.fog} style={{ flex: 1 }}>
-                {protectedCount} website{protectedCount === 1 ? '' : 's'} protected — always on
+                {protectedCount} website{protectedCount === 1 ? '' : 's'} protected - always on
               </Text>
             </GlassTile>
           )}
@@ -322,7 +322,7 @@ export default function Sos() {
               <View style={{ flex: 1 }}>
                 <Text variant="callout" color={palette.fog}>Education Hub</Text>
                 <Text variant="caption" color={FOG_SOFT} style={{ marginTop: 1 }}>
-                  Understand it to beat it — guides & free reading
+                  Understand it to beat it - guides & free reading
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={FOG_SOFT} />

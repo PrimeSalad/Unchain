@@ -19,7 +19,7 @@ interface ButtonProps {
 
 /**
  * iOS-native button. Filled primary, tinted secondary, plain text tertiary,
- * text-red destructive. Subtle opacity/scale on press — no playful 3D. One
+ * text-red destructive. Subtle opacity/scale on press - no playful 3D. One
  * primary per screen.
  */
 export function Button({ label, onPress, kind = 'primary', disabled, full, style }: ButtonProps) {

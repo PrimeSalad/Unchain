@@ -1,5 +1,5 @@
 /**
- * Education Reader — distraction-free reading for built-in guides. Tracks
+ * Education Reader - distraction-free reading for built-in guides. Tracks
  * how far the user has read (thin progress bar up top) and restores the
  * exact scroll position next time, powering the hub's Continue Reading card.
  */
@@ -36,7 +36,7 @@ export default function EducationReader() {
   const lastRef = useRef({ pct: savedPct, offset: saved?.offset ?? 0 });
   const restoredRef = useRef(false);
 
-  // Navigation is a side effect — never call it during render.
+  // Navigation is a side effect - never call it during render.
   useEffect(() => {
     if (!guide) safeBack();
   }, [guide, safeBack]);

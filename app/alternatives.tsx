@@ -1,5 +1,5 @@
 /**
- * Healthy Alternatives — interactive recovery actions.
+ * Healthy Alternatives - interactive recovery actions.
  *
  * Every activity is a real action with its own native-feeling flow (sheet,
  * timer, or confirmation) instead of a static suggestion. Completions persist
@@ -91,7 +91,7 @@ interface WalkMetrics {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Completed state — shared success view inside sheets
+// Completed state - shared success view inside sheets
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SheetDone({
@@ -103,7 +103,7 @@ function SheetDone({
 }: {
   title: string;
   message: string;
-  /** Session summary tiles (duration, finish time, …) — the Strava moment. */
+  /** Session summary tiles (duration, finish time, …) - the Strava moment. */
   stats?: { label: string; value: string }[];
   /** Opens the shareable session card. */
   onShare?: () => void;
@@ -174,14 +174,14 @@ function SheetHeading({ title, subtitle }: { title: string; subtitle?: string })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Walk — open-ended Strava-style session: live stopwatch, real step count
+// 1. Walk - open-ended Strava-style session: live stopwatch, real step count
 // (pedometer) and GPS distance. The user decides when to stop. Sensors are
 // requested only when the walk starts and everything stays on-device.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type WalkPhase = 'idle' | 'running' | 'paused' | 'done';
 
-/** Soft pulsing halo behind the live stopwatch — the "recording" heartbeat. */
+/** Soft pulsing halo behind the live stopwatch - the "recording" heartbeat. */
 function WalkPulse({ active, children }: { active: boolean; children: React.ReactNode }) {
   const theme = useTheme();
   const anim = useRef(new RNAnimated.Value(0)).current;
@@ -222,7 +222,7 @@ function WalkPulse({ active, children }: { active: boolean; children: React.Reac
   );
 }
 
-/** Live metric tile — springs on every value change so the numbers feel alive. */
+/** Live metric tile - springs on every value change so the numbers feel alive. */
 function LiveStat({ label, value, on }: { label: string; value: string; on: boolean }) {
   const theme = useTheme();
   const scale = useRef(new RNAnimated.Value(1)).current;
@@ -279,7 +279,7 @@ function WalkSheet({
   const [hasSteps, setHasSteps] = useState(false);
   const [hasGps, setHasGps] = useState(false);
 
-  // Wall-clock elapsed, pause-aware — locking the phone stays honest.
+  // Wall-clock elapsed, pause-aware - locking the phone stays honest.
   const startAtRef = useRef(0);
   const accumRef = useRef(0);
   // Each pedometer watch counts from its own start; the base carries totals
@@ -306,7 +306,7 @@ function WalkSheet({
   const startSensors = useCallback(async () => {
     const gen = sensorGenRef.current;
 
-    // Steps — Motion & Fitness permission, requested only now, in context.
+    // Steps - Motion & Fitness permission, requested only now, in context.
     try {
       if (await Pedometer.isAvailableAsync()) {
         const perm = await Pedometer.requestPermissionsAsync();
@@ -319,10 +319,10 @@ function WalkSheet({
         }
       }
     } catch {
-      /* step counting is a bonus — the walk still works without it */
+      /* step counting is a bonus - the walk still works without it */
     }
 
-    // Distance — while-in-use location, requested only now, in context.
+    // Distance - while-in-use location, requested only now, in context.
     try {
       const perm = await Location.requestForegroundPermissionsAsync();
       if (perm.granted) {
@@ -352,7 +352,7 @@ function WalkSheet({
         }
       }
     } catch {
-      /* distance is a bonus — the walk still works without it */
+      /* distance is a bonus - the walk still works without it */
     }
   }, []);
 
@@ -375,7 +375,7 @@ function WalkSheet({
   }, [visible, stopSensors]);
   useEffect(() => () => stopSensors(), [stopSensors]);
 
-  // Stopwatch — derived from the wall clock, never drift-prone increments.
+  // Stopwatch - derived from the wall clock, never drift-prone increments.
   useEffect(() => {
     if (phase !== 'running') return;
     const id = setInterval(() => {
@@ -428,7 +428,7 @@ function WalkSheet({
   const canFinish = elapsed >= WALK_MIN_SECONDS;
   const pace = formatPace(elapsed, meters);
   const status =
-    phase === 'running' ? 'Walking — stay with it' : phase === 'paused' ? 'Paused' : 'Ready when you are';
+    phase === 'running' ? 'Walking - stay with it' : phase === 'paused' ? 'Paused' : 'Ready when you are';
 
   return (
     <ActionSheet visible={visible} onClose={onClose} dismissable={phase === 'idle'}>
@@ -438,8 +438,8 @@ function WalkSheet({
           message="Every healthy choice strengthens your recovery."
           stats={[
             { label: 'Time', value: fmtClock(elapsed) },
-            { label: 'Steps', value: hasSteps ? steps.toLocaleString() : '—' },
-            { label: 'Distance', value: hasGps && meters > 0 ? formatDistance(meters) : '—' },
+            { label: 'Steps', value: hasSteps ? steps.toLocaleString() : '-' },
+            { label: 'Distance', value: hasGps && meters > 0 ? formatDistance(meters) : '-' },
           ]}
           onShare={() => onShare({ seconds: elapsed, steps: stepsRef.current, meters: Math.round(metersRef.current) })}
           onClose={onClose}
@@ -448,11 +448,11 @@ function WalkSheet({
         <View style={{ gap: spacing.md }}>
           <SheetHeading
             title="Take a Walk"
-            subtitle="Walk as long as you like — you decide when to stop. Time, steps, and distance are tracked live, all on this device."
+            subtitle="Walk as long as you like - you decide when to stop. Time, steps, and distance are tracked live, all on this device."
           />
           <View style={{ gap: spacing.sm }}>
             {([
-              ['stopwatch', 'Live stopwatch — walk at your own pace'],
+              ['stopwatch', 'Live stopwatch - walk at your own pace'],
               ['footsteps', 'Step counting via your phone’s motion sensor'],
               ['navigate', 'GPS distance & pace, only while walking'],
             ] as [keyof typeof Ionicons.glyphMap, string][]).map(([icon, text]) => (
@@ -488,9 +488,9 @@ function WalkSheet({
 
           {/* Live metrics */}
           <View style={{ alignSelf: 'stretch', flexDirection: 'row', gap: spacing.sm }}>
-            <LiveStat label="Steps" value={hasSteps ? steps.toLocaleString() : '—'} on={hasSteps} />
-            <LiveStat label="Distance" value={hasGps ? formatDistance(meters) : '—'} on={hasGps} />
-            <LiveStat label="Pace" value={pace ?? '—'} on={pace != null} />
+            <LiveStat label="Steps" value={hasSteps ? steps.toLocaleString() : '-'} on={hasSteps} />
+            <LiveStat label="Distance" value={hasGps ? formatDistance(meters) : '-'} on={hasGps} />
+            <LiveStat label="Pace" value={pace ?? '-'} on={pace != null} />
           </View>
 
           {/* Sensor status */}
@@ -520,7 +520,7 @@ function WalkSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Water — small confirmation sheet
+// 3. Water - small confirmation sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Round +/- stepper button shared by the water and breathe configurators. */
@@ -593,7 +593,7 @@ function WaterSheet({
           title={glassesToday >= WATER_GOAL_GLASSES ? 'Hydration goal reached!' : 'Nicely done.'}
           message={
             glassesToday >= WATER_GOAL_GLASSES
-              ? `${WATER_GOAL_GLASSES} glasses today — your body thanks you.`
+              ? `${WATER_GOAL_GLASSES} glasses today - your body thanks you.`
               : 'Hydration helps your body recover.'
           }
           stats={[
@@ -608,7 +608,7 @@ function WaterSheet({
         <View style={{ gap: spacing.lg }}>
           <SheetHeading
             title="Drink Water"
-            subtitle="A small reset for your body — and a pause for your mind."
+            subtitle="A small reset for your body - and a pause for your mind."
           />
 
           {/* Today's goal */}
@@ -651,12 +651,12 @@ function WaterSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Stretch — the user builds the routine: how many stretches, how long each
+// 4. Stretch - the user builds the routine: how many stretches, how long each
 // ─────────────────────────────────────────────────────────────────────────────
 
 type StretchPhase = 'idle' | 'running' | 'done';
 
-/** Fisher–Yates copy — sessions draw a fresh mix from the stretch library. */
+/** Fisher–Yates copy - sessions draw a fresh mix from the stretch library. */
 function shuffled<T>(arr: readonly T[]): T[] {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -730,7 +730,7 @@ function StretchSheet({
   // Refs mirror the config so timer callbacks never read stale state.
   const routineRef = useRef<StretchStep[]>([]);
   const perStepRef = useRef(30);
-  // Wall-clock session start — the shared card reports real time spent.
+  // Wall-clock session start - the shared card reports real time spent.
   const startedAtRef = useRef(0);
 
   useEffect(() => {
@@ -814,7 +814,7 @@ function StretchSheet({
         <View style={{ gap: spacing.lg }}>
           <SheetHeading
             title="Stretch Your Body"
-            subtitle="Build your own routine — pick how many stretches and how long each one runs."
+            subtitle="Build your own routine - pick how many stretches and how long each one runs."
           />
 
           <View style={{ gap: spacing.sm }}>
@@ -845,7 +845,7 @@ function StretchSheet({
           >
             <Ionicons name="shuffle" size={18} color={theme.color.primary} />
             <Text variant="callout" style={{ flex: 1 }}>
-              {count} stretches · about {estMinutes} minute{estMinutes === 1 ? '' : 's'} — a fresh mix from {STRETCH_STEPS.length} moves
+              {count} stretches · about {estMinutes} minute{estMinutes === 1 ? '' : 's'} - a fresh mix from {STRETCH_STEPS.length} moves
             </Text>
           </View>
 
@@ -857,7 +857,7 @@ function StretchSheet({
       ) : step == null ? null : (
         <View style={{ gap: spacing.md, alignItems: 'center' }}>
           <SheetHeading title={step.title} />
-          {/* Animated demo — move along with the figure. */}
+          {/* Animated demo - move along with the figure. */}
           <StretchFigure title={step.title} size={132} />
           <Text variant="callout" dim center style={{ lineHeight: 22, paddingHorizontal: spacing.md }}>
             {step.instruction}
@@ -886,7 +886,7 @@ function StretchSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. Breathing — orb-guided session with selectable duration
+// 5. Breathing - orb-guided session with selectable duration
 // ─────────────────────────────────────────────────────────────────────────────
 
 type BreathePhase = 'idle' | 'running' | 'done';
@@ -906,11 +906,11 @@ function BreatheSheet({
   const [phase, setPhase] = useState<BreathePhase>('idle');
   const [remaining, setRemaining] = useState(0);
   const [sessionSecs, setSessionSecs] = useState(0);
-  /** User-chosen session length in minutes — chips for quick picks, stepper
+  /** User-chosen session length in minutes - chips for quick picks, stepper
    *  for anything from 1 to 30. */
   const [minutes, setMinutes] = useState(3);
   const endAtRef = useRef(0);
-  /** Chosen session length in seconds — elapsed = chosen − remaining. */
+  /** Chosen session length in seconds - elapsed = chosen − remaining. */
   const chosenRef = useRef(0);
 
   useEffect(() => {
@@ -961,7 +961,7 @@ function BreatheSheet({
         <View style={{ gap: spacing.lg }}>
           <SheetHeading
             title="Practice Deep Breathing"
-            subtitle="Inhale, hold, exhale — the orb sets the pace. Set any length you like."
+            subtitle="Inhale, hold, exhale - the orb sets the pace. Set any length you like."
           />
 
           {/* Quick picks */}
@@ -993,7 +993,7 @@ function BreatheSheet({
             })}
           </View>
 
-          {/* Free stepper — 1 to 30 minutes */}
+          {/* Free stepper - 1 to 30 minutes */}
           <View
             style={{
               flexDirection: 'row', alignItems: 'center', gap: spacing.lg,
@@ -1045,7 +1045,7 @@ function BreatheSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7. Calming music — built-in audio; completes after a meaningful session
+// 7. Calming music - built-in audio; completes after a meaningful session
 // ─────────────────────────────────────────────────────────────────────────────
 
 type MusicPhase = 'idle' | 'playing' | 'done';
@@ -1059,7 +1059,7 @@ function MusicSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  /** Fires once at the goal mark — unlocks the daily completion. */
+  /** Fires once at the goal mark - unlocks the daily completion. */
   onComplete: () => void;
   /** Fires at Stop with the FULL listening time (incl. beyond the goal). */
   onSessionEnd: (seconds: number) => void;
@@ -1107,7 +1107,7 @@ function MusicSheet({
   const stop = () => {
     stopCalmMusic();
     if (completedRef.current) {
-      // Log the whole listen — minutes past the goal count toward lifetime.
+      // Log the whole listen - minutes past the goal count toward lifetime.
       onSessionEnd(Math.floor((Date.now() - startAtRef.current) / 1000));
       setPhase('done');
     } else {
@@ -1169,7 +1169,7 @@ function MusicSheet({
             <ProgressBar progress={goal} height={8} />
             <Text variant="caption" dim center>
               {completedRef.current
-                ? 'Session complete — keep listening as long as you like'
+                ? 'Session complete - keep listening as long as you like'
                 : `${Math.max(0, MUSIC_GOAL_SECONDS - elapsed)}s until this counts as a session`}
             </Text>
           </View>
@@ -1186,7 +1186,7 @@ function MusicSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. Journal already done — info sheet
+// 2. Journal already done - info sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
 function JournalDoneSheet({
@@ -1223,7 +1223,7 @@ function JournalDoneSheet({
         </Text>
         <Text variant="callout" dim center style={{ lineHeight: 22 }}>
           {completedAt ? `Written at ${fmtTime(completedAt)}. ` : ''}
-          One honest entry per day — you already did the work.
+          One honest entry per day - you already did the work.
         </Text>
         <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm }}>
           <Button label="View Today's Journal" onPress={onView} full />
@@ -1236,7 +1236,7 @@ function JournalDoneSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Health Metrics — the on-device health dashboard. Everything is measured by
+// Health Metrics - the on-device health dashboard. Everything is measured by
 // this phone (pedometer, GPS, session timers, water logs) and never uploaded.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1297,12 +1297,12 @@ function HealthMetrics() {
     (altSeconds.walk ?? 0) + (altSeconds.stretch ?? 0) + (altSeconds.breathe ?? 0) + (altSeconds.music ?? 0);
 
   const tiles: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; tint: string }[] = [
-    { icon: 'footsteps', label: 'Steps', value: walkSteps > 0 ? walkSteps.toLocaleString() : '—', tint: theme.color.success },
-    { icon: 'navigate', label: 'Distance', value: walkMeters > 0 ? formatDistance(walkMeters) : '—', tint: theme.color.success },
-    { icon: 'time', label: 'Active time', value: activeSeconds > 0 ? fmtTotalDur(activeSeconds) : '—', tint: theme.color.primary },
+    { icon: 'footsteps', label: 'Steps', value: walkSteps > 0 ? walkSteps.toLocaleString() : '-', tint: theme.color.success },
+    { icon: 'navigate', label: 'Distance', value: walkMeters > 0 ? formatDistance(walkMeters) : '-', tint: theme.color.success },
+    { icon: 'time', label: 'Active time', value: activeSeconds > 0 ? fmtTotalDur(activeSeconds) : '-', tint: theme.color.primary },
     { icon: 'water', label: 'Water today', value: `${glassesToday}/${WATER_GOAL_GLASSES}`, tint: '#4A6FA5' },
-    { icon: 'leaf', label: 'Breathing', value: (altSeconds.breathe ?? 0) > 0 ? fmtTotalDur(altSeconds.breathe ?? 0) : '—', tint: theme.color.primary },
-    { icon: 'body', label: 'Stretching', value: (altSeconds.stretch ?? 0) > 0 ? fmtTotalDur(altSeconds.stretch ?? 0) : '—', tint: theme.color.celebrateText },
+    { icon: 'leaf', label: 'Breathing', value: (altSeconds.breathe ?? 0) > 0 ? fmtTotalDur(altSeconds.breathe ?? 0) : '-', tint: theme.color.primary },
+    { icon: 'body', label: 'Stretching', value: (altSeconds.stretch ?? 0) > 0 ? fmtTotalDur(altSeconds.stretch ?? 0) : '-', tint: theme.color.celebrateText },
   ];
 
   return (
@@ -1455,7 +1455,7 @@ export default function Alternatives() {
   const journalRoute = profile?.addictionType === 'pornography' ? '/porn-journal-entry' : '/journal-entry';
 
   const [sheet, setSheet] = useState<AlternativeId | null>(null);
-  // Achievements unlocked mid-sheet are celebrated after the sheet closes —
+  // Achievements unlocked mid-sheet are celebrated after the sheet closes -
   // a RN Modal always paints above sibling overlays, so the confetti card
   // has to wait its turn.
   const pendingUnlocks = useRef<AltAchievement[]>([]);
@@ -1470,7 +1470,7 @@ export default function Alternatives() {
   };
 
   /** Complete today's activity. When `seconds` is given the session is also
-   *  logged to lifetime stats — music omits it here because its full length
+   *  logged to lifetime stats - music omits it here because its full length
    *  is only known at Stop (see onSessionEnd), and logging twice would
    *  double-count the session. */
   const handleComplete = (id: AlternativeId, seconds?: number) => {
@@ -1480,7 +1480,7 @@ export default function Alternatives() {
   };
 
   /** Open the Strava-style session card. Closes the sheet WITHOUT flushing
-   *  pending achievement unlocks — a visible RN Modal would float above the
+   *  pending achievement unlocks - a visible RN Modal would float above the
    *  pushed share screen. They celebrate on refocus instead (below). */
   const shareSession = (id: AlternativeId, seconds: number, extra?: Record<string, string>) => {
     setSheet(null);
@@ -1529,7 +1529,7 @@ export default function Alternatives() {
         <View style={{ flex: 1 }}>
           <Text variant="title1">Healthy Alternatives</Text>
           <Text variant="footnote" dim style={{ marginTop: 2 }}>
-            Real actions that outlast an urge — each counts once a day.
+            Real actions that outlast an urge - each counts once a day.
           </Text>
         </View>
         <Pressable
@@ -1658,7 +1658,7 @@ export default function Alternatives() {
         }}
       />
 
-      {/* Achievement unlock celebration — same confetti card as the games.
+      {/* Achievement unlock celebration - same confetti card as the games.
           Hosted in a Modal so it overlays the whole viewport (this screen
           scrolls; an absolute overlay would scroll with the content). */}
       <Modal
@@ -1686,7 +1686,7 @@ export default function Alternatives() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Achievement row — progress while locked, share when unlocked
+// Achievement row - progress while locked, share when unlocked
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AchievementRow({

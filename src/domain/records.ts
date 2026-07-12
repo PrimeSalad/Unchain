@@ -47,13 +47,13 @@ export interface JournalEntry {
   lost?: boolean;
   /** Amount lost (if applicable). */
   amountLost?: number;
-  /** Why they gambled — selected option or free-text when "Other" chosen. */
+  /** Why they gambled - selected option or free-text when "Other" chosen. */
   whyGambled?: string;
 
   // ── Financial tracking ────────────────────────────────────────────────────
   /**
    * The RAW answer to "How much money do you have today?" as entered by the
-   * user. Financial metrics never read this directly — they use the
+   * user. Financial metrics never read this directly - they use the
    * recovery-adjusted balance (`recoveryAdjustedBalance` in gambling.ts):
    * on a day the user gambled and lost, the wager is subtracted
    * (remaining = moneyToday - wagerAmount); a gambling win is never added,
@@ -89,7 +89,7 @@ export interface JournalEntry {
   feelingNow?: string;
 }
 
-/** Emergency Reflection — captured during a crisis (SOS). Stored separately
+/** Emergency Reflection - captured during a crisis (SOS). Stored separately
  *  from the Journal so the two features never mix. */
 export interface Reflection {
   id: string;

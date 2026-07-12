@@ -1,4 +1,4 @@
-# Focus Protection — Real Website Blocking (Native Enforcement Guide)
+# Focus Protection - Real Website Blocking (Native Enforcement Guide)
 
 ## Where things stand
 
@@ -14,7 +14,7 @@ bypass-resistant blocking requires one of Apple's native mechanisms below.
 The domain function `activeBlockedDomains()` in `src/domain/protection.ts`
 returns exactly the list any of these layers should enforce.
 
-## Option A — Screen Time API (recommended)
+## Option A - Screen Time API (recommended)
 
 Blocks the user's chosen domains **system-wide in Safari** with Apple's own
 shield screen. This is what first-party wellbeing apps use.
@@ -23,7 +23,7 @@ shield screen. This is what first-party wellbeing apps use.
    (ships an Expo config plugin). It wraps `FamilyControls`,
    `ManagedSettings`, and `DeviceActivity`.
 2. **Build**: requires a development/EAS build (`npx expo prebuild` /
-   `eas build`) — it will NOT run in Expo Go.
+   `eas build`) - it will NOT run in Expo Go.
 3. **Entitlement**: `com.apple.developer.family-controls`.
    - Development builds work immediately.
    - **Distribution requires applying to Apple**:
@@ -33,16 +33,16 @@ shield screen. This is what first-party wellbeing apps use.
      wellbeing apps are routinely approved; expect a few weeks.
 4. **Flow in code**:
    - Ask consent: `AuthorizationCenter.requestAuthorization(for: .individual)`
-     (the module exposes this) — explain why before asking.
+     (the module exposes this) - explain why before asking.
    - Enforce: write `activeBlockedDomains(store.blockedSites)` into
      `ManagedSettingsStore.shield.webDomains` whenever the blocklist changes.
-   - Remove: when the user deletes a site, rewrite the shield set — the
+   - Remove: when the user deletes a site, rewrite the shield set - the
      domain is unblocked immediately.
 5. **App protection** (optional later): the same module exposes Apple's
-   `FamilyActivityPicker` so users can select apps to shield — the picker
+   `FamilyActivityPicker` so users can select apps to shield - the picker
    guarantees the app never chooses for them.
 
-## Option B — Safari Content Blocker extension
+## Option B - Safari Content Blocker extension
 
 A native extension target that gives Safari a JSON rule list
 (`{"trigger":{"url-filter":"stake\\.com"},"action":{"type":"block"}}` per
@@ -54,7 +54,7 @@ domain). No special entitlement needed, but:
 
 ## App Review notes (Guideline 2.3.1, 2.5.1, 5.1.1)
 
-- Never claim blocking the app can't perform — current UI copy says sites
+- Never claim blocking the app can't perform - current UI copy says sites
   are "protected", which is accurate for the commitment model and becomes
   literally true once Option A ships.
 - Only public APIs above; both options are fully App Store legal.

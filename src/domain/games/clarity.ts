@@ -1,5 +1,5 @@
 /**
- * Clarity — a five-letter word puzzle (offline). Six guesses, colour feedback,
+ * Clarity - a five-letter word puzzle (offline). Six guesses, colour feedback,
  * built-in dictionary, on-screen keyboard state, daily + practice modes.
  */
 
@@ -34,14 +34,14 @@ export function evaluate(guess: string, answer: string): TileState[] {
 
   for (const ch of a) counts[ch] = (counts[ch] ?? 0) + 1;
 
-  // Pass 1 — greens.
+  // Pass 1 - greens.
   for (let i = 0; i < WORD_LENGTH; i++) {
     if (g[i] === a[i]) {
       result[i] = 'correct';
       counts[g[i]]--;
     }
   }
-  // Pass 2 — yellows from the remaining pool.
+  // Pass 2 - yellows from the remaining pool.
   for (let i = 0; i < WORD_LENGTH; i++) {
     if (result[i] === 'correct') continue;
     const ch = g[i];

@@ -1,16 +1,16 @@
 /**
- * DailyMissions — gamified daily recovery quests displayed as navigation cards.
+ * DailyMissions - gamified daily recovery quests displayed as navigation cards.
  *
  * Interaction model (nav cards, not a checklist):
  *  - Tapping a mission navigates to the corresponding feature screen.
  *  - Completion happens automatically when the user finishes the action in
- *    that screen — never by tapping a checkbox here.
+ *    that screen - never by tapping a checkbox here.
  *  - Completed missions show a checkmark + muted style as visual feedback.
  *  - No manual completion controls exist anywhere in this component.
  *
  * Rendering guarantees:
- *  - useDailyMissions() returns s.dailyMissions directly — a stable store
- *    reference — so this component never triggers the "getSnapshot should be
+ *  - useDailyMissions() returns s.dailyMissions directly - a stable store
+ *    reference - so this component never triggers the "getSnapshot should be
  *    cached" warning.
  *  - Reduced-motion preference is respected throughout.
  */
@@ -143,7 +143,7 @@ function LevelBar({
 }
 
 // ---------------------------------------------------------------------------
-// Single mission row — navigation card only, no manual completion control
+// Single mission row - navigation card only, no manual completion control
 // ---------------------------------------------------------------------------
 
 function MissionRow({
@@ -179,7 +179,7 @@ function MissionRow({
         checkScale.value = 1;
       }
     } else if (done && prevDone.current) {
-      // Already done on mount — set immediately, no animation.
+      // Already done on mount - set immediately, no animation.
       rowBg.value = 1;
       checkScale.value = 1;
     }
@@ -213,8 +213,8 @@ function MissionRow({
         accessibilityRole="button"
         accessibilityLabel={
           done
-            ? `${mission.title} — completed`
-            : `${mission.title} — tap to start`
+            ? `${mission.title} - completed`
+            : `${mission.title} - tap to start`
         }
         style={({ pressed }) => ({
           flexDirection: 'row',
@@ -326,7 +326,7 @@ function AllDoneState() {
 
 export function DailyMissions() {
   const theme = useTheme();
-  // Stable store reference — no new object created on each render.
+  // Stable store reference - no new object created on each render.
   const missionState = useDailyMissions();
   const missionXp = useStore((s) => s.missionXp);
 

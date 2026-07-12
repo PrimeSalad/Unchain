@@ -1,5 +1,5 @@
 /**
- * Healthy Alternatives — interactive recovery actions (pure definitions).
+ * Healthy Alternatives - interactive recovery actions (pure definitions).
  * Each activity completes at most once per calendar day; completion state
  * lives in the store as `alternatives[id] = timestamp` and "done today" is
  * always derived with sameDay(), so it resets automatically at local midnight.
@@ -36,7 +36,7 @@ export function alternativeById(id: AlternativeId): Alternative {
   return ALTERNATIVES.find((a) => a.id === id) ?? ALTERNATIVES[0];
 }
 
-/** Guided stretch — the user picks how many stretches and how long each runs. */
+/** Guided stretch - the user picks how many stretches and how long each runs. */
 export interface StretchStep {
   title: string;
   instruction: string;
@@ -44,13 +44,13 @@ export interface StretchStep {
   icon: string;
 }
 
-/** The full stretch library — sessions draw a shuffled subset from here. */
+/** The full stretch library - sessions draw a shuffled subset from here. */
 export const STRETCH_STEPS: StretchStep[] = [
-  { title: 'Neck Release',   instruction: 'Slowly tilt your ear toward each shoulder. Let gravity do the work — no forcing.', icon: 'person' },
+  { title: 'Neck Release',   instruction: 'Slowly tilt your ear toward each shoulder. Let gravity do the work - no forcing.', icon: 'person' },
   { title: 'Shoulder Rolls', instruction: 'Roll your shoulders back in big, slow circles. Drop them away from your ears.',    icon: 'sync' },
   { title: 'Forward Fold',   instruction: 'Stand and fold forward with soft knees. Hang loose and breathe into your back.',   icon: 'arrow-down' },
   { title: 'Side Stretch',   instruction: 'Reach one arm overhead and lean gently to the side. Switch halfway through.',      icon: 'resize' },
-  { title: 'Hamstring Reach', instruction: 'Reach gently toward your toes with soft knees. Ease in — no bouncing.',           icon: 'trending-down' },
+  { title: 'Hamstring Reach', instruction: 'Reach gently toward your toes with soft knees. Ease in - no bouncing.',           icon: 'trending-down' },
   { title: 'Chest Opener',   instruction: 'Clasp your hands behind your back and lift gently. Open across the chest.',        icon: 'expand' },
   { title: 'Hip Circles',    instruction: 'Hands on hips, draw slow circles. Switch direction halfway through.',              icon: 'refresh' },
   { title: 'Calf Stretch',   instruction: 'Step one foot back and press the heel down. Switch legs halfway through.',         icon: 'walk' },
@@ -68,7 +68,7 @@ export const STRETCH_SECONDS_OPTIONS = [20, 30, 40, 60] as const;
 export const WATER_GOAL_GLASSES = 8;
 
 // ---------------------------------------------------------------------------
-// Healthy-habit achievements — permanent unlocks, mirrored on the game
+// Healthy-habit achievements - permanent unlocks, mirrored on the game
 // achievement system (id → unlockedAt in the store, shareable cards).
 // ---------------------------------------------------------------------------
 

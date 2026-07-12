@@ -11,7 +11,7 @@ import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore } from '@/application/store';
 
 /**
- * Emergency Reflection — its own local data, fully separate from the Journal.
+ * Emergency Reflection - its own local data, fully separate from the Journal.
  * Capturing a moment of crisis in words. Nothing here touches Journal data.
  */
 export default function ReflectionScreen() {
@@ -29,7 +29,7 @@ export default function ReflectionScreen() {
     setText('');
   };
 
-  // Deleting a reflection is irreversible — always confirm with a native alert.
+  // Deleting a reflection is irreversible - always confirm with a native alert.
   const confirmDelete = (id: string) => {
     Alert.alert('Delete this reflection?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
@@ -48,7 +48,7 @@ export default function ReflectionScreen() {
       </View>
 
       <Text variant="body" dim style={{ marginTop: spacing.lg }}>
-        Right now, in this moment — what are you feeling, and what do you want to remember?
+        Right now, in this moment - what are you feeling, and what do you want to remember?
       </Text>
 
       <TextInput

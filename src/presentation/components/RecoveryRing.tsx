@@ -48,7 +48,7 @@ export function RecoveryRing({ current, target, size = 200, caption }: RecoveryR
     strokeDashoffset: circumference * (1 - progress.value),
   }));
 
-  // Gradient colours — swap for dark mode readability
+  // Gradient colours - swap for dark mode readability
   const gradStart = theme.mode === 'dark' ? palette.grape300 : palette.grape;
   const gradEnd   = palette.coral;
 

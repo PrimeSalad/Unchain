@@ -89,7 +89,7 @@ export function OnboardingScreen() {
       addictionDetail: detail.trim() || undefined,
       // Store as the LOCAL midnight of the day they last used.
       // e.g. daysAgo=6, today=July 7  →  startedAt = July 1 @ 00:00 local.
-      // This makes calendar math exact — no fractional-day drift.
+      // This makes calendar math exact - no fractional-day drift.
       startedAt: localMidnightDaysAgo(daysAgo),
       expenseAmount: meta && !meta.hasExpense ? 0 : parseInt(amount, 10) || 0,
       expensePeriod: period,
@@ -158,7 +158,7 @@ export function OnboardingScreen() {
             Welcome to Unchain
           </Text>
           <Text variant="body" dim center style={{ marginTop: spacing.md, paddingHorizontal: spacing.md }}>
-            Your private companion for breaking free — one day at a time. Everything stays on your device. No account, no internet, no judgment.
+            Your private companion for breaking free - one day at a time. Everything stays on your device. No account, no internet, no judgment.
           </Text>
           <Button label="Get started" onPress={next} full style={{ marginTop: spacing.xxxl }} />
         </View>
@@ -301,7 +301,7 @@ export function OnboardingScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <Text variant="title1">How much did you spend?</Text>
           <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
-            An estimate is fine — it powers your money-saved counter.
+            An estimate is fine - it powers your money-saved counter.
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
             <Text variant="title1">₱</Text>

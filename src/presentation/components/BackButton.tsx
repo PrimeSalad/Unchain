@@ -11,7 +11,7 @@ import { useTheme } from '../theme/ThemeProvider';
  * Hardened: going back when there is no history entry (or while navigation is
  * mid-transition) used to crash or dead-end the screen. Now it (1) debounces
  * rapid double-taps, (2) checks canGoBack() first, and (3) falls back to a
- * known-good route — and never lets a navigation error escape.
+ * known-good route - and never lets a navigation error escape.
  */
 export function BackButton({ fallback = '/(tabs)/home' }: { fallback?: string }) {
   const router = useRouter();
@@ -29,7 +29,7 @@ export function BackButton({ fallback = '/(tabs)/home' }: { fallback?: string })
         router.replace(fallback as Href);
       }
     } catch {
-      // Navigation state was unusable — hard-reset to the fallback.
+      // Navigation state was unusable - hard-reset to the fallback.
       try {
         router.replace(fallback as Href);
       } catch {

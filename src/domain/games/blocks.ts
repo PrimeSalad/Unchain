@@ -1,5 +1,5 @@
 /**
- * Block puzzle (Block-Blast style) logic — pure TS, offline.
+ * Block puzzle (Block-Blast style) logic - pure TS, offline.
  * 8×8 board. Three pieces are offered; place them anywhere they fit. Any full
  * row AND column clears. Game over when none of the remaining pieces fit.
  */

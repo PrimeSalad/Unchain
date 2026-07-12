@@ -48,7 +48,7 @@ export default function Sudoku() {
   const [unitFlashCells, setUnitFlashCells] = useState<Set<number>>(new Set());
   const unitFlashAnim = useRef(new Animated.Value(0)).current;
   const recorded = useRef(false);
-  // Synchronous hint counter — state alone can be raced by rapid taps.
+  // Synchronous hint counter - state alone can be raced by rapid taps.
   const hintsRef = useRef(0);
   const tutorial = useGameTutorial('sudoku');
 
@@ -328,7 +328,7 @@ export default function Sudoku() {
           { label: 'Hints', value: `${hints}` },
           {
             label: 'Best',
-            value: games.sudokuBestMs[level] != null ? fmt(Math.round((games.sudokuBestMs[level] as number) / 1000)) : '—',
+            value: games.sudokuBestMs[level] != null ? fmt(Math.round((games.sudokuBestMs[level] as number) / 1000)) : '-',
           },
         ]}
         unlocked={unlocked}

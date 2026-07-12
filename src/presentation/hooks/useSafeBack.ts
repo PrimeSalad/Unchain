@@ -6,7 +6,7 @@ import { useRouter, type Href } from 'expo-router';
  * history entry (web deep-link/refresh, or a modal reached via `replace`)
  * triggers "The action 'GO_BACK' was not handled by any navigator" and leaves
  * the user stuck. This mirrors BackButton's hardened logic: pop when history
- * exists, otherwise replace to a known-good fallback — and never throw.
+ * exists, otherwise replace to a known-good fallback - and never throw.
  */
 export function useSafeBack(fallback: Href = '/(tabs)/home'): () => void {
   const router = useRouter();

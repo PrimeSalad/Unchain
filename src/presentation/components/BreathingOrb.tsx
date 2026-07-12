@@ -17,7 +17,7 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 type Phase = 'Breathe in' | 'Hold' | 'Breathe out';
 
 /**
- * Paced-breathing orb — inhale 4s / hold 2s / exhale 6s (exhale-biased to lower
+ * Paced-breathing orb - inhale 4s / hold 2s / exhale 6s (exhale-biased to lower
  * arousal via the parasympathetic response). Haptic-synced so it works
  * eyes-closed / phone-in-pocket. Falls back to an opacity pulse under Reduce Motion.
  */

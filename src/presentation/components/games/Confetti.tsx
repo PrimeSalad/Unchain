@@ -59,7 +59,7 @@ function Piece({ p }: { p: Particle }) {
   const dy = Math.sin(p.angle) * p.dist;
 
   const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, dx] });
-  // Rise a little, then settle past the radial target — reads as a soft arc.
+  // Rise a little, then settle past the radial target - reads as a soft arc.
   const translateY = anim.interpolate({
     inputRange: [0, 0.35, 1],
     outputRange: [0, dy * 0.45 - 40, dy + 60],

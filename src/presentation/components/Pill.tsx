@@ -19,7 +19,7 @@ interface PillProps {
 }
 
 /**
- * Selectable chip — animated scale + colour spring on press.
+ * Selectable chip - animated scale + colour spring on press.
  * Larger tap target (minimum 44pt), smooth active/inactive transitions.
  */
 export function Pill({ label, active, onPress, emoji }: PillProps) {

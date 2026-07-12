@@ -8,13 +8,13 @@ interface ActionSheetProps {
   visible: boolean;
   onClose: () => void;
   /** When false the scrim tap and hardware back are ignored (e.g. while a
-   *  timed session is running) — the sheet's own buttons must dismiss it. */
+   *  timed session is running) - the sheet's own buttons must dismiss it. */
   dismissable?: boolean;
   children: ReactNode;
 }
 
 /**
- * iOS-style bottom sheet built on a transparent Modal — pull handle, sheet
+ * iOS-style bottom sheet built on a transparent Modal - pull handle, sheet
  * radius, safe-area bottom padding, scrim tap to dismiss.
  *
  * Layout note: the scrim and the sheet are SIBLINGS, not parent/child. The
@@ -40,7 +40,7 @@ export function ActionSheet({ visible, onClose, dismissable = true, children }: 
       onRequestClose={requestClose}
     >
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        {/* Scrim — a sibling BEHIND the sheet. Taps on the sheet never reach
+        {/* Scrim - a sibling BEHIND the sheet. Taps on the sheet never reach
             it, so no tap-swallowing wrapper is needed around the content. */}
         <Pressable
           onPress={requestClose}

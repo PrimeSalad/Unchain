@@ -11,10 +11,10 @@ import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore } from '@/application/store';
-import { achievementById, GAME_NAMES } from '@/domain/games/achievements';
+import { achievementById, GAME_ACHIEVEMENTS, GAME_NAMES } from '@/domain/games/achievements';
 import { ALTERNATIVES, altAchievementById } from '@/domain/alternatives';
 
-/** Strava-style share card for an unlocked achievement — recreational games
+/** Strava-style share card for an unlocked achievement - recreational games
  *  and healthy-habit achievements share the same card and flow. */
 export default function ShareAchievement() {
   const safeBack = useSafeBack();
@@ -31,18 +31,19 @@ export default function ShareAchievement() {
   const altAch = !gameAch && id ? altAchievementById(id) : undefined;
   const achievement = gameAch ?? altAch;
 
-  // Navigation is a side effect — never call it during render.
+  // Navigation is a side effect - never call it during render.
   useEffect(() => {
     if (!achievement) safeBack();
   }, [achievement, safeBack]);
   if (!achievement) return null;
 
   const categoryLabel = gameAch ? GAME_NAMES[gameAch.game] : 'Healthy Habits';
+  const unlockedGameCount = GAME_ACHIEVEMENTS.filter((a) => games.achievements[a.id]).length;
   const unlockedAt =
     (gameAch ? games.achievements[gameAch.id] : altAchievements[achievement.id]) ?? Date.now();
   const date = new Date(unlockedAt).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  // Stats that make the card feel earned — per game, or habit totals.
+  // Stats that make the card feel earned - per game, or habit totals.
   const stats: { label: string; value: string }[] = (() => {
     if (!gameAch) {
       const counts = { ...altCounts, journal: journalCount };
@@ -80,7 +81,7 @@ export default function ShareAchievement() {
         const ss = best != null ? Math.floor((best % 60000) / 1000) : 0;
         return [
           { label: 'Solved', value: `${games.sudokuSolved}` },
-          { label: 'Best time', value: best != null ? `${mm}:${String(ss).padStart(2, '0')}` : '—' },
+          { label: 'Best time', value: best != null ? `${mm}:${String(ss).padStart(2, '0')}` : '-' },
           { label: 'Levels', value: `${Object.keys(games.sudokuBestMs).length}/4` },
         ];
       }
@@ -88,24 +89,18 @@ export default function ShareAchievement() {
         return [
           { label: 'Best score', value: games.blocksBest.toLocaleString() },
           { label: 'Games', value: `${games.blocksGames}` },
-          { label: 'Unlocked', value: `${Object.keys(games.achievements).length}` },
+          { label: 'Unlocked', value: `${unlockedGameCount}` },
         ];
       case 'gonogo':
         return [
           { label: 'Best score', value: games.gonogoBest.toLocaleString() },
           { label: 'Rounds', value: `${games.gonogoGames}` },
-          { label: 'Unlocked', value: `${Object.keys(games.achievements).length}` },
-        ];
-      case 'stopsignal':
-        return [
-          { label: 'Best score', value: games.stopBest.toLocaleString() },
-          { label: 'Rounds', value: `${games.stopGames}` },
-          { label: 'Unlocked', value: `${Object.keys(games.achievements).length}` },
+          { label: 'Unlocked', value: `${unlockedGameCount}` },
         ];
     }
   })();
 
-  const summary = `Achievement unlocked: ${achievement.title} — ${categoryLabel} 🏆\n${achievement.desc}\nRecovering, one calm day at a time. — Unchain`;
+  const summary = `Achievement unlocked: ${achievement.title} - ${categoryLabel} 🏆\n${achievement.desc}\nRecovering, one calm day at a time. - Unchain`;
 
   const shareImage = async () => {
     setBusy(true);
@@ -135,7 +130,7 @@ export default function ShareAchievement() {
         </View>
 
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl }}>
-          {/* Capture target — 4:5 card */}
+          {/* Capture target - 4:5 card */}
           <View
             ref={cardRef}
             collapsable={false}

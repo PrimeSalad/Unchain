@@ -1,6 +1,6 @@
 /**
  * Pornography Recovery Journal Entry wizard.
- * New file — gambling journal (app/journal-entry.tsx) is never touched.
+ * New file - gambling journal (app/journal-entry.tsx) is never touched.
  * Route: /porn-journal-entry
  *
  * No  → did_watch → mood → urge intensity → what helped → reflection → summary (green day)
@@ -349,7 +349,7 @@ export default function PornJournalEntry() {
       case 'did_watch':
         return (
           <>
-            <StepHeading title="Did you watch porn today?" subtitle="Be honest — this is just for you. No judgment here." />
+            <StepHeading title="Did you watch porn today?" subtitle="Be honest - this is just for you. No judgment here." />
             <YesNoToggle value={watched} onChange={setWatched} />
             {watched === false && (
               <Card tone="successSoft" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, borderLeftWidth: 3, borderLeftColor: theme.color.success }}>
@@ -389,7 +389,7 @@ export default function PornJournalEntry() {
       case 'triggers_clean':
         return (
           <>
-            <StepHeading title="Any triggers today?" subtitle="Select all that you noticed — even if you resisted them." />
+            <StepHeading title="Any triggers today?" subtitle="Select all that you noticed - even if you resisted them." />
             <MultiGrid
               options={PORN_TRIGGERS}
               selected={cleanTriggers}
@@ -401,7 +401,7 @@ export default function PornJournalEntry() {
       case 'what_helped':
         return (
           <>
-            <StepHeading title="What helped you stay clean?" subtitle="Optional — what got you through the urge?" />
+            <StepHeading title="What helped you stay clean?" subtitle="Optional - what got you through the urge?" />
             <TextInput value={whatHelped} onChangeText={setWhatHelped}
               placeholder="e.g. went for a walk, called a friend, used the breathing tool…"
               placeholderTextColor={theme.color.textDim} multiline underlineColorAndroid="transparent"
@@ -413,7 +413,7 @@ export default function PornJournalEntry() {
       case 'reflection_clean':
         return (
           <>
-            <StepHeading title="Any reflections?" subtitle="Optional — anything else on your mind today?" />
+            <StepHeading title="Any reflections?" subtitle="Optional - anything else on your mind today?" />
             <TextInput value={reflection} onChangeText={setReflection}
               placeholder="What's on your mind? Wins, challenges, things you're proud of…"
               placeholderTextColor={theme.color.textDim} multiline underlineColorAndroid="transparent"
@@ -461,7 +461,7 @@ export default function PornJournalEntry() {
       case 'next_time_plan':
         return (
           <>
-            <StepHeading title="What could help you next time?" subtitle="Optional — one small thing to try when the urge hits." />
+            <StepHeading title="What could help you next time?" subtitle="Optional - one small thing to try when the urge hits." />
             <TextInput value={nextTimePlan} onChangeText={setNextTimePlan}
               placeholder="e.g. close the laptop and go outside, call someone…"
               placeholderTextColor={theme.color.textDim} multiline underlineColorAndroid="transparent"
@@ -473,7 +473,7 @@ export default function PornJournalEntry() {
       case 'feeling_now':
         return (
           <>
-            <StepHeading title="How are you feeling now?" subtitle="After watching — what sits with you most?" />
+            <StepHeading title="How are you feeling now?" subtitle="After watching - what sits with you most?" />
             <OptionGrid options={FEELING_NOW_OPTIONS} selected={feelingNow} onSelect={setFeelingNow} />
           </>
         );

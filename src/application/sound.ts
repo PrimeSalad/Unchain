@@ -1,5 +1,5 @@
 /**
- * App sounds — tiny synthesized WAVs (generated in-house, no third-party audio).
+ * App sounds - tiny synthesized WAVs (generated in-house, no third-party audio).
  * Everything is fire-and-forget and failure-safe: if audio can't play we stay silent.
  */
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
@@ -51,7 +51,7 @@ export function playSound(name: SoundName, volume = 1) {
       players.set(name, p);
     }
     p.volume = volume;
-    // seekTo is async native work — a rejection (e.g. still loading) must
+    // seekTo is async native work - a rejection (e.g. still loading) must
     // never surface as an unhandled error mid-game.
     safe(() => p!.seekTo(0));
     safe(() => p!.play());

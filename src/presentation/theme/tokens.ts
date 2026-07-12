@@ -1,9 +1,9 @@
 /**
- * Wool & Chain — Unchain design tokens.
+ * Wool & Chain - Unchain design tokens.
  *
  * Every colour here was sampled from the mascot art in /assets and every
  * contrast pairing was verified against WCAG 2.2 (see docs/plan.md §4.1).
- * Components must import from here — never hardcode a hex value.
+ * Components must import from here - never hardcode a hex value.
  *
  * The system aims for Duolingo-grade craft (tactile chunky controls, rounded
  * friendly forms, delightful motion) held inside Unchain's calmer, lower-arousal
@@ -11,28 +11,28 @@
  */
 
 // ---------------------------------------------------------------------------
-// Palette (raw values — prefer the semantic `lightTheme` / `darkTheme` below)
+// Palette (raw values - prefer the semantic `lightTheme` / `darkTheme` below)
 // ---------------------------------------------------------------------------
 
 export const palette = {
-  // Brand — from the sheep's purple hooves & chains
+  // Brand - from the sheep's purple hooves & chains
   grape: '#5A2E7A',
   grapeDeep: '#43265C',
   grapeSoft: '#EEE7F3', // 12% tint surface
   grape300: '#B98FD6', // dark-mode primary
 
-  // Accent — from mouth / ears / cheeks
+  // Accent - from mouth / ears / cheeks
   coral: '#E8697A',
   coralDeep: '#B23A4B',
   coralSoft: '#FBE7EA',
   coral300: '#F09AA6',
 
-  // Celebration warmth — from the sheep's face / wool tan (our "dawn/hope")
+  // Celebration warmth - from the sheep's face / wool tan (our "dawn/hope")
   honey: '#D0A070',
   honeyDeep: '#97591F',
   honeySoft: '#F6ECDD',
 
-  // Neutrals — warm, aubergine-tinted (echo the eyes), never clinical
+  // Neutrals - warm, aubergine-tinted (echo the eyes), never clinical
   ink: '#2A1F33',
   slate: '#6B5E75',
   wool: '#FBF6EF',
@@ -121,7 +121,7 @@ export const lightTheme: Theme = {
     textDim: palette.slate,
     textInverse: palette.white,
 
-    // The 3D "chunky button" bottom edge — darkened brand tones
+    // The 3D "chunky button" bottom edge - darkened brand tones
     edgePrimary: '#3D1E56',
     edgeNeutral: '#D8CEC4',
   },
@@ -162,7 +162,7 @@ export const darkTheme: Theme = {
 };
 
 // ---------------------------------------------------------------------------
-// Spacing — 8pt scale (docs/plan.md §4.3)
+// Spacing - 8pt scale (docs/plan.md §4.3)
 // ---------------------------------------------------------------------------
 
 export const spacing = {

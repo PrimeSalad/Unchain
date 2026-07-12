@@ -10,8 +10,8 @@ import { useTheme } from '../theme/ThemeProvider';
 /**
  * Root error boundary (expo-router picks this up via the layout's
  * `export { AppErrorBoundary as ErrorBoundary }`). If any screen throws during
- * render the user lands here — with a calm, recovery-appropriate message and a
- * way back — instead of a dead app. Raw exception details are never shown.
+ * render the user lands here - with a calm, recovery-appropriate message and a
+ * way back - instead of a dead app. Raw exception details are never shown.
  */
 export function AppErrorBoundary({ retry }: { error: Error; retry: () => Promise<void> }) {
   const router = useRouter();
@@ -34,7 +34,7 @@ export function AppErrorBoundary({ retry }: { error: Error; retry: () => Promise
             Something went wrong
           </Text>
           <Text variant="body" dim center style={{ marginTop: spacing.sm }}>
-            Your data is safe on this device. Take a breath — then try again.
+            Your data is safe on this device. Take a breath - then try again.
           </Text>
         </View>
         <View style={{ marginTop: spacing.xxl, gap: spacing.sm }}>

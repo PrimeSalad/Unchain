@@ -1,5 +1,5 @@
 /**
- * Checkers (American / English draughts) engine + AI — pure TS, offline.
+ * Checkers (American / English draughts) engine + AI - pure TS, offline.
  *
  * Board is 64 cells, index = row*8 + col, row 0 at the TOP.
  * Human = red ('r'), starts at the bottom, moves UP (row decreasing).
@@ -116,7 +116,7 @@ function simpleMoves(board: Board, idx: number): Move[] {
   return moves;
 }
 
-/** All legal moves for a player. Captures are optional — the player may choose
+/** All legal moves for a player. Captures are optional - the player may choose
  *  any legal move whether or not a jump is available. */
 export function legalMoves(board: Board, player: Player): Move[] {
   const jumps: Move[] = [];
@@ -163,7 +163,7 @@ export function status(board: Board, toMove: Player): GameStatus {
 }
 
 // ---------------------------------------------------------------------------
-// AI — minimax with alpha-beta pruning
+// AI - minimax with alpha-beta pruning
 // ---------------------------------------------------------------------------
 
 function evaluate(board: Board, me: Player): number {
@@ -223,7 +223,7 @@ export function chooseMove(board: Board, me: Player, difficulty: Difficulty): Mo
   if (moves.length === 1) return moves[0];
 
   if (difficulty === 'easy') {
-    // Prefer captures, otherwise random — beatable but not silly.
+    // Prefer captures, otherwise random - beatable but not silly.
     const caps = moves.filter((m) => m.captures.length > 0);
     const pool = Math.random() < 0.65 && caps.length ? caps : moves;
     return pool[Math.floor(Math.random() * pool.length)];

@@ -92,7 +92,7 @@ export function ProfileScreen() {
 
   if (!profile) return null;
 
-  // Same event-derived streak as Home/Progress — never counts through a relapse.
+  // Same event-derived streak as Home/Progress - never counts through a relapse.
   const days = streakDays(currentStreakStart(profile.startedAt, relapses, journal));
   const typeLabel = addictionMeta(profile.addictionType).label;
 
@@ -101,7 +101,7 @@ export function ProfileScreen() {
   const showToast = (message: string, type: ToastConfig['type'] = 'success') => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ message, type });
-    // Screen readers can't see the transient toast — announce it.
+    // Screen readers can't see the transient toast - announce it.
     AccessibilityInfo.announceForAccessibility(message);
     toastAnim.setValue(0);
     Animated.spring(toastAnim, {
@@ -181,7 +181,7 @@ export function ProfileScreen() {
           resetRecovery();
           showToast('Recovery data reset successfully');
         } catch (e) {
-          showToast('Something went wrong — data was not reset', 'error');
+          showToast('Something went wrong - data was not reset', 'error');
         }
       },
     });
@@ -189,14 +189,14 @@ export function ProfileScreen() {
   const openDeleteAllModal = () =>
     setModal({
       title: 'Delete all local data?',
-      body: 'Every piece of data will be permanently deleted — your profile, streak, journal, check-ins, and all records.\n\nThe app will return to the welcome screen.\n\nThis cannot be undone.',
+      body: 'Every piece of data will be permanently deleted - your profile, streak, journal, check-ins, and all records.\n\nThe app will return to the welcome screen.\n\nThis cannot be undone.',
       confirmLabel: 'Delete everything',
       onConfirm: () => {
         try {
           resetAll();
           router.replace('/loading');
         } catch (e) {
-          showToast('Something went wrong — data was not deleted', 'error');
+          showToast('Something went wrong - data was not deleted', 'error');
         }
       },
     });
@@ -372,7 +372,7 @@ export function ProfileScreen() {
         Recovery Information
       </Text>
       <Card>
-        {/* Name row — display or edit mode */}
+        {/* Name row - display or edit mode */}
         <View style={{ marginBottom: spacing.md }}>
           <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>Name</Text>
           {editingName ? (
@@ -579,7 +579,7 @@ export function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setModal(null)}
       >
-        {/* Scrim and dialog are siblings — nesting the dialog inside a
+        {/* Scrim and dialog are siblings - nesting the dialog inside a
             Pressable nests buttons inside a button (invalid on web). */}
         <View
           style={{

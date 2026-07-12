@@ -69,8 +69,8 @@ export function HomeScreen() {
   const urgesResisted = useStore((s) => s.urgesResisted);
   const healthyHabitsCount = useStore((s) => s.healthyHabitsCount);
 
-  // Derive the current streak start from the event log — never from startedAt
-  // directly — so a relapse only marks today red without wiping history.
+  // Derive the current streak start from the event log - never from startedAt
+  // directly - so a relapse only marks today red without wiping history.
   const streakStart = profile
     ? currentStreakStart(profile.startedAt, relapses, journal)
     : 0;
@@ -105,7 +105,7 @@ export function HomeScreen() {
       pushTimeline('milestone', `Reached Day ${crossed}`);
       router.push({
         pathname: '/celebrate',
-        params: { title: `Day ${crossed} ${addictionMeta(profile.addictionType).freeLabel}!`, arm: 'Keep going — one day at a time.' },
+        params: { title: `Day ${crossed} ${addictionMeta(profile.addictionType).freeLabel}!`, arm: 'Keep going - one day at a time.' },
       });
     }
   }, [days, profile, timeline, pushTimeline, router]);
@@ -125,7 +125,7 @@ export function HomeScreen() {
         <Mascot state={days > 0 ? 'happy' : 'braced'} size={72} />
       </View>
 
-      {/* Recovery Dashboard — flat, sits directly on the page */}
+      {/* Recovery Dashboard - flat, sits directly on the page */}
       <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
         <RecoveryRing current={days} target={target} size={ringSize} caption={`of ${target} days`} />
         <Text variant="title2" style={{ marginTop: spacing.md }}>
@@ -138,7 +138,7 @@ export function HomeScreen() {
         <View style={{ alignSelf: 'stretch', marginTop: spacing.xl, gap: spacing.md }}>
           {profile.addictionType === 'pornography' ? (
             <>
-              {/* Compact values + context in the label — same visual rhythm
+              {/* Compact values + context in the label - same visual rhythm
                   as the gambling money tiles. */}
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
                 <StatTile
@@ -166,14 +166,14 @@ export function HomeScreen() {
             <>
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
                 <StatTile
-                  value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '—'}
+                  value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '-'}
                   label="Current Balance"
                 />
                 <StatTile
                   value={
                     moneyStats.change != null
                       ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
-                      : '—'
+                      : '-'
                   }
                   label="Since Last Entry"
                 />
@@ -183,7 +183,7 @@ export function HomeScreen() {
                   value={
                     moneyStats.weeklyTrend != null
                       ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency) + '/day'
-                      : '—'
+                      : '-'
                   }
                   label="Weekly Trend"
                 />
@@ -191,7 +191,7 @@ export function HomeScreen() {
                   value={
                     moneyStats.monthlyTrend != null
                       ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency) + '/day'
-                      : '—'
+                      : '-'
                   }
                   label="Monthly Trend"
                   tone="primarySoft"
@@ -202,7 +202,7 @@ export function HomeScreen() {
         </View>
       </View>
 
-      {/* Share progress — sits above the motivation feed. */}
+      {/* Share progress - sits above the motivation feed. */}
       <Pressable
         onPress={() => router.push('/share' as Href)}
         accessibilityRole="button"
@@ -239,7 +239,7 @@ export function HomeScreen() {
         </View>
       </Pressable>
 
-      {/* Daily motivation — today's quote first, saved favorites after. */}
+      {/* Daily motivation - today's quote first, saved favorites after. */}
       <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
         Daily Motivation
       </Text>
@@ -291,7 +291,7 @@ export function HomeScreen() {
           <View style={{ flex: 1 }}>
             <Text variant="callout">Play a game</Text>
             <Text variant="caption" dim style={{ marginTop: 1 }}>
-              Checkers, Clarity, Sudoku & Block Puzzle — all offline
+              Checkers, Clarity, Sudoku & Block Puzzle - all offline
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
@@ -342,7 +342,7 @@ export function HomeScreen() {
 // ---------------------------------------------------------------------------
 
 
-/** Compact iOS-style action tile — 3-up grid, flat surface with a hairline
+/** Compact iOS-style action tile - 3-up grid, flat surface with a hairline
  *  border and a tinted rounded-square glyph. Calm, not carnival. */
 function QuickAction({
   icon, label, onPress, accent,

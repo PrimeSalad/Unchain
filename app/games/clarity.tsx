@@ -39,7 +39,7 @@ const FLIP_DURATION = 340;
 const REVEAL_TOTAL = FLIP_STAGGER * (WORD_LENGTH - 1) + FLIP_DURATION + 80;
 
 // ---------------------------------------------------------------------------
-// Responsive layout — derived from the real screen size so the game fits every
+// Responsive layout - derived from the real screen size so the game fits every
 // device, from iPhone SE (320 × 568 pt) to large phones and tablets.
 // ---------------------------------------------------------------------------
 
@@ -65,7 +65,7 @@ function useClarityLayout() {
   // Leave 16 pt safe margin on each side (matches the app gutter token).
   const SIDE_MARGIN = 16;
   const tileGap = width < 360 ? 4 : 5;
-  // Board fills the available width exactly — no maxWidth cap needed because
+  // Board fills the available width exactly - no maxWidth cap needed because
   // we already express it as available pixels, not a hard number.
   const boardWidth = width - SIDE_MARGIN * 2;
   // 5 tiles across, separated by 4 gaps.
@@ -219,7 +219,7 @@ export default function Clarity() {
     }, REVEAL_TOTAL);
   };
 
-  /** Restart — only offered once the round is complete; never repeats the word. */
+  /** Restart - only offered once the round is complete; never repeats the word. */
   const newRound = () => {
     const fresh = randomAnswer(answer);
     setAnswer(fresh);
@@ -293,7 +293,7 @@ export default function Clarity() {
           })}
         </View>
 
-        {/* Board — no horizontal padding here; boardWidth already accounts for margins */}
+        {/* Board - no horizontal padding here; boardWidth already accounts for margins */}
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <View style={{ width: layout.boardWidth, gap: layout.rowGap }}>
             {Array.from({ length: MAX_GUESSES }).map((_, r) => {
@@ -340,7 +340,7 @@ export default function Clarity() {
           </View>
         </View>
 
-        {/* Keyboard — swapped for round actions once the round completes */}
+        {/* Keyboard - swapped for round actions once the round completes */}
         {doneRevealed ? (
           <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.sm }}>
             <View style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.xl, marginBottom: spacing.sm }}>
@@ -358,7 +358,7 @@ export default function Clarity() {
             >
               <Ionicons name="refresh" size={18} color={theme.color.onPrimary} />
               <Text variant="headline" color={theme.color.onPrimary}>
-                {mode === 'daily' ? 'Keep playing — practice word' : 'New word'}
+                {mode === 'daily' ? 'Keep playing - practice word' : 'New word'}
               </Text>
             </Pressable>
           </View>
@@ -418,7 +418,7 @@ function tileBg(state: TileState, dark: boolean): string {
   return dark ? GRAY_DARK : GRAY_LIGHT;
 }
 
-/** Empty/typing tile — pops softly when a letter lands in it. */
+/** Empty/typing tile - pops softly when a letter lands in it. */
 function TypeTile({ letter, fontSize }: { letter: string; fontSize: number }) {
   const theme = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
@@ -450,7 +450,7 @@ function TypeTile({ letter, fontSize }: { letter: string; fontSize: number }) {
   );
 }
 
-/** Submitted tile — flips to reveal its colour (instant when resuming). */
+/** Submitted tile - flips to reveal its colour (instant when resuming). */
 function FlipTile({
   letter, state, delay, instant, bounce, fontSize,
 }: {

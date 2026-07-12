@@ -18,12 +18,12 @@ import {
 // A crash inside the screen must never take navigation down with it.
 export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
 
-const GAME_ORDER: GameId[] = ['clarity', 'checkers', 'sudoku', 'blocks', 'gonogo', 'stopsignal'];
+const GAME_ORDER: GameId[] = ['clarity', 'checkers', 'sudoku', 'blocks', 'gonogo'];
 
 export default function Achievements() {
   const theme = useTheme();
   const games = useStore((s) => s.games);
-  const unlockedCount = Object.keys(games.achievements).length;
+  const unlockedCount = GAME_ACHIEVEMENTS.filter((a) => games.achievements[a.id]).length;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.bg }}>

@@ -1,5 +1,5 @@
 /**
- * Education Hub — pure domain: built-in guides, curated free resources, and
+ * Education Hub - pure domain: built-in guides, curated free resources, and
  * the personalization rules that adapt both to the user's addiction type.
  *
  * Content principles:
@@ -7,7 +7,7 @@
  *    public-health literature. No moralising, no shame, no scare tactics.
  *  - Fully offline: every guide ships with the app. External resources are
  *    free, legal sources (public-domain books, open-access publications) and
- *    are clearly links — nothing is scraped or embedded.
+ *    are clearly links - nothing is scraped or embedded.
  *  - Personalized: guides, resources, and categories derive from
  *    profile.addictionType, so changing the profile re-personalizes the hub
  *    automatically.
@@ -55,12 +55,12 @@ export interface Resource {
   readUrl: string;
   /** Only set when a legal, stable PDF download exists. */
   pdfUrl?: string;
-  /** Generated cover tint (no remote images — offline + no rights issues). */
+  /** Generated cover tint (no remote images - offline + no rights issues). */
   tint: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Categories — universal set + addiction-specific additions
+// Categories - universal set + addiction-specific additions
 // ─────────────────────────────────────────────────────────────────────────────
 
 const UNIVERSAL_CATEGORIES: EduCategory[] = [
@@ -93,14 +93,14 @@ export function categoriesFor(type: AddictionType): EduCategory[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Built-in guides — offline, evidence-based, per addiction
+// Built-in guides - offline, evidence-based, per addiction
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Shared closing section — the same honest guidance for every addiction. */
+/** Shared closing section - the same honest guidance for every addiction. */
 const SEEK_HELP = (examples: string): GuideSection => ({
   heading: 'When to consider professional help',
   body: [
-    'Self-help tools work best alongside support, not instead of it. Reaching out is a practical step, not a last resort — most people who recover well have help at some point.',
+    'Self-help tools work best alongside support, not instead of it. Reaching out is a practical step, not a last resort - most people who recover well have help at some point.',
     'It is reasonable to talk to a doctor, counsellor, or support group when:',
   ],
   bullets: [
@@ -118,7 +118,7 @@ const GUIDES: Guide[] = [
   {
     id: 'g-gambling',
     title: 'Understanding Gambling Addiction',
-    subtitle: 'Odds, urges, chasing losses — and the way out',
+    subtitle: 'Odds, urges, chasing losses - and the way out',
     icon: 'dice',
     audience: ['gambling'],
     minutes: 9,
@@ -126,22 +126,22 @@ const GUIDES: Guide[] = [
       {
         heading: 'What gambling addiction is',
         body: [
-          'Gambling disorder is a recognised behavioral addiction: the drive to keep betting despite mounting harm. It is not a weakness of character — gambling products are engineered around intermittent rewards, the same reinforcement pattern that trains lab animals fastest and holds humans hardest.',
-          'Near-misses, bonus rounds, and fast bet-to-result loops keep the brain\'s reward system firing on possibility rather than payout. Over time the activity stops being about winning money and becomes about escaping discomfort — boredom, stress, shame, or the losses themselves.',
+          'Gambling disorder is a recognised behavioral addiction: the drive to keep betting despite mounting harm. It is not a weakness of character - gambling products are engineered around intermittent rewards, the same reinforcement pattern that trains lab animals fastest and holds humans hardest.',
+          'Near-misses, bonus rounds, and fast bet-to-result loops keep the brain\'s reward system firing on possibility rather than payout. Over time the activity stops being about winning money and becomes about escaping discomfort - boredom, stress, shame, or the losses themselves.',
         ],
       },
       {
         heading: 'Why people get pulled in',
         body: [
           'Nobody chooses addiction. Common on-ramps are an early big win (which the brain over-remembers), gambling to cope with stress or loneliness, easy 24/7 access on a phone, payday rituals, and the belief that skill or systems can beat the odds.',
-          'Financial pressure is a cruel accelerator: the worse the losses, the stronger the pull to win them back — which is precisely how the losses grow.',
+          'Financial pressure is a cruel accelerator: the worse the losses, the stronger the pull to win them back - which is precisely how the losses grow.',
         ],
       },
       {
         heading: 'Myths and facts',
         body: [],
         bullets: [
-          'Myth: "I\'m due for a win." Fact: every spin, draw, and hand is independent. Past losses do not raise your odds — this is the gambler\'s fallacy.',
+          'Myth: "I\'m due for a win." Fact: every spin, draw, and hand is independent. Past losses do not raise your odds - this is the gambler\'s fallacy.',
           'Myth: "Chasing losses can dig me out." Fact: the house edge means longer play loses more on average. Chasing is how debts compound.',
           'Myth: "Near-misses mean I\'m close." Fact: near-misses are designed outcomes that fire reward circuitry without paying anything.',
           'Myth: "I can win it back with a system." Fact: no betting pattern changes the underlying odds of an independent random event.',
@@ -151,8 +151,8 @@ const GUIDES: Guide[] = [
       {
         heading: 'How it affects life',
         body: [
-          'Finances take the visible hit — drained savings, borrowed money, hidden debt, and the constant mental accounting of what could be recovered. But the quieter costs run deeper: secrecy strains relationships, sleep breaks under late sessions and worry, focus at work shrinks to the next chance to play, and mood swings track wins and losses.',
-          'Many people describe the worst part not as the money but the shrinking of life — hobbies, friendships, and plans crowded out by one activity.',
+          'Finances take the visible hit - drained savings, borrowed money, hidden debt, and the constant mental accounting of what could be recovered. But the quieter costs run deeper: secrecy strains relationships, sleep breaks under late sessions and worry, focus at work shrinks to the next chance to play, and mood swings track wins and losses.',
+          'Many people describe the worst part not as the money but the shrinking of life - hobbies, friendships, and plans crowded out by one activity.',
         ],
       },
       {
@@ -171,14 +171,14 @@ const GUIDES: Guide[] = [
       {
         heading: 'Recovery strategies that work',
         body: [
-          'Make gambling harder to reach and money harder to move — friction is your friend.',
+          'Make gambling harder to reach and money harder to move - friction is your friend.',
         ],
         bullets: [
           'Block gambling sites and apps (this app\'s Focus Protection is built for exactly this).',
           'Add money friction: let a trusted person hold cards, set bank gambling blocks, keep only small cash.',
-          'Self-exclude from venues and betting sites — most offer formal programs.',
+          'Self-exclude from venues and betting sites - most offer formal programs.',
           'Track honestly: a daily journal entry turns fog into data, and data shows progress.',
-          'Plan for triggers: payday, sports events, ads, and free time are predictable — schedule something incompatible with betting.',
+          'Plan for triggers: payday, sports events, ads, and free time are predictable - schedule something incompatible with betting.',
           'Treat debt as a project, not a shame: list it, talk to creditors, and consider free debt-advice services.',
           'Expect urges and relapses to be part of recovery, not proof of failure. Each one mapped is one weakened.',
         ],
@@ -189,9 +189,9 @@ const GUIDES: Guide[] = [
           'Urges crest and fall like waves, usually within 15–30 minutes. Your job is not to fight the wave but to outlast it.',
         ],
         bullets: [
-          'Delay: tell yourself "not in the next 15 minutes" — then use the SOS tools here.',
+          'Delay: tell yourself "not in the next 15 minutes" - then use the SOS tools here.',
           'Breathe: a few minutes of slow, exhale-heavy breathing lowers arousal measurably.',
-          'Move: a walk changes body chemistry and location — two triggers gone at once.',
+          'Move: a walk changes body chemistry and location - two triggers gone at once.',
           'Say it out loud: message one person "having an urge." Naming it shrinks it.',
           'Play a no-stakes game (the games in this app exist for this exact moment).',
         ],
@@ -212,7 +212,7 @@ const GUIDES: Guide[] = [
       {
         heading: 'What compulsive use is',
         body: [
-          'Compulsive pornography use means the habit has moved from a choice to a pull — using more than intended, escalating to stay stimulated, and continuing despite costs to mood, focus, or relationships.',
+          'Compulsive pornography use means the habit has moved from a choice to a pull - using more than intended, escalating to stay stimulated, and continuing despite costs to mood, focus, or relationships.',
           'The mechanism is ordinary neuroscience, not moral failure: unlimited novelty on demand trains the reward system to expect intense stimulation with zero effort, which can mute interest in slower, real-world rewards for a while. The good news: this is trainable in both directions.',
         ],
       },
@@ -220,7 +220,7 @@ const GUIDES: Guide[] = [
         heading: 'Why the habit forms',
         body: [
           'Most compulsive use is emotional regulation in disguise: a fast, private way to switch off stress, loneliness, boredom, anxiety, or insomnia. Late nights, being alone, and aimless scrolling are the classic on-ramps.',
-          'Because the relief is instant and reliable, the brain files it as the go-to answer for any discomfort — which is how a coping shortcut becomes a loop.',
+          'Because the relief is instant and reliable, the brain files it as the go-to answer for any discomfort - which is how a coping shortcut becomes a loop.',
         ],
       },
       {
@@ -236,7 +236,7 @@ const GUIDES: Guide[] = [
       {
         heading: 'How it affects life',
         body: [
-          'Heavy use commonly crowds out sleep (late-night sessions), drains next-day focus and motivation, and feeds a shame loop that lowers mood — which then triggers more use. In relationships it can create secrecy and distance, and make real intimacy feel flatter than the screen.',
+          'Heavy use commonly crowds out sleep (late-night sessions), drains next-day focus and motivation, and feeds a shame loop that lowers mood - which then triggers more use. In relationships it can create secrecy and distance, and make real intimacy feel flatter than the screen.',
           'None of this is permanent. People consistently report that mood, energy, focus, and connection recover as the compulsive loop weakens.',
         ],
       },
@@ -258,12 +258,12 @@ const GUIDES: Guide[] = [
           'Attack the loop, not yourself: change the cue, add friction, and give the need underneath a better answer.',
         ],
         bullets: [
-          'Identify your pattern — this app\'s journal asks exactly the right questions (when, what led up, what you felt before).',
+          'Identify your pattern - this app\'s journal asks exactly the right questions (when, what led up, what you felt before).',
           'Add friction: content blockers, phone out of the bedroom, no aimless scrolling in bed.',
           'Protect sleep: a fixed lights-out time removes the highest-risk window for most people.',
-          'Fill the slot: the urge usually arrives at predictable times — put something real there (walk, shower, call, game).',
+          'Fill the slot: the urge usually arrives at predictable times - put something real there (walk, shower, call, game).',
           'Practise self-compassion deliberately: shame fuels the loop; kindness starves it. Talk to yourself like a friend in recovery.',
-          'Track clean days and urges — visible progress is powerful fuel.',
+          'Track clean days and urges - visible progress is powerful fuel.',
         ],
       },
       {
@@ -272,7 +272,7 @@ const GUIDES: Guide[] = [
         bullets: [
           'Get out of the trigger position: stand up, leave the room, lights on.',
           'Do 2 minutes of paced breathing (the SOS orb sets the pace).',
-          'Cold water on the face or a quick shower — a hard state-changer.',
+          'Cold water on the face or a quick shower - a hard state-changer.',
           'Message someone, or write an Emergency Reflection right here.',
           'Set a 15-minute timer. Most urges do not survive it.',
         ],
@@ -294,7 +294,7 @@ const GUIDES: Guide[] = [
         heading: 'What compulsive use is',
         body: [
           'Compulsive social media use is the loss of control over checking and scrolling: reaching for the phone without deciding to, losing hours to feeds, and feeling unable to stop despite wanting to.',
-          'Feeds are built on variable rewards — sometimes the next scroll is great, usually it is not — which is the most habit-forming reinforcement schedule known. Infinite scroll removes every natural stopping point on purpose.',
+          'Feeds are built on variable rewards - sometimes the next scroll is great, usually it is not - which is the most habit-forming reinforcement schedule known. Infinite scroll removes every natural stopping point on purpose.',
         ],
       },
       {
@@ -307,16 +307,16 @@ const GUIDES: Guide[] = [
         heading: 'Myths and facts',
         body: [],
         bullets: [
-          'Myth: "It\'s just a bad habit, not a real problem." Fact: excessive use measurably affects sleep, mood, focus, and self-esteem — that is real.',
+          'Myth: "It\'s just a bad habit, not a real problem." Fact: excessive use measurably affects sleep, mood, focus, and self-esteem - that is real.',
           'Myth: "I need it for everything." Fact: most people need specific functions (messages, groups), not the feed. The feed is the product; the functions are the excuse.',
-          'Myth: "Quitting means deleting everything forever." Fact: most successful changes are structural — removing feeds, not friends.',
+          'Myth: "Quitting means deleting everything forever." Fact: most successful changes are structural - removing feeds, not friends.',
           'Myth: "Everyone else\'s life really is like their feed." Fact: feeds are highlight reels; comparing your inside to someone\'s outside is rigged.',
         ],
       },
       {
         heading: 'How it affects life',
         body: [
-          'The costs are attention-shaped: fragmented focus, "phantom" checking mid-task, doomscrolling that displaces sleep, and mood dips from comparison. Relationships feel it too — present in body, absent in attention.',
+          'The costs are attention-shaped: fragmented focus, "phantom" checking mid-task, doomscrolling that displaces sleep, and mood dips from comparison. Relationships feel it too - present in body, absent in attention.',
           'Time-use studies keep finding the same thing: heavy users underestimate their screen time by hours. The journal here helps you see the real number without judgment.',
         ],
       },
@@ -327,20 +327,20 @@ const GUIDES: Guide[] = [
           'Checking within minutes of waking, or during every pause.',
           'Losing chunks of time you intended to spend elsewhere.',
           'Scrolling in bed and paying for it the next day.',
-          'Feeling worse after — envy, agitation, emptiness — yet returning.',
+          'Feeling worse after - envy, agitation, emptiness - yet returning.',
           'Phantom vibrations, or anxiety when the phone is out of reach.',
           'Work, study, or people getting the leftovers of your attention.',
         ],
       },
       {
         heading: 'Recovery strategies that work',
-        body: ['You are not fighting yourself — you are re-designing an environment built to defeat you.'],
+        body: ['You are not fighting yourself - you are re-designing an environment built to defeat you.'],
         bullets: [
           'Kill the feed, keep the function: use messaging directly, unfollow aggressively, try feed-blocker settings.',
           'Turn off every non-human notification. People can interrupt you; algorithms cannot.',
           'Make the phone boring: grayscale mode, home screen with tools only, apps behind a search.',
           'Create phone-free zones and times: bedroom, meals, first hour of the day.',
-          'Replace, don\'t just remove: the checking urge is often a boredom or connection need — give it a real answer.',
+          'Replace, don\'t just remove: the checking urge is often a boredom or connection need - give it a real answer.',
           'Use this app\'s blocklist for the sites that pull you in hardest.',
         ],
       },
@@ -349,9 +349,9 @@ const GUIDES: Guide[] = [
         body: ['The reach-for-phone impulse takes seconds to pass if you notice it.'],
         bullets: [
           'Feel the impulse, name it: "urge to check." Wait ten seconds.',
-          'Put the phone in another room and let discomfort settle — it does.',
+          'Put the phone in another room and let discomfort settle - it does.',
           'Swap the motion: open the breathing tool instead of the feed.',
-          'Bored? Boredom is withdrawal from stimulation — it fades and focus returns.',
+          'Bored? Boredom is withdrawal from stimulation - it fades and focus returns.',
         ],
       },
       SEEK_HELP('Screen time keeps overriding sleep, work, or relationships despite real attempts to change.'),
@@ -370,14 +370,14 @@ const GUIDES: Guide[] = [
       {
         heading: 'What nicotine addiction is',
         body: [
-          'Nicotine is one of the most dependence-forming substances known — not because the high is big, but because the cycle is fast. Each dose relieves the withdrawal the previous dose created, so smoking feels like stress relief when it is mostly relief from nicotine\'s own absence.',
+          'Nicotine is one of the most dependence-forming substances known - not because the high is big, but because the cycle is fast. Each dose relieves the withdrawal the previous dose created, so smoking feels like stress relief when it is mostly relief from nicotine\'s own absence.',
           'Vaping runs the same loop, often with higher nicotine delivery and fewer natural pauses.',
         ],
       },
       {
         heading: 'Why the habit forms',
         body: [
-          'Beyond the chemistry, smoking weaves into daily ritual: with coffee, after meals, on breaks, in stress, in company. Each pairing becomes a trigger, which is why "just one" moments feel everywhere. Most smokers started young, before the risks felt real — dependence did the rest.',
+          'Beyond the chemistry, smoking weaves into daily ritual: with coffee, after meals, on breaks, in stress, in company. Each pairing becomes a trigger, which is why "just one" moments feel everywhere. Most smokers started young, before the risks felt real - dependence did the rest.',
         ],
       },
       {
@@ -393,7 +393,7 @@ const GUIDES: Guide[] = [
       {
         heading: 'How it affects life',
         body: [
-          'Health effects are well documented — heart, lungs, cancers, healing, skin. Day to day it also taxes money (count your monthly spend in this app), fitness, taste and smell, sleep quality, and the low-grade anxiety of managing supply and cravings.',
+          'Health effects are well documented - heart, lungs, cancers, healing, skin. Day to day it also taxes money (count your monthly spend in this app), fitness, taste and smell, sleep quality, and the low-grade anxiety of managing supply and cravings.',
         ],
       },
       {
@@ -409,14 +409,14 @@ const GUIDES: Guide[] = [
       },
       {
         heading: 'Quitting strategies that work',
-        body: ['Quitting is a skill with a strong evidence base — stack the proven pieces.'],
+        body: ['Quitting is a skill with a strong evidence base - stack the proven pieces.'],
         bullets: [
-          'Pick a quit date within two weeks and tell people — commitment works.',
+          'Pick a quit date within two weeks and tell people - commitment works.',
           'Consider nicotine replacement (patches, gum, lozenges) or ask a doctor about cessation medicines; they roughly double success rates.',
           'Break the pairings: change the coffee spot, leave the table after meals, new break routine.',
-          'Remove supply and paraphernalia the night before — all of it.',
+          'Remove supply and paraphernalia the night before - all of it.',
           'Know the timeline: cravings peak in the first 3 days, ease over 2–4 weeks. It is finite.',
-          'Track money not smoked — watch it become something real.',
+          'Track money not smoked - watch it become something real.',
         ],
       },
       {
@@ -425,7 +425,7 @@ const GUIDES: Guide[] = [
         bullets: [
           'The 4 Ds: Delay, Deep breathe, Drink water, Do something else.',
           'Hands and mouth busy: toothpick, gum, cold water, walk.',
-          'Slow exhale breathing mimics the smoking rhythm — often what the body misses.',
+          'Slow exhale breathing mimics the smoking rhythm - often what the body misses.',
           'Urge-surf with the SOS tools; log it and watch the count of survived cravings grow.',
         ],
       },
@@ -437,7 +437,7 @@ const GUIDES: Guide[] = [
   {
     id: 'g-alcohol',
     title: 'Understanding Alcohol Problems',
-    subtitle: 'From habit creep to dependence — honestly, without shame',
+    subtitle: 'From habit creep to dependence - honestly, without shame',
     icon: 'wine',
     audience: ['alcohol'],
     minutes: 9,
@@ -445,7 +445,7 @@ const GUIDES: Guide[] = [
       {
         heading: 'What problem drinking is',
         body: [
-          'Alcohol problems sit on a spectrum, from creeping habit (every evening, a bit more each year) to physical dependence. The line that matters is simple: drinking is a problem when it keeps costing you things — health, mornings, money, trust, memory — and you keep doing it anyway.',
+          'Alcohol problems sit on a spectrum, from creeping habit (every evening, a bit more each year) to physical dependence. The line that matters is simple: drinking is a problem when it keeps costing you things - health, mornings, money, trust, memory - and you keep doing it anyway.',
           'Alcohol is a depressant that the brain adapts to; with regular use it recalibrates, so stopping produces rebound anxiety and poor sleep that feel like reasons to drink again.',
         ],
       },
@@ -460,15 +460,15 @@ const GUIDES: Guide[] = [
         body: [],
         bullets: [
           'Myth: "I\'m fine because I only drink beer / only at night / never before 5." Fact: pattern rules do not change what the dose does.',
-          'Myth: "Alcohol helps me sleep." Fact: it sedates, then fragments sleep — REM suffers and 3 a.m. wakefulness follows.',
+          'Myth: "Alcohol helps me sleep." Fact: it sedates, then fragments sleep - REM suffers and 3 a.m. wakefulness follows.',
           'Myth: "Real alcoholics are falling down. I function." Fact: high-functioning dependence is common and still compounds harm.',
-          'Myth: "Quitting cold is the only way." Fact: for heavy daily drinkers, sudden stopping can be medically dangerous — tapering with medical advice is safer. For others, structured cutting down or sobriety both work.',
+          'Myth: "Quitting cold is the only way." Fact: for heavy daily drinkers, sudden stopping can be medically dangerous - tapering with medical advice is safer. For others, structured cutting down or sobriety both work.',
         ],
       },
       {
         heading: 'How it affects life',
         body: [
-          'Beyond liver, heart, and cancer risk, regular drinking erodes the everyday: sleep quality, morning energy, mood stability, judgment, money, and the reliability people feel from you. Many people only see the size of the effect after 30 days without — which is itself a useful experiment.',
+          'Beyond liver, heart, and cancer risk, regular drinking erodes the everyday: sleep quality, morning energy, mood stability, judgment, money, and the reliability people feel from you. Many people only see the size of the effect after 30 days without - which is itself a useful experiment.',
         ],
       },
       {
@@ -486,14 +486,14 @@ const GUIDES: Guide[] = [
       {
         heading: 'Recovery strategies that work',
         body: [
-          'Important safety note: if you drink heavily every day, talk to a doctor before stopping abruptly — withdrawal can be dangerous and is very manageable with help.',
+          'Important safety note: if you drink heavily every day, talk to a doctor before stopping abruptly - withdrawal can be dangerous and is very manageable with help.',
         ],
         bullets: [
-          'Make the house dry — distance beats discipline at 9 p.m.',
+          'Make the house dry - distance beats discipline at 9 p.m.',
           'Change the ritual, keep the slot: alcohol-free versions, new glass, new drink, same couch.',
           'Tell people and give the refusal one sentence: "I\'m not drinking at the moment."',
           'Plan the danger windows: Friday night, stress spikes, certain company.',
-          'Fix sleep without alcohol — it is the keystone habit that makes everything easier.',
+          'Fix sleep without alcohol - it is the keystone habit that makes everything easier.',
           'Count your streak and money saved here; visible wins carry the boring middle weeks.',
         ],
       },
@@ -501,13 +501,13 @@ const GUIDES: Guide[] = [
         heading: 'Healthy coping in the moment',
         body: ['Cravings pass. Every one you outlast weakens the wiring.'],
         bullets: [
-          'Cold non-alcoholic drink in hand immediately — occupies ritual and thirst.',
+          'Cold non-alcoholic drink in hand immediately - occupies ritual and thirst.',
           'Change rooms or go outside; state change kills momentum.',
           'Slow breathing or a shower for stress spikes.',
           'Message someone, or log the urge here and watch it pass.',
         ],
       },
-      SEEK_HELP('You experience shakes, sweats, or anxiety when not drinking — see a doctor before stopping.'),
+      SEEK_HELP('You experience shakes, sweats, or anxiety when not drinking - see a doctor before stopping.'),
     ],
   },
 
@@ -523,14 +523,14 @@ const GUIDES: Guide[] = [
       {
         heading: 'What substance addiction is',
         body: [
-          'Addiction is a learned, compulsive loop: a substance reliably changes how you feel, the brain over-learns the shortcut, tolerance raises the dose, and eventually the substance is needed to feel normal rather than good. Medicine treats it as a health condition — because that is what the evidence shows it is.',
+          'Addiction is a learned, compulsive loop: a substance reliably changes how you feel, the brain over-learns the shortcut, tolerance raises the dose, and eventually the substance is needed to feel normal rather than good. Medicine treats it as a health condition - because that is what the evidence shows it is.',
           'Different substances differ in risk and withdrawal, but the recovery principles below hold across them.',
         ],
       },
       {
         heading: 'Why it develops',
         body: [
-          'The strongest predictors are not weakness but exposure and pain: stress, trauma, untreated anxiety or depression, chronic pain, social environment, and genetics. The substance works — briefly — for something real. Recovery means finding better answers for that real thing.',
+          'The strongest predictors are not weakness but exposure and pain: stress, trauma, untreated anxiety or depression, chronic pain, social environment, and genetics. The substance works - briefly - for something real. Recovery means finding better answers for that real thing.',
         ],
       },
       {
@@ -546,7 +546,7 @@ const GUIDES: Guide[] = [
       {
         heading: 'How it affects life',
         body: [
-          'Beyond the substance-specific health risks, dependence reorganises life around supply and recovery from use: money leaks, sleep breaks, work slips, honesty erodes under secrecy, and relationships carry the strain. The fog lifts surprisingly fast for many once use stops — that early clarity is worth protecting.',
+          'Beyond the substance-specific health risks, dependence reorganises life around supply and recovery from use: money leaks, sleep breaks, work slips, honesty erodes under secrecy, and relationships carry the strain. The fog lifts surprisingly fast for many once use stops - that early clarity is worth protecting.',
         ],
       },
       {
@@ -569,7 +569,7 @@ const GUIDES: Guide[] = [
         bullets: [
           'Change the environment: distance from supply, from using spaces, and where needed from using company.',
           'Structure beats willpower: fill high-risk hours with fixed commitments.',
-          'Use support — groups (12-step, SMART Recovery), counselling, or medication-assisted treatment where appropriate.',
+          'Use support - groups (12-step, SMART Recovery), counselling, or medication-assisted treatment where appropriate.',
           'Sleep, food, movement: boring, and they measurably cut craving intensity.',
           'Track clean days here; plan specifically for the situations that ended previous attempts.',
           'Have a lapse plan written in advance: who you call, what you do next, no spiral.',
@@ -579,13 +579,13 @@ const GUIDES: Guide[] = [
         heading: 'Healthy coping in the moment',
         body: ['Cravings are intense but time-limited. Plan to outlast, not out-argue.'],
         bullets: [
-          'Leave the situation — physical distance first, debate later.',
+          'Leave the situation - physical distance first, debate later.',
           'Call or message your person; isolation is craving\'s best friend.',
-          'Slow breathing, cold water, hard exercise burst — pick your state-changer.',
+          'Slow breathing, cold water, hard exercise burst - pick your state-changer.',
           'Log the urge here. Surviving one is a rep; reps build the muscle.',
         ],
       },
-      SEEK_HELP('Withdrawal is physically rough, or use involves opioids, alcohol, or benzodiazepines — medical support makes this far safer.'),
+      SEEK_HELP('Withdrawal is physically rough, or use involves opioids, alcohol, or benzodiazepines - medical support makes this far safer.'),
     ],
   },
 
@@ -601,14 +601,14 @@ const GUIDES: Guide[] = [
       {
         heading: 'What a behavioral addiction is',
         body: [
-          'Any behavior that reliably changes how you feel — gaming, shopping, eating, trading, exercise, anything — can become compulsive: repeated more than intended, hard to stop, and continued despite harm. The substance is optional; the loop is the addiction.',
+          'Any behavior that reliably changes how you feel - gaming, shopping, eating, trading, exercise, anything - can become compulsive: repeated more than intended, hard to stop, and continued despite harm. The substance is optional; the loop is the addiction.',
           'The loop is always the same shape: cue → urge → behavior → relief → repetition, with the relief teaching the brain to run it again, faster, next time.',
         ],
       },
       {
         heading: 'Why loops form',
         body: [
-          'Compulsive habits are usually solutions that outlived their usefulness — ways of coping with stress, boredom, loneliness, or pain that worked instantly and got over-learned. Availability matters too: what is always within reach gets woven in deepest.',
+          'Compulsive habits are usually solutions that outlived their usefulness - ways of coping with stress, boredom, loneliness, or pain that worked instantly and got over-learned. Availability matters too: what is always within reach gets woven in deepest.',
         ],
       },
       {
@@ -617,13 +617,13 @@ const GUIDES: Guide[] = [
         bullets: [
           'Myth: "It\'s not a real addiction if there\'s no substance." Fact: behavioral addictions engage the same reward circuitry and respond to the same treatments.',
           'Myth: "I should be able to stop by deciding to." Fact: loops live in environment and routine; redesigning those is what works.',
-          'Myth: "One slip means starting from zero." Fact: progress is cumulative — the skills and days you built do not vanish with a lapse.',
+          'Myth: "One slip means starting from zero." Fact: progress is cumulative - the skills and days you built do not vanish with a lapse.',
         ],
       },
       {
         heading: 'How it affects life',
         body: [
-          'The costs depend on the behavior, but the pattern is shared: time and attention drain first, then sleep, then money or health, then honesty (hiding it), then relationships. The tell is narrowing — life organising itself around one activity.',
+          'The costs depend on the behavior, but the pattern is shared: time and attention drain first, then sleep, then money or health, then honesty (hiding it), then relationships. The tell is narrowing - life organising itself around one activity.',
         ],
       },
       {
@@ -643,19 +643,19 @@ const GUIDES: Guide[] = [
         bullets: [
           'Map your loop in the journal: cue, feeling, behavior, payoff. Precision beats guilt.',
           'Add friction to the behavior and remove friction from alternatives.',
-          'Time-box or fully abstain — pick the rule that fits the behavior and your history with rules.',
+          'Time-box or fully abstain - pick the rule that fits the behavior and your history with rules.',
           'Fill the vacated time deliberately; empty hours refill themselves with the old habit.',
           'Recruit one accountable person. Secrets feed loops.',
-          'Track streaks and urges here — the trend is the motivation.',
+          'Track streaks and urges here - the trend is the motivation.',
         ],
       },
       {
         heading: 'Healthy coping in the moment',
         body: [],
         bullets: [
-          'Pause and name the urge — observation weakens automaticity.',
+          'Pause and name the urge - observation weakens automaticity.',
           'Delay 15 minutes and change location.',
-          'Breathe slow, move fast, or get cold — any deliberate state change.',
+          'Breathe slow, move fast, or get cold - any deliberate state change.',
           'Open this app instead: SOS, a game, a walk, a journal line.',
         ],
       },
@@ -675,7 +675,7 @@ const GUIDES: Guide[] = [
       {
         heading: 'The idea',
         body: [
-          'An urge is a wave: it rises, peaks, and always falls — typically within 15–30 minutes, often faster. Fighting it ("don\'t think about it") feeds it attention; giving in resets the clock harder. Urge surfing is the third option: observe it like weather and let it pass.',
+          'An urge is a wave: it rises, peaks, and always falls - typically within 15–30 minutes, often faster. Fighting it ("don\'t think about it") feeds it attention; giving in resets the clock harder. Urge surfing is the third option: observe it like weather and let it pass.',
         ],
       },
       {
@@ -683,16 +683,16 @@ const GUIDES: Guide[] = [
         body: [],
         bullets: [
           'Notice and name: "This is an urge. It will peak and fade."',
-          'Find it in your body — chest, hands, stomach. Describe the sensation neutrally, like a scientist.',
+          'Find it in your body - chest, hands, stomach. Describe the sensation neutrally, like a scientist.',
           'Breathe slowly into it. You are not suppressing; you are watching.',
           'Rate it 1–10 every couple of minutes. Watching the number fall is the lesson.',
-          'When it passes — and it will — log it. Every surfed urge permanently weakens the loop.',
+          'When it passes - and it will - log it. Every surfed urge permanently weakens the loop.',
         ],
       },
       {
         heading: 'Why it works',
         body: [
-          'Cravings are conditioned responses. Every time a cue fires and the behavior does NOT follow, the association weakens — extinction, the most reliable finding in learning science. You are not white-knuckling; you are retraining.',
+          'Cravings are conditioned responses. Every time a cue fires and the behavior does NOT follow, the association weakens - extinction, the most reliable finding in learning science. You are not white-knuckling; you are retraining.',
         ],
       },
     ],
@@ -716,7 +716,7 @@ const GUIDES: Guide[] = [
         heading: 'If you slip',
         body: [],
         bullets: [
-          'Stop the moment now — the first hour after a lapse matters most.',
+          'Stop the moment now - the first hour after a lapse matters most.',
           'Be blunt and kind: "That was a lapse. It does not erase my progress."',
           'Log it honestly here. The streak resets; the skills, insight, and days you built do not.',
           'Mine it: what was the cue, the feeling, the opening? That answer is next time\'s defense.',
@@ -726,7 +726,7 @@ const GUIDES: Guide[] = [
       {
         heading: 'The long view',
         body: [
-          'Recovery is almost never a straight line, and the data says attempts stack: each one carries learning into the next. The people who make it are rarely the ones who never slipped — they are the ones who kept coming back fast.',
+          'Recovery is almost never a straight line, and the data says attempts stack: each one carries learning into the next. The people who make it are rarely the ones who never slipped - they are the ones who kept coming back fast.',
         ],
       },
     ],
@@ -742,7 +742,7 @@ const GUIDES: Guide[] = [
       {
         heading: 'Cue, routine, reward',
         body: [
-          'Every habit — good or destructive — runs the same circuit: a cue triggers a routine that delivers a reward. Removing a routine while leaving the cue and the need creates a vacuum, and vacuums refill with the old habit. Durable change swaps the routine while honoring the need.',
+          'Every habit - good or destructive - runs the same circuit: a cue triggers a routine that delivers a reward. Removing a routine while leaving the cue and the need creates a vacuum, and vacuums refill with the old habit. Durable change swaps the routine while honoring the need.',
         ],
       },
       {
@@ -751,7 +751,7 @@ const GUIDES: Guide[] = [
         bullets: [
           'Find the cue: time, place, feeling, people, or the previous action. Your journal reveals it within a week.',
           'Name the real reward: relief? stimulation? connection? numbness? The new routine must pay the same bill.',
-          'Choose a replacement that is easy, fast, and available at the cue moment — this app\'s Healthy Alternatives are built as drop-in swaps.',
+          'Choose a replacement that is easy, fast, and available at the cue moment - this app\'s Healthy Alternatives are built as drop-in swaps.',
           'Engineer the environment: make the old routine 20 seconds harder and the new one 20 seconds easier.',
           'Stack it: attach the new routine to an existing anchor ("after coffee, I walk").',
           'Expect ~2 months of reps before it feels automatic. Consistency beats intensity.',
@@ -779,7 +779,7 @@ export function guideById(id: string): Guide | undefined {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Free reading — public-domain books and open-access resources. Every link is
+// Free reading - public-domain books and open-access resources. Every link is
 // a free, legal source. Gutenberg titles offer full online reading; PDF
 // downloads are only listed where the source provides one.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -790,7 +790,7 @@ const RESOURCES: Resource[] = [
     id: 'r-gambler',
     title: 'The Gambler',
     author: 'Fyodor Dostoevsky',
-    desc: 'The classic novel of compulsive gambling, written by an author who lived it — the psychology of chasing losses has never been drawn sharper.',
+    desc: 'The classic novel of compulsive gambling, written by an author who lived it - the psychology of chasing losses has never been drawn sharper.',
     category: 'gambling',
     audience: ['gambling'],
     length: '~190 pages',
@@ -801,7 +801,7 @@ const RESOURCES: Resource[] = [
     id: 'r-money-getting',
     title: 'The Art of Money Getting',
     author: 'P. T. Barnum',
-    desc: 'A short, plain-spoken classic on keeping and growing money — useful scaffolding while rebuilding finances in recovery.',
+    desc: 'A short, plain-spoken classic on keeping and growing money - useful scaffolding while rebuilding finances in recovery.',
     category: 'money',
     audience: ['gambling'],
     length: '~60 pages',
@@ -812,7 +812,7 @@ const RESOURCES: Resource[] = [
     id: 'r-barleycorn',
     title: 'John Barleycorn',
     author: 'Jack London',
-    desc: 'London\'s famous "alcoholic memoirs" — an unflinching first-person account of how drinking weaves into a life, decades ahead of its time.',
+    desc: 'London\'s famous "alcoholic memoirs" - an unflinching first-person account of how drinking weaves into a life, decades ahead of its time.',
     category: 'alcohol',
     audience: ['alcohol'],
     length: '~230 pages',
@@ -823,7 +823,7 @@ const RESOURCES: Resource[] = [
     id: 'r-opium',
     title: 'Confessions of an English Opium-Eater',
     author: 'Thomas De Quincey',
-    desc: 'The first great addiction memoir — dependence, withdrawal, and relapse described from the inside, still recognisable two centuries later.',
+    desc: 'The first great addiction memoir - dependence, withdrawal, and relapse described from the inside, still recognisable two centuries later.',
     category: 'substances',
     audience: ['drugs'],
     length: '~120 pages',
@@ -845,7 +845,7 @@ const RESOURCES: Resource[] = [
     id: 'r-smokefree',
     title: 'Quit Smoking Resources',
     author: 'Smokefree.gov (U.S. HHS)',
-    desc: 'Free, evidence-based quit plans, craving tools, and guides on nicotine replacement — the standard public-health toolkit, open to everyone.',
+    desc: 'Free, evidence-based quit plans, craving tools, and guides on nicotine replacement - the standard public-health toolkit, open to everyone.',
     category: 'smoking',
     audience: ['smoking'],
     length: 'Guides & tools',
@@ -856,7 +856,7 @@ const RESOURCES: Resource[] = [
     id: 'r-walden',
     title: 'Walden',
     author: 'Henry David Thoreau',
-    desc: 'The original argument for deliberate living and less noise — startlingly relevant to reclaiming attention from feeds and screens.',
+    desc: 'The original argument for deliberate living and less noise - startlingly relevant to reclaiming attention from feeds and screens.',
     category: 'digital',
     audience: ['social_media', 'pornography'],
     length: '~350 pages',
@@ -869,7 +869,7 @@ const RESOURCES: Resource[] = [
     id: 'r-meditations',
     title: 'Meditations',
     author: 'Marcus Aurelius',
-    desc: 'Two thousand years of field-tested advice on urges, discomfort, and self-command — the Stoic handbook that modern CBT grew from.',
+    desc: 'Two thousand years of field-tested advice on urges, discomfort, and self-command - the Stoic handbook that modern CBT grew from.',
     category: 'mindfulness',
     audience: 'all',
     length: '~250 pages',
@@ -880,7 +880,7 @@ const RESOURCES: Resource[] = [
     id: 'r-thinketh',
     title: 'As a Man Thinketh',
     author: 'James Allen',
-    desc: 'A one-sitting classic on how thought patterns shape habits and circumstance — short enough to reread whenever resolve dips.',
+    desc: 'A one-sitting classic on how thought patterns shape habits and circumstance - short enough to reread whenever resolve dips.',
     category: 'growth',
     audience: 'all',
     length: '~30 pages',
@@ -902,7 +902,7 @@ const RESOURCES: Resource[] = [
     id: 'r-franklin',
     title: 'The Autobiography of Benjamin Franklin',
     author: 'Benjamin Franklin',
-    desc: 'Contains history\'s most famous habit-tracking experiment — Franklin\'s thirteen-virtues chart — plus a life built on deliberate self-correction.',
+    desc: 'Contains history\'s most famous habit-tracking experiment - Franklin\'s thirteen-virtues chart - plus a life built on deliberate self-correction.',
     category: 'habits',
     audience: 'all',
     length: '~230 pages',
@@ -924,7 +924,7 @@ const RESOURCES: Resource[] = [
     id: 'r-smart',
     title: 'SMART Recovery Toolbox',
     author: 'SMART Recovery',
-    desc: 'Free, science-based worksheets and exercises (CBT-rooted) for urges, beliefs, and lifestyle balance — used by recovery groups worldwide.',
+    desc: 'Free, science-based worksheets and exercises (CBT-rooted) for urges, beliefs, and lifestyle balance - used by recovery groups worldwide.',
     category: 'recovery',
     audience: 'all',
     length: 'Worksheets & tools',
@@ -935,7 +935,7 @@ const RESOURCES: Resource[] = [
     id: 'r-conduct',
     title: 'The Conduct of Life',
     author: 'Ralph Waldo Emerson',
-    desc: 'Essays on power, wealth, and behavior — Emerson on ruling appetite rather than being ruled, in prose worth underlining.',
+    desc: 'Essays on power, wealth, and behavior - Emerson on ruling appetite rather than being ruled, in prose worth underlining.',
     category: 'growth',
     audience: 'all',
     length: '~280 pages',

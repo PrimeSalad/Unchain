@@ -9,7 +9,7 @@ interface CardProps extends ViewProps {
   style?: ViewStyle;
 }
 
-/** Grouped card — 20pt radius, soft e1 elevation (or lightened surface in dark). */
+/** Grouped card - 20pt radius, soft e1 elevation (or lightened surface in dark). */
 export function Card({ raised, tone = 'surface', padding = spacing.lg, style, children, ...rest }: CardProps) {
   const theme = useTheme();
   const bg =

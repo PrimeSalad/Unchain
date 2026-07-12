@@ -92,7 +92,7 @@ export default function CheckIn() {
           <Text variant="title2" center style={{ marginTop: spacing.lg }}>You've checked in today</Text>
           <Text variant="body" dim center style={{ marginTop: spacing.sm }}>
             {moodSaved
-              ? 'Mood saved. Come back tomorrow — one day at a time.'
+              ? 'Mood saved. Come back tomorrow - one day at a time.'
               : hasMood
                 ? `Today's mood: ${already.mood}/10`
                 : "You haven't recorded today's mood yet."}

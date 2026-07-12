@@ -1,5 +1,5 @@
 /**
- * Pornography recovery domain — pure TS, zero framework deps.
+ * Pornography recovery domain - pure TS, zero framework deps.
  * Kept completely separate from gambling.ts so neither module is ever modified.
  */
 
@@ -25,7 +25,7 @@ export const PORN_TRIGGERS = [
 export type PornTrigger = (typeof PORN_TRIGGERS)[number];
 
 // ---------------------------------------------------------------------------
-// Last Check-in — human-readable time-since
+// Last Check-in - human-readable time-since
 // ---------------------------------------------------------------------------
 
 export function formatLastCheckedIn(timestamp: number | null, now = Date.now()): string {
@@ -45,7 +45,7 @@ export function formatLastCheckedIn(timestamp: number | null, now = Date.now()):
 }
 
 // ---------------------------------------------------------------------------
-// Weekly reset helper — urgesResisted resets every Monday at local midnight
+// Weekly reset helper - urgesResisted resets every Monday at local midnight
 // ---------------------------------------------------------------------------
 
 export function currentWeekStart(now = Date.now()): number {

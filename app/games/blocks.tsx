@@ -216,7 +216,7 @@ export default function Blocks() {
     playSound('tap', 0.4);
   };
 
-  // Cells that would be filled by the current (valid) drag — for the ghost preview.
+  // Cells that would be filled by the current (valid) drag - for the ghost preview.
   const hoverCells = useMemo(() => {
     const set = new Set<number>();
     if (drag && drag.valid) {
@@ -240,7 +240,7 @@ export default function Blocks() {
         <View style={{ flexDirection: 'row', paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.md }}>
           <Info label="Score" value={score.toLocaleString()} />
           <Info label="Best" value={Math.max(best, score).toLocaleString()} />
-          <Info label="Combo" value={combo > 1 ? `×${combo}` : '—'} highlight={combo > 1} />
+          <Info label="Combo" value={combo > 1 ? `×${combo}` : '-'} highlight={combo > 1} />
         </View>
 
         {/* Board */}
@@ -327,7 +327,7 @@ export default function Blocks() {
         score={{ label: 'Final score', value: score }}
         stats={[
           { label: 'Best', value: Math.max(best, score).toLocaleString() },
-          { label: 'Max combo', value: maxComboRef.current > 1 ? `×${maxComboRef.current}` : '—' },
+          { label: 'Max combo', value: maxComboRef.current > 1 ? `×${maxComboRef.current}` : '-' },
           { label: 'Games', value: `${games.blocksGames}` },
         ]}
         unlocked={unlocked}

@@ -1,11 +1,11 @@
 /**
- * StretchFigure — an animated demo mannequin for every stretch in the library.
+ * StretchFigure - an animated demo mannequin for every stretch in the library.
  *
  * Built on a small forward-kinematics rig: every pose is expressed as JOINT
  * ANGLES over fixed bone lengths (torso, upper arm, forearm, thigh, shin), so
  * limbs never stretch or shrink and the motion reads as a real body. Each
  * stretch is a continuous function of a looping phase θ (~3.4 s breathing
- * tempo) — smooth in, smooth out, no keyframe pops. Far-side limbs render
+ * tempo) - smooth in, smooth out, no keyframe pops. Far-side limbs render
  * slightly dimmed for depth. Honors Reduce Motion by freezing mid-stretch.
  * Drawn entirely in code (react-native-svg): offline, zero asset weight.
  */
@@ -17,7 +17,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Rig — bone lengths (canvas units) and angle conventions.
+// Rig - bone lengths (canvas units) and angle conventions.
 //
 //   Limb angles are ABSOLUTE, measured from straight-down:
 //     0° = hanging down · 90° = out to the right · 180° = straight up
@@ -74,7 +74,7 @@ const sway = (t: number) => Math.sin(t);
 const side = (k: number) => Math.max(0, k) ** 1.2;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Poses — each stretch as a continuous function of phase θ.
+// Poses - each stretch as a continuous function of phase θ.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function poseFor(title: string, t: number): FKPose {
@@ -86,7 +86,7 @@ function poseFor(title: string, t: number): FKPose {
     case 'Neck Release':
       return { ...STAND, head: 38 * k };
 
-    // Front view: both shoulders draw slow circles — arms trail the roll,
+    // Front view: both shoulders draw slow circles - arms trail the roll,
     // the whole frame bobs a touch.
     case 'Shoulder Rolls': {
       const roll = 10 * Math.cos(t);
@@ -130,7 +130,7 @@ function poseFor(title: string, t: number): FKPose {
       };
     }
 
-    // Side view: a flat-back reach — shallower hinge than the fold, arms
+    // Side view: a flat-back reach - shallower hinge than the fold, arms
     // extended ahead toward the toes instead of dangling.
     case 'Hamstring Reach': {
       const lean = 72 * s;
@@ -175,7 +175,7 @@ function poseFor(title: string, t: number): FKPose {
       };
     }
 
-    // Side view: classic wall calf stretch — hands pressing forward, front
+    // Side view: classic wall calf stretch - hands pressing forward, front
     // knee bending deeper as the back leg stays long, heel down.
     case 'Calf Stretch': {
       return {
@@ -269,7 +269,7 @@ export function StretchFigure({ title, size = 150 }: { title: string; size?: num
 
   useEffect(() => {
     if (reduce) {
-      // Freeze at the deepest point of the stretch — still a useful demo.
+      // Freeze at the deepest point of the stretch - still a useful demo.
       setTheta(Math.PI);
       return;
     }

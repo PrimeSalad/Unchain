@@ -29,7 +29,7 @@ import {
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // ---------------------------------------------------------------------------
-// Helpers — all date arithmetic uses LOCAL calendar values so the result
+// Helpers - all date arithmetic uses LOCAL calendar values so the result
 // always matches what the device clock shows, regardless of timezone.
 // ---------------------------------------------------------------------------
 
@@ -65,7 +65,7 @@ export function ProgressScreen() {
   const syncAchievements = useStore((s) => s.syncAchievements);
   const completeMission = useStore((s) => s.completeMission);
 
-  // Viewing this screen IS the "Review Your Progress" daily mission —
+  // Viewing this screen IS the "Review Your Progress" daily mission -
   // without this call the mission could never be completed. Runs on every
   // focus (not just mount) so it also counts on later days while the tab
   // stays mounted; completeMission is idempotent per day.
@@ -88,13 +88,13 @@ export function ProgressScreen() {
   const best = Math.max(longestStreak, current);
   // Financial stats use the recovery-adjusted balance from journal entries:
   // gambling losses are subtracted from the entered balance, gambling wins
-  // are never added — a win can never improve these figures, achievements,
+  // are never added - a win can never improve these figures, achievements,
   // or the streak.
   const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
   const resisted = urges.filter((u) => u.resisted).length;
 
-  // Porn-specific journal stats — computed only when needed.
+  // Porn-specific journal stats - computed only when needed.
   const pornStats = useMemo(() => {
     const pornEntries = journal.filter((j) => j.watched !== undefined);
     const cleanDays   = pornEntries.filter((j) => j.watched === false).length;
@@ -103,7 +103,7 @@ export function ProgressScreen() {
     const avgUrge     = withUrge.length
       ? Math.round((withUrge.reduce((s, j) => s + (j.urgeIntensity ?? 0), 0) / withUrge.length) * 10) / 10
       : null;
-    // Triggers logged on clean days — find the most common one.
+    // Triggers logged on clean days - find the most common one.
     const triggerCounts: Record<string, number> = {};
     pornEntries
       .filter((j) => j.watched === false && j.triggersEncountered)
@@ -140,11 +140,11 @@ export function ProgressScreen() {
   //                        before the first journal entry
   //
   // "high" urge days are still shown when a clean journal entry exists AND
-  // a high-intensity urge (≥7) was logged that same day — so the indicator
+  // a high-intensity urge (≥7) was logged that same day - so the indicator
   // still works but never overrides the journal-based color.
   //
   // profile.startedAt and the relapses array are intentionally NOT used here
-  // to infer calendar colors — only committed journal entries count.
+  // to infer calendar colors - only committed journal entries count.
   // ---------------------------------------------------------------------------
   const calendar = useMemo(() => {
     const now = new Date();
@@ -181,7 +181,7 @@ export function ProgressScreen() {
       } else if (journalGambled === true) {
         status = 'relapse';
       } else {
-        // Clean day — check for high urge on the same day
+        // Clean day - check for high urge on the same day
         const hasHighUrge =
           urges.some((u) => sameDay(u.at, cellMid) && u.intensity >= 7) ||
           checkIns.some((c) => sameDay(c.at, cellMid) && (c.urgeStrength ?? 0) >= 7);
@@ -272,7 +272,7 @@ export function ProgressScreen() {
       <Text variant="footnote" dim style={{ marginBottom: spacing.md }}>
         {current >= 365
           ? 'A full year free. You built this.'
-          : `${current} days in — next stop is day ${nextMilestone(current)}.`}
+          : `${current} days in - next stop is day ${nextMilestone(current)}.`}
       </Text>
       <Card>
         <Roadmap days={current} />
@@ -308,16 +308,16 @@ export function ProgressScreen() {
       </Text>
       <BadgesPager badges={badges} />
 
-      {/* Financial Tracker — gambling users only */}
+      {/* Financial Tracker - gambling users only */}
       {!isPorn && (
         <Card style={{ marginTop: spacing.xl }}>
           <Text variant="headline" style={{ marginBottom: spacing.md }}>Financial Tracker</Text>
           <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-            Based on your daily balance entries in the journal. A lost wager is subtracted from your balance; winnings are never counted — recovery comes first. Financial changes do not affect your streak or achievements.
+            Based on your daily balance entries in the journal. A lost wager is subtracted from your balance; winnings are never counted - recovery comes first. Financial changes do not affect your streak or achievements.
           </Text>
           <Row
             label="Current balance"
-            value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '—'}
+            value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '-'}
             bold
           />
           <Row
@@ -325,7 +325,7 @@ export function ProgressScreen() {
             value={
               moneyStats.change != null
                 ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
-                : '—'
+                : '-'
             }
           />
           <Row
@@ -333,7 +333,7 @@ export function ProgressScreen() {
             value={
               moneyStats.weeklyTrend != null
                 ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency)
-                : '—'
+                : '-'
             }
           />
           <Row
@@ -341,43 +341,43 @@ export function ProgressScreen() {
             value={
               moneyStats.monthlyTrend != null
                 ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency)
-                : '—'
+                : '-'
             }
           />
         </Card>
       )}
 
-      {/* Porn Recovery Tracker — pornography users only */}
+      {/* Porn Recovery Tracker - pornography users only */}
       {isPorn && (
         <Card style={{ marginTop: spacing.xl }}>
           <Text variant="headline" style={{ marginBottom: spacing.md }}>Recovery Insights</Text>
           <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-            Based on your daily journal entries. These figures track how your recovery is growing — they never affect your streak or achievements.
+            Based on your daily journal entries. These figures track how your recovery is growing - they never affect your streak or achievements.
           </Text>
           <Row
             label="Clean days logged"
-            value={pornStats.cleanDays > 0 ? `${pornStats.cleanDays} day${pornStats.cleanDays === 1 ? '' : 's'}` : '—'}
+            value={pornStats.cleanDays > 0 ? `${pornStats.cleanDays} day${pornStats.cleanDays === 1 ? '' : 's'}` : '-'}
             bold
           />
           <Row
             label="Relapses logged"
-            value={pornStats.relapseDays > 0 ? `${pornStats.relapseDays} time${pornStats.relapseDays === 1 ? '' : 's'}` : '—'}
+            value={pornStats.relapseDays > 0 ? `${pornStats.relapseDays} time${pornStats.relapseDays === 1 ? '' : 's'}` : '-'}
           />
           <Row
             label="Urges resisted (week)"
-            value={urgesResisted > 0 ? `${urgesResisted} urge${urgesResisted === 1 ? '' : 's'}` : '—'}
+            value={urgesResisted > 0 ? `${urgesResisted} urge${urgesResisted === 1 ? '' : 's'}` : '-'}
           />
           <Row
             label="Healthy habits done"
-            value={healthyHabitsCount > 0 ? `${healthyHabitsCount} time${healthyHabitsCount === 1 ? '' : 's'}` : '—'}
+            value={healthyHabitsCount > 0 ? `${healthyHabitsCount} time${healthyHabitsCount === 1 ? '' : 's'}` : '-'}
           />
           <Row
             label="Avg urge intensity"
-            value={pornStats.avgUrge != null ? `${pornStats.avgUrge} / 10` : '—'}
+            value={pornStats.avgUrge != null ? `${pornStats.avgUrge} / 10` : '-'}
           />
           <Row
             label="Top trigger"
-            value={pornStats.topTrigger ?? '—'}
+            value={pornStats.topTrigger ?? '-'}
           />
         </Card>
       )}
@@ -431,10 +431,10 @@ export function ProgressScreen() {
           <Text variant="callout" dim>Log urges and check-ins to see your patterns.</Text>
         ) : (
           <>
-            <Row label="Most common trigger" value={analysis.top ?? '—'} />
-            <Row label="Highest-risk day" value={analysis.day ?? '—'} />
-            <Row label="Highest-risk time" value={analysis.hour ?? '—'} />
-            <Row label="Average urge" value={analysis.avgUrge ? `${analysis.avgUrge}/10` : '—'} />
+            <Row label="Most common trigger" value={analysis.top ?? '-'} />
+            <Row label="Highest-risk day" value={analysis.day ?? '-'} />
+            <Row label="Highest-risk time" value={analysis.hour ?? '-'} />
+            <Row label="Average urge" value={analysis.avgUrge ? `${analysis.avgUrge}/10` : '-'} />
           </>
         )}
       </Card>
@@ -500,7 +500,7 @@ const BADGE_CATEGORIES: { key: BadgeCategory; label: string }[] = [
   { key: 'money', label: 'Money' },
 ];
 
-/** Badges organised into category tabs — tap a category, see its badges.
+/** Badges organised into category tabs - tap a category, see its badges.
  *  No horizontal paging (which fought the vertical scroll and crowded text). */
 function BadgesPager({ badges }: { badges: ReturnType<typeof badgeProgress> }) {
   const theme = useTheme();
@@ -609,7 +609,7 @@ function AddGoalModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      {/* Scrim and sheet are siblings — nesting the sheet inside a Pressable
+      {/* Scrim and sheet are siblings - nesting the sheet inside a Pressable
           nests buttons inside a button (invalid on web). */}
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable

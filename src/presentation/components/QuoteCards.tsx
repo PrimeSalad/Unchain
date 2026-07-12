@@ -1,10 +1,10 @@
 /**
- * Recovery Motivation — a single quote feed.
+ * Recovery Motivation - a single quote feed.
  *
  * One carousel: today's quote always first, permanently saved favorites after
  * it (a favorite that IS today's quote is not duplicated). Hearting today's
  * quote saves it with a gentle confirmation toast; today's quote can never be
- * removed while it is the active daily quote — removal (with a destructive
+ * removed while it is the active daily quote - removal (with a destructive
  * confirmation) applies to favorites from previous days only.
  */
 
@@ -37,7 +37,7 @@ import { QUOTES, type FavoriteQuote, type Quote } from '@/domain/quotes';
 const GAP = spacing.md;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Heart button — Apple-style favorite spring
+// Heart button - Apple-style favorite spring
 // ─────────────────────────────────────────────────────────────────────────────
 
 function HeartButton({ active, onToggle }: { active: boolean; onToggle: () => void }) {
@@ -104,7 +104,7 @@ export function QuoteFeed() {
     return () => clearTimeout(id);
   }, [toast]);
 
-  // A persisted index can outlive a shrunken quote pool after an update —
+  // A persisted index can outlive a shrunken quote pool after an update -
   // never index blindly.
   const today = QUOTES[dailyQuote?.index ?? 0] ?? QUOTES[0];
 
@@ -131,7 +131,7 @@ export function QuoteFeed() {
       setToast('Quote added to favorites.');
       AccessibilityInfo.announceForAccessibility('Quote added to favorites.');
     } else {
-      // The active daily quote is protected — removable starting tomorrow.
+      // The active daily quote is protected - removable starting tomorrow.
       Alert.alert(
         "Today's quote is protected",
         'This is your recovery message for today. You can remove it from your favorites starting tomorrow.',
@@ -231,7 +231,7 @@ export function QuoteFeed() {
           </Text>
           {author ? (
             <Text variant="footnote" color="rgba(255,255,255,0.75)" style={{ marginTop: spacing.sm }}>
-              — {author}
+              - {author}
             </Text>
           ) : null}
         </LinearGradient>
@@ -259,7 +259,7 @@ export function QuoteFeed() {
         />
       )}
 
-      {/* Page indicator — dots for small sets, a counter for large ones */}
+      {/* Page indicator - dots for small sets, a counter for large ones */}
       {feed.length > 1 && (
         <View
           style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.md, gap: 6 }}

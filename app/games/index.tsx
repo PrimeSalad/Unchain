@@ -47,7 +47,6 @@ export default function GamesHub() {
     { route: '/games/sudoku', game: 'sudoku', icon: require('../../assets/game icon/Sodoku.jpg'), title: 'Sudoku', desc: 'Fill the grid, 1–9', stat: games.sudokuSolved ? `${games.sudokuSolved} solved` : '4 difficulties' },
     { route: '/games/blocks', game: 'blocks', icon: require('../../assets/game icon/Blocks Align.jpg'), title: 'Block Puzzle', desc: 'Place, clear, combo', stat: games.blocksBest ? `Best ${games.blocksBest.toLocaleString()}` : 'Beat your best' },
     { route: '/games/gonogo', game: 'gonogo', ionIcon: 'flash', tint: '#4E9B5E', title: 'Go / No-Go', desc: 'Tap green, resist red', stat: games.gonogoBest ? `Best ${games.gonogoBest.toLocaleString()}` : 'Train impulse control' },
-    { route: '/games/stop-signal', game: 'stopsignal', ionIcon: 'hand-left', tint: '#4A6FA5', title: 'Stop Signal', desc: 'Tap fast, brake faster', stat: games.stopBest ? `Best ${games.stopBest.toLocaleString()}` : 'Train response inhibition' },
   ];
 
   return (
@@ -79,7 +78,7 @@ export default function GamesHub() {
               <Pressable
                 onPress={() => router.push(g.route as Href)}
                 accessibilityRole="button"
-                accessibilityLabel={`${g.title} — ${g.desc}`}
+                accessibilityLabel={`${g.title} - ${g.desc}`}
                 style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
               >
                 <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>

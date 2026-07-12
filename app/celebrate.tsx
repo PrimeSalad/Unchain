@@ -22,7 +22,7 @@ import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 /**
  * Peak-end celebration (docs/plan.md §12, §16). Full-screen, ≤2.5s, skippable,
  * once. Maria celebrates; a chain-link "forges"; one line of forward-arming.
- * Calm afterwards — never a badge storm.
+ * Calm afterwards - never a badge storm.
  */
 export default function Celebrate() {
   const router = useRouter();
@@ -30,7 +30,7 @@ export default function Celebrate() {
   const reduce = useReducedMotion();
 
   const title = params.title ?? 'You made your commitment.';
-  const arm = params.arm ?? 'This is the beginning. One day at a time — no shame.';
+  const arm = params.arm ?? 'This is the beginning. One day at a time - no shame.';
 
   const burst = useSharedValue(0);
   const mascotScale = useSharedValue(reduce ? 1 : 0.4);

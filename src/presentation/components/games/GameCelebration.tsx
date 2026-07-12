@@ -9,7 +9,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { ConfettiBurst } from './Confetti';
 import { playSound } from '@/application/sound';
 
-/** Minimal shape a celebrated achievement needs — structurally satisfied by
+/** Minimal shape a celebrated achievement needs - structurally satisfied by
  *  both GameAchievement and AltAchievement, so games and healthy habits share
  *  this popup. */
 export interface UnlockedAchievement {
@@ -32,7 +32,7 @@ interface Props {
   /** A number that counts up (e.g. final score). */
   score?: { label: string; value: number };
   stats?: CelebrationStat[];
-  /** Achievements unlocked by this result — revealed with a stagger. */
+  /** Achievements unlocked by this result - revealed with a stagger. */
   unlocked?: UnlockedAchievement[];
   /** Progress hint toward the next locked achievement. */
   hint?: string | null;
@@ -148,7 +148,7 @@ export function GameCelebration({
   );
 }
 
-/** Number that eases up from 0 — the little dopamine drumroll. */
+/** Number that eases up from 0 - the little dopamine drumroll. */
 function CountUp({ value }: { value: number }) {
   const theme = useTheme();
   const [display, setDisplay] = useState(0);

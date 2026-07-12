@@ -43,13 +43,13 @@ export default function LogUrge() {
           {level === 'low' && (
             <>
               <Text variant="title1" center>You caught it early.</Text>
-              <Text variant="body" dim center style={{ marginTop: spacing.md }}>Nice awareness. Carry on with your day — you've got this.</Text>
+              <Text variant="body" dim center style={{ marginTop: spacing.md }}>Nice awareness. Carry on with your day - you've got this.</Text>
             </>
           )}
           {level === 'medium' && (
             <>
               <Text variant="title1" center>Let's take the edge off.</Text>
-              <Text variant="body" dim center style={{ marginTop: spacing.md, marginBottom: spacing.xl }}>Pick one — the urge will pass.</Text>
+              <Text variant="body" dim center style={{ marginTop: spacing.md, marginBottom: spacing.xl }}>Pick one - the urge will pass.</Text>
               <View style={{ gap: spacing.md }}>
                 <ActionBtn icon="leaf" label="Take a Mindful Pause" onPress={() => router.replace('/mindful-pause' as Href)} />
                 <ActionBtn icon="book" label="Open Journal" onPress={() => router.replace('/(tabs)/journal')} />

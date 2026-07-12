@@ -47,7 +47,7 @@ import { challengeDayNumber, dailyChallengeTarget } from '@/domain/games/inhibit
 
 /**
  * Single local store for the recovery companion. Offline-first: no accounts,
- * no backend — persisted to the device with AsyncStorage.
+ * no backend - persisted to the device with AsyncStorage.
  */
 
 type ThemePref = 'system' | 'light' | 'dark';
@@ -129,20 +129,20 @@ interface RecoveryState {
   /** Last completion timestamp per activity. "Done today" = sameDay(ts, now),
    *  so state resets automatically at local midnight without a scheduler. */
   alternatives: Partial<Record<AlternativeId, number>>;
-  /** Lifetime completion counts (one per activity per day) — powers the
+  /** Lifetime completion counts (one per activity per day) - powers the
    *  healthy-habit achievements. `journal` is derived, not stored here. */
   altCounts: AltCounts;
   /** Permanently unlocked habit achievements: id → unlockedAt (ms). */
   altAchievements: Record<string, number>;
-  /** Lifetime seconds spent per timed activity — powers the Strava-style
+  /** Lifetime seconds spent per timed activity - powers the Strava-style
    *  session share cards. Every session adds, including same-day repeats. */
   altSeconds: Partial<Record<AlternativeId, number>>;
   /** Lifetime session counts per activity (every session, incl. repeats). */
   altSessions: Partial<Record<AlternativeId, number>>;
-  /** Lifetime walk totals — steps counted and metres covered (GPS). */
+  /** Lifetime walk totals - steps counted and metres covered (GPS). */
   walkSteps: number;
   walkMeters: number;
-  /** Glasses drunk today — day-keyed so it resets at local midnight. */
+  /** Glasses drunk today - day-keyed so it resets at local midnight. */
   waterToday: { day: string; glasses: number };
   /** Lifetime glasses logged. */
   waterGlassesTotal: number;
@@ -160,13 +160,13 @@ interface RecoveryState {
   /** Reading progress per built-in guide: fraction read + scroll offset so
    *  "Continue reading" reopens exactly where the user left off. */
   eduProgress: Record<string, { pct: number; offset: number }>;
-  /** The last guide opened — powers the hub's Continue Reading card. */
+  /** The last guide opened - powers the hub's Continue Reading card. */
   eduLastGuideId: string | null;
   toggleEduBookmark: (id: string) => void;
   setEduProgress: (guideId: string, pct: number, offset: number) => void;
 
   // ── Focus Protection ────────────────────────────────────────────────────
-  /** The user's permanent blocklist — every entry added explicitly by them,
+  /** The user's permanent blocklist - every entry added explicitly by them,
    *  protected until manually removed. No timers, no expiry. Stored locally
    *  only; never uploaded, never auto-populated. */
   blockedSites: BlockedSite[];
@@ -181,12 +181,12 @@ interface RecoveryState {
   // ── Recovery Motivation ─────────────────────────────────────────────────
   /** Quotes the user has hearted. Survive restarts/updates via persistence. */
   favoriteQuotes: FavoriteQuote[];
-  /** Today's quote — same all day, rotates once per local calendar day. */
+  /** Today's quote - same all day, rotates once per local calendar day. */
   dailyQuote: { day: string; index: number } | null;
-  /** Recently shown quote indexes — avoids repeats until the pool cycles. */
+  /** Recently shown quote indexes - avoids repeats until the pool cycles. */
   recentQuotes: number[];
 
-  // Recreational games — record actions return achievements newly unlocked
+  // Recreational games - record actions return achievements newly unlocked
   // by that result so screens can celebrate them.
   recordCheckers: (
     result: 'win' | 'loss',
@@ -202,14 +202,13 @@ interface RecoveryState {
    *  score (plus a daily-challenge bonus the first time the day's target is
    *  beaten) and returns everything the results screen needs. */
   recordInhibition: (
-    game: 'gonogo' | 'stopsignal',
+    game: 'gonogo',
     summary: {
       score: number;
       accuracy: number;
       maxCombo: number;
       avgReactionMs: number;
       trials: number;
-      stopsCaught?: number;
     },
   ) => { unlocked: GameAchievement[]; pointsEarned: number; newBest: boolean; challengeCompleted: boolean };
   saveClarityProgress: (day: number, guesses: string[]) => void;
@@ -220,12 +219,12 @@ interface RecoveryState {
   /** Set (or intentionally edit) today's mood on today's check-in. No-op without one. */
   setTodayMood: (mood: number) => void;
 
-  /** Mark a Healthy Alternative complete for today (idempotent per day —
+  /** Mark a Healthy Alternative complete for today (idempotent per day -
    *  repeat sessions refresh the timestamp without double-awarding). Returns
    *  any habit achievements newly unlocked by this completion. */
   completeAlternative: (id: AlternativeId) => AltAchievement[];
   /** Log a finished activity session's duration for lifetime stats. Safe to
-   *  call on every session — repeats add up (that's the point). */
+   *  call on every session - repeats add up (that's the point). */
   recordAltSession: (id: AlternativeId, seconds: number) => void;
   /** Add a finished walk's steps + metres to the lifetime totals. */
   recordWalkMetrics: (steps: number, meters: number) => void;
@@ -240,10 +239,10 @@ interface RecoveryState {
     id: string,
     patch: { domain?: string; nickname?: string },
   ) => 'updated' | 'duplicate' | 'invalid';
-  /** The ONLY way a site stops being protected — explicit manual removal. */
+  /** The ONLY way a site stops being protected - explicit manual removal. */
   removeBlockedSite: (id: string) => void;
 
-  /** Complete a daily mission for today. Idempotent — repeating the same
+  /** Complete a daily mission for today. Idempotent - repeating the same
    *  mission ID in the same day is a no-op. Returns the XP awarded (0 if
    *  already completed or on error). Resets stale state if a new local day
    *  has started. */
@@ -289,7 +288,7 @@ function evt(type: TimelineType, label: string): TimelineEvent {
 
 const PERSIST_KEY = 'unchained-gambling-v1';
 
-/** True when every Healthy Alternative has been completed today —
+/** True when every Healthy Alternative has been completed today -
  *  the journal activity is derived from the journal entries themselves. */
 function altFullDay(
   alternatives: Partial<Record<AlternativeId, number>>,
@@ -338,7 +337,7 @@ function withGameEvent(
       games: nextGames,
       points: s.points + unlocked.length * 5,
       timeline: [
-        ...unlocked.map((a) => evt('achievement', `Achievement unlocked — ${a.title}`)),
+        ...unlocked.map((a) => evt('achievement', `Achievement unlocked - ${a.title}`)),
         ...s.timeline,
       ],
     },
@@ -449,7 +448,7 @@ export const useStore = create<RecoveryState>()(
         };
         set((s) => ({
           blockedSites: [site, ...s.blockedSites],
-          timeline: [evt('shield', `Focus Protection — added ${domain} to the blocklist`), ...s.timeline],
+          timeline: [evt('shield', `Focus Protection - added ${domain} to the blocklist`), ...s.timeline],
         }));
         return 'added';
       },
@@ -510,7 +509,7 @@ export const useStore = create<RecoveryState>()(
             missionXp: s.missionXp + awarded,
             points: s.points + awarded,
             timeline: [
-              evt('activity', `Daily Mission complete — ${mission.title}`),
+              evt('activity', `Daily Mission complete - ${mission.title}`),
               ...s.timeline,
             ],
           };
@@ -526,7 +525,7 @@ export const useStore = create<RecoveryState>()(
           const already = prev != null && sameDay(prev, now);
           const alternatives = { ...s.alternatives, [id]: now };
 
-          // Repeat sessions the same day refresh the timestamp only — no
+          // Repeat sessions the same day refresh the timestamp only - no
           // double points, counts, timeline entries, or achievement checks.
           if (already) return { alternatives };
 
@@ -547,8 +546,8 @@ export const useStore = create<RecoveryState>()(
             points: s.points + 5 + unlocked.length * 5,
             healthyHabitsCount: s.healthyHabitsCount + 1,
             timeline: [
-              ...unlocked.map((a) => evt('achievement', `Achievement unlocked — ${a.title}`)),
-              evt('activity', `Recovery activity — ${alternativeById(id).title}`),
+              ...unlocked.map((a) => evt('achievement', `Achievement unlocked - ${a.title}`)),
+              evt('activity', `Recovery activity - ${alternativeById(id).title}`),
               ...s.timeline,
             ],
           };
@@ -623,25 +622,15 @@ export const useStore = create<RecoveryState>()(
         let newBest = false;
         let challengeCompleted = false;
         set((s) => {
-          const prevBest = game === 'gonogo' ? s.games.gonogoBest : s.games.stopBest;
+          const prevBest = s.games.gonogoBest;
           newBest = summary.score > prevBest;
           const games: GamesState = {
             ...s.games,
-            ...(game === 'gonogo'
-              ? {
-                  gonogoBest: Math.max(s.games.gonogoBest, summary.score),
-                  gonogoGames: s.games.gonogoGames + 1,
-                }
-              : {
-                  stopBest: Math.max(s.games.stopBest, summary.score),
-                  stopGames: s.games.stopGames + 1,
-                }),
+            gonogoBest: Math.max(s.games.gonogoBest, summary.score),
+            gonogoGames: s.games.gonogoGames + 1,
           };
 
-          const ev: GameEvent =
-            game === 'gonogo'
-              ? { game: 'gonogo', ...summary }
-              : { game: 'stopsignal', stopsCaught: summary.stopsCaught ?? 0, ...summary };
+          const ev: GameEvent = { game: 'gonogo', ...summary };
           const r = withGameEvent(s, games, ev);
           unlocked = r.unlocked;
 
@@ -649,7 +638,7 @@ export const useStore = create<RecoveryState>()(
           // achievement points withGameEvent already granted.
           pointsEarned = Math.max(2, Math.min(15, Math.round(summary.score / 150)));
 
-          // Daily challenge — beat today's target once per day for a bonus.
+          // Daily challenge - beat today's target once per day for a bonus.
           const day = challengeDayNumber();
           const target = dailyChallengeTarget(prevBest, day);
           const doneDay = s.games.challengeDoneDay[game] ?? -1;
@@ -661,7 +650,7 @@ export const useStore = create<RecoveryState>()(
               challengeDoneDay: { ...r.patch.games.challengeDoneDay, [game]: day },
             };
             r.patch.timeline = [
-              evt('achievement', `Daily challenge complete — ${game === 'gonogo' ? 'Go / No-Go' : 'Stop Signal'}`),
+              evt('achievement', 'Daily challenge complete - Go / No-Go'),
               ...r.patch.timeline,
             ];
           }
@@ -760,7 +749,7 @@ export const useStore = create<RecoveryState>()(
         //      - pornography                         → watched: true
         //   3. Addiction-specific clean entries for every day BETWEEN the relapse
         //      and today (exclusive) → calendar shows those days green.
-        //   Today itself is left blank — the user fills it in via the journal.
+        //   Today itself is left blank - the user fills it in via the journal.
         const now = new Date();
         const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const isToday = profile.startedAt >= todayMid;
@@ -777,7 +766,7 @@ export const useStore = create<RecoveryState>()(
         const initialJournal: import('@/domain/records').JournalEntry[] = [];
 
         if (!isToday) {
-          // Red dot on the last-used day — use the correct field for the addiction type.
+          // Red dot on the last-used day - use the correct field for the addiction type.
           initialJournal.push(
             isPorn
               ? { id: uid(), at: seedAt, watched: true,  text: 'Last use before recovery.' }
@@ -837,8 +826,8 @@ export const useStore = create<RecoveryState>()(
           celebratedBadges: [...s.celebratedBadges, ...newlyIds],
           goals,
           timeline: [
-            ...newlyIds.map((id) => evt('achievement', `Badge earned — ${title(id)}`)),
-            ...newlyGoals.map((g) => evt('milestone', `Goal reached — ${goalTitle(g)}`)),
+            ...newlyIds.map((id) => evt('achievement', `Badge earned - ${title(id)}`)),
+            ...newlyGoals.map((g) => evt('milestone', `Goal reached - ${goalTitle(g)}`)),
             ...s.timeline,
           ],
         });
@@ -878,7 +867,7 @@ export const useStore = create<RecoveryState>()(
         set((s) => ({
           urges: [entry, ...s.urges],
           points: s.points + 5,
-          timeline: [evt('urge', `Logged urge — intensity ${data.intensity}/10`), ...s.timeline],
+          timeline: [evt('urge', `Logged urge - intensity ${data.intensity}/10`), ...s.timeline],
         }));
       },
 
@@ -889,12 +878,12 @@ export const useStore = create<RecoveryState>()(
           const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
           const prevDays = streakDays(streakStart);
           const relapse: RelapseEvent = { ...data, id: uid(), at: Date.now() };
-          // Do NOT mutate profile.startedAt — the relapses array is the
+          // Do NOT mutate profile.startedAt - the relapses array is the
           // canonical history.  streakDays is now derived from events.
           return {
             relapses: [relapse, ...s.relapses],
             longestStreak: Math.max(s.longestStreak, prevDays),
-            timeline: [evt('relapse', 'Logged a relapse — recovery continues'), ...s.timeline],
+            timeline: [evt('relapse', 'Logged a relapse - recovery continues'), ...s.timeline],
           };
         });
       },
@@ -913,13 +902,13 @@ export const useStore = create<RecoveryState>()(
             if (!sameDay(j.at, Date.now())) return false;
             if (isGamblingEntry) return j.gambled !== undefined;
             if (isPornEntry) return j.watched !== undefined;
-            return true; // generic entry — block any duplicate
+            return true; // generic entry - block any duplicate
           });
           if (alreadyToday) return s;
 
           const entry: JournalEntry = { ...data, id: uid(), at: Date.now() };
 
-          // Journaling is also a Healthy Alternative — a new entry can unlock
+          // Journaling is also a Healthy Alternative - a new entry can unlock
           // habit achievements (journal count, or completing the full day).
           const journalAfter = [entry, ...s.journal];
           const altUnlocked = newAltUnlocks(
@@ -935,7 +924,7 @@ export const useStore = create<RecoveryState>()(
                 },
               }
             : {};
-          const altEvents = altUnlocked.map((a) => evt('achievement', `Achievement unlocked — ${a.title}`));
+          const altEvents = altUnlocked.map((a) => evt('achievement', `Achievement unlocked - ${a.title}`));
 
           if (data.gambled) {
             // Record the relapse event but do NOT touch profile.startedAt.
@@ -957,8 +946,8 @@ export const useStore = create<RecoveryState>()(
               ...altPatch,
               timeline: [
                 ...altEvents,
-                evt('journal', 'Journal entry — gambling relapse logged'),
-                evt('relapse', 'Logged a relapse via journal — recovery continues'),
+                evt('journal', 'Journal entry - gambling relapse logged'),
+                evt('relapse', 'Logged a relapse via journal - recovery continues'),
                 ...s.timeline,
               ],
             };
@@ -983,8 +972,8 @@ export const useStore = create<RecoveryState>()(
               ...altPatch,
               timeline: [
                 ...altEvents,
-                evt('journal', 'Journal entry — porn relapse logged'),
-                evt('relapse', 'Logged a relapse via journal — recovery continues'),
+                evt('journal', 'Journal entry - porn relapse logged'),
+                evt('relapse', 'Logged a relapse via journal - recovery continues'),
                 ...s.timeline,
               ],
             };
@@ -1002,7 +991,7 @@ export const useStore = create<RecoveryState>()(
               ...altPatch,
               timeline: [
                 ...altEvents,
-                evt('journal', 'Wrote a journal entry — clean day'),
+                evt('journal', 'Wrote a journal entry - clean day'),
                 ...s.timeline,
               ],
             };
@@ -1045,7 +1034,7 @@ export const useStore = create<RecoveryState>()(
           goals: [],
           celebratedBadges: [],
           alternatives: {},
-          // Weekly porn-recovery counters are recovery data — restart them
+          // Weekly porn-recovery counters are recovery data - restart them
           // with the streak. Lifetime habit totals are kept, like altCounts.
           urgesResisted: 0,
           urgesResistedWeek: 0,
@@ -1103,7 +1092,7 @@ export const useStore = create<RecoveryState>()(
       // Deep-merge the games slice so users upgrading from an older build get
       // defaults for fields that didn't exist when their state was saved.
       // Also normalise dailyMissions to today so the selector never has to
-      // construct a new object — eliminating the getSnapshot infinite-loop.
+      // construct a new object - eliminating the getSnapshot infinite-loop.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<RecoveryState>;
         const today = missionDayKey();
@@ -1138,7 +1127,7 @@ export function useTodayCheckIn(): DailyCheckIn | undefined {
 /**
  * Today's journal entry for gambling users, or undefined if none submitted yet.
  * Finds any entry today where `gambled` is defined (gambling-specific gate).
- * For gambling users only — do NOT use this in porn-journal-entry.tsx.
+ * For gambling users only - do NOT use this in porn-journal-entry.tsx.
  */
 export function useTodayJournal(): import('@/domain/records').JournalEntry | undefined {
   return useStore((s) =>
@@ -1161,7 +1150,7 @@ export function useTodayPornJournal(): import('@/domain/records').JournalEntry |
 /**
  * Today's journal entry of ANY addiction type. For type-agnostic surfaces
  * (Healthy Alternatives "journal done today", Protection's activity counter)
- * that only care whether the user journaled at all — never for wizard gates.
+ * that only care whether the user journaled at all - never for wizard gates.
  */
 export function useTodayAnyJournal(): import('@/domain/records').JournalEntry | undefined {
   return useStore((s) => s.journal.find((j) => sameDay(j.at, Date.now())));
@@ -1170,8 +1159,8 @@ export function useTodayAnyJournal(): import('@/domain/records').JournalEntry | 
 /**
  * Today's daily mission state.
  *
- * The selector returns `s.dailyMissions` directly — always a stable reference
- * from the store — so Zustand never sees a new object and the
+ * The selector returns `s.dailyMissions` directly - always a stable reference
+ * from the store - so Zustand never sees a new object and the
  * "getSnapshot should be cached" infinite-loop warning cannot fire.
  *
  * Daily reset is handled in two places so the selector stays trivial:

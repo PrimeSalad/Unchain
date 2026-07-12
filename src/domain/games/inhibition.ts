@@ -1,5 +1,5 @@
 /**
- * Inhibition-training game — pure domain for Go/No-Go.
+ * Inhibition-training game - pure domain for Go/No-Go.
  *
  * Go/No-Go is an evidence-based cognitive-control paradigm: respond to "go"
  * stimuli, withhold on "no-go" stimuli. It trains prepotent-response
@@ -12,7 +12,7 @@
 // Shared arcade tuning
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Lives per round — a miss or false tap costs one. */
+/** Lives per round - a miss or false tap costs one. */
 export const LIVES = 3;
 
 /** Trials per level; speed increases each level. */
@@ -53,10 +53,10 @@ export function levelForTrial(trialIndex: number): number {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Probability a trial is NO-GO (red). Classic paradigms keep go dominant so
- *  responding becomes prepotent — that's what makes withholding hard. */
+ *  responding becomes prepotent - that's what makes withholding hard. */
 export const NOGO_PROBABILITY = 0.3;
 
-/** Response window (ms) for a given level — shrinks as levels climb. */
+/** Response window (ms) for a given level - shrinks as levels climb. */
 export function gonogoWindowMs(level: number): number {
   return Math.max(520, 1050 - (level - 1) * 70);
 }
@@ -106,7 +106,7 @@ export function summarize(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Daily challenge — a deterministic per-day target that scales gently with
+// Daily challenge - a deterministic per-day target that scales gently with
 // the player's personal best, so it is always beatable but never trivial.
 // ─────────────────────────────────────────────────────────────────────────────
 

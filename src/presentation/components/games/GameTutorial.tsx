@@ -10,7 +10,7 @@ import { useStore } from '@/application/store';
 import type { GameId } from '@/domain/games/achievements';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Per-game "How to play" content — short, concrete, no jargon.
+// Per-game "How to play" content - short, concrete, no jargon.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface TutorialStep {
@@ -23,9 +23,9 @@ const TUTORIALS: Record<GameId, { title: string; steps: TutorialStep[] }> = {
     title: 'How to play Clarity',
     steps: [
       { icon: 'text', text: 'Guess the hidden five-letter word. You have six tries.' },
-      { icon: 'checkmark-circle', text: 'Green tile — right letter in the right spot.' },
-      { icon: 'swap-horizontal', text: 'Yellow tile — the letter is in the word, but in a different spot.' },
-      { icon: 'close-circle-outline', text: 'Gray tile — the letter is not in the word at all.' },
+      { icon: 'checkmark-circle', text: 'Green tile - right letter in the right spot.' },
+      { icon: 'swap-horizontal', text: 'Yellow tile - the letter is in the word, but in a different spot.' },
+      { icon: 'close-circle-outline', text: 'Gray tile - the letter is not in the word at all.' },
       { icon: 'flame', text: 'One daily word keeps your streak; Practice mode gives unlimited words.' },
     ],
   },
@@ -34,7 +34,7 @@ const TUTORIALS: Record<GameId, { title: string; steps: TutorialStep[] }> = {
     steps: [
       { icon: 'hand-left', text: 'You play the coral pieces. Tap a piece, then tap a green dot to move.' },
       { icon: 'arrow-up', text: 'Pieces move diagonally forward on the dark squares.' },
-      { icon: 'flash', text: 'Jump over an AI piece to capture it — chains of jumps are allowed.' },
+      { icon: 'flash', text: 'Jump over an AI piece to capture it - chains of jumps are allowed.' },
       { icon: 'ribbon', text: 'Reach the far row to crown a King, which can also move backward.' },
       { icon: 'trophy', text: 'Win by capturing every AI piece or leaving it no legal move.' },
     ],
@@ -44,9 +44,9 @@ const TUTORIALS: Record<GameId, { title: string; steps: TutorialStep[] }> = {
     steps: [
       { icon: 'grid', text: 'Fill the grid so every row, column, and 3×3 box has the numbers 1–9 exactly once.' },
       { icon: 'hand-left', text: 'Tap an empty cell, then tap a number below to place it.' },
-      { icon: 'pencil', text: 'Notes mode writes small pencil marks instead — great for possibilities.' },
+      { icon: 'pencil', text: 'Notes mode writes small pencil marks instead - great for possibilities.' },
       { icon: 'bulb', text: 'Stuck? You have 3 hints per puzzle. Erase clears a cell.' },
-      { icon: 'time', text: 'Solve it to log your time — beat your best on each difficulty.' },
+      { icon: 'time', text: 'Solve it to log your time - beat your best on each difficulty.' },
     ],
   },
   blocks: {
@@ -55,29 +55,18 @@ const TUTORIALS: Record<GameId, { title: string; steps: TutorialStep[] }> = {
       { icon: 'move', text: 'Drag pieces from the tray anywhere they fit on the board.' },
       { icon: 'reorder-four', text: 'Fill a whole row or column to clear it and score.' },
       { icon: 'flame', text: 'Clear lines back-to-back to build combos for bonus points.' },
-      { icon: 'alert-circle-outline', text: 'The game ends when none of your pieces fit — plan ahead!' },
+      { icon: 'alert-circle-outline', text: 'The game ends when none of your pieces fit - plan ahead!' },
     ],
   },
   gonogo: {
     title: 'How to play Go / No-Go',
     steps: [
-      { icon: 'radio-button-on', text: 'A GREEN circle means TAP — as fast as you can.' },
+      { icon: 'radio-button-on', text: 'A GREEN circle means TAP - as fast as you can.' },
       { icon: 'close-circle', text: 'A RED circle means DO NOT tap. Hold back, even mid-reach.' },
-      { icon: 'speedometer', text: 'The pace quickens every level — shorter windows, trickier timing.' },
+      { icon: 'speedometer', text: 'The pace quickens every level - shorter windows, trickier timing.' },
       { icon: 'flame', text: 'Consecutive correct answers build a combo multiplier (up to ×5).' },
       { icon: 'heart', text: 'You have 3 focus points. A wrong tap or a miss costs one.' },
-      { icon: 'fitness', text: 'This trains real impulse control — the same "wait" muscle recovery uses.' },
-    ],
-  },
-  stopsignal: {
-    title: 'How to play Stop Signal',
-    steps: [
-      { icon: 'arrow-forward-circle', text: 'When the arrow appears, TAP it quickly.' },
-      { icon: 'stop-circle', text: 'If a red STOP flashes over it, cancel your tap — do nothing.' },
-      { icon: 'shuffle', text: 'The stop timing adapts to you, staying right at the edge of control.' },
-      { icon: 'flame', text: 'Correct taps and caught stops build a combo multiplier (up to ×5).' },
-      { icon: 'heart', text: 'You have 3 focus points. Tapping through a stop, or missing, costs one.' },
-      { icon: 'fitness', text: 'Built on the Stop-Signal Task used in cognitive-control research.' },
+      { icon: 'fitness', text: 'This trains real impulse control - the same "wait" muscle recovery uses.' },
     ],
   },
 };
@@ -90,7 +79,7 @@ interface GameTutorialProps {
   game: GameId;
   visible: boolean;
   onClose: () => void;
-  /** True when the popup auto-opened on the game's first visit — only then
+  /** True when the popup auto-opened on the game's first visit - only then
    *  is the "Don't show this again" checkbox offered. Opening via the header
    *  info button is deliberate, so it just shows the guide + a Close button. */
   showOptOut?: boolean;
@@ -116,7 +105,7 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
   const { title, steps } = TUTORIALS[game];
 
   const close = () => {
-    // Only the auto-shown popup carries the checkbox — never overwrite the
+    // Only the auto-shown popup carries the checkbox - never overwrite the
     // saved preference from an info-button viewing.
     if (showOptOut) setTutorialHidden(game, dontShow);
     onClose();
@@ -129,7 +118,7 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
-      {/* Scrim and card are SIBLINGS — nesting the card in a Pressable would
+      {/* Scrim and card are SIBLINGS - nesting the card in a Pressable would
           nest buttons inside a button (invalid on web). */}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl }}>
         <Pressable
@@ -188,7 +177,7 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
             </View>
           </ScrollView>
 
-          {/* Don't show again — first-visit popup only */}
+          {/* Don't show again - first-visit popup only */}
           {showOptOut && (
           <Pressable
             onPress={toggle}
@@ -230,7 +219,7 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Header info button — re-opens the tutorial on demand
+// Header info button - re-opens the tutorial on demand
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function TutorialInfoButton({ onPress }: { onPress: () => void }) {
@@ -254,11 +243,11 @@ export function TutorialInfoButton({ onPress }: { onPress: () => void }) {
 /**
  * Tutorial visibility for a game screen: auto-open on first visit (unless the
  * user opted out), plus an `open()` for the header info button. `auto` tells
- * the popup whether to offer the "Don't show this again" checkbox — only the
+ * the popup whether to offer the "Don't show this again" checkbox - only the
  * automatic first-visit showing does; info-button viewings just get Close.
  */
 export function useGameTutorial(game: GameId) {
-  // Read once on mount — the root layout gates rendering on store hydration,
+  // Read once on mount - the root layout gates rendering on store hydration,
   // so the persisted opt-out is always available here.
   const [state, setState] = useState(() => ({
     visible: !useStore.getState().games.tutorialsHidden[game],

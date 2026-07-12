@@ -1,5 +1,5 @@
 /**
- * Go / No-Go Challenge — evidence-based inhibitory-control training wrapped
+ * Go / No-Go Challenge - evidence-based inhibitory-control training wrapped
  * in an arcade shell. Green circle = tap fast; red circle = hold back. The
  * response window shrinks and the pacing gets less predictable as levels
  * climb. Combos, focus hearts, a daily challenge, and achievements keep it a
@@ -48,8 +48,11 @@ export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/g
 
 const GO_COLOR = '#4E9B5E';
 const NOGO_COLOR = '#D9534F';
+const GO_SOFT = '#E4F2E7';
+const NOGO_SOFT = '#F8E4E2';
 
 type Phase = 'idle' | 'countdown' | 'playing' | 'over';
+type Mode = 'standard' | 'extreme';
 
 interface Trial {
   isGo: boolean;
@@ -57,6 +60,35 @@ interface Trial {
   windowMs: number;
   handled: boolean;
 }
+
+const MODE_CONFIG: Record<Mode, {
+  label: string;
+  sublabel: string;
+  startLevel: number;
+  windowShiftMs: number;
+  gapShiftMs: number;
+  noGoProbability: number;
+  scoreBoost: number;
+}> = {
+  standard: {
+    label: 'Standard',
+    sublabel: 'Balanced reflex training',
+    startLevel: 1,
+    windowShiftMs: 0,
+    gapShiftMs: 0,
+    noGoProbability: NOGO_PROBABILITY,
+    scoreBoost: 1,
+  },
+  extreme: {
+    label: 'Extreme',
+    sublabel: 'Faster pace, more red traps',
+    startLevel: 4,
+    windowShiftMs: -170,
+    gapShiftMs: -130,
+    noGoProbability: 0.38,
+    scoreBoost: 1.35,
+  },
+};
 
 export default function GoNoGo() {
   const theme = useTheme();
@@ -66,23 +98,26 @@ export default function GoNoGo() {
   const completeMission = useStore((s) => s.completeMission);
   const tutorial = useGameTutorial('gonogo');
   const { width } = useWindowDimensions();
-  const circleSize = Math.min(190, width * 0.46);
+  const isCompact = width < 380;
+  const circleSize = Math.min(isCompact ? 176 : 208, width * 0.52);
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [lives, setLives] = useState(LIVES);
   const [level, setLevel] = useState(1);
+  const [mode, setMode] = useState<Mode>('standard');
   const [stimulus, setStimulus] = useState<'go' | 'nogo' | null>(null);
   const [float, setFloat] = useState<{ amount: number; id: number } | null>(null);
   const [verdict, setVerdict] = useState<'good' | 'bad' | null>(null);
+  const [status, setStatus] = useState('Choose a mode and start when ready.');
   const [celebrate, setCelebrate] = useState(false);
   const [result, setResult] = useState<{
     unlocked: GameAchievement[]; pointsEarned: number; newBest: boolean; challengeCompleted: boolean;
     accuracy: number; avgReactionMs: number; maxCombo: number; finalScore: number;
   } | null>(null);
 
-  // Round bookkeeping in refs — timers read these without stale closures.
+  // Round bookkeeping in refs - timers read these without stale closures.
   const trialRef = useRef<Trial | null>(null);
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -93,26 +128,36 @@ export default function GoNoGo() {
   const reactionsRef = useRef<number[]>([]);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const overRef = useRef(false);
+  const modeRef = useRef<Mode>('standard');
 
   // Stimulus entrance / verdict flash animation plumbing (stable values).
   const pop = useRef(new Animated.Value(0)).current;
   const ring = useRef(new Animated.Value(0)).current;
+  const windowMeter = useRef(new Animated.Value(0)).current;
 
   const clearTimers = useCallback(() => {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
   }, []);
   const after = useCallback((ms: number, fn: () => void) => {
-    timersRef.current.push(setTimeout(fn, ms));
+    const timer = setTimeout(() => {
+      timersRef.current = timersRef.current.filter((t) => t !== timer);
+      fn();
+    }, ms);
+    timersRef.current.push(timer);
   }, []);
 
   useEffect(() => () => clearTimers(), [clearTimers]);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   const endRound = useCallback(() => {
     if (overRef.current) return;
     overRef.current = true;
     clearTimers();
     setStimulus(null);
+    setStatus('Round complete.');
     setPhase('over');
     const summary = summarize(
       scoreRef.current, trialsRef.current, correctRef.current, maxComboRef.current, reactionsRef.current,
@@ -165,23 +210,36 @@ export default function GoNoGo() {
   }, [flashVerdict]);
 
   const hideStimulus = useCallback(() => {
+    windowMeter.stopAnimation();
+    windowMeter.setValue(0);
     setStimulus(null);
     trialRef.current = null;
-  }, []);
+  }, [windowMeter]);
 
   const scheduleNext = useCallback(() => {
     if (overRef.current || livesRef.current <= 0) return;
-    const lvl = levelForTrial(trialsRef.current);
+    const config = MODE_CONFIG[modeRef.current];
+    const lvl = levelForTrial(trialsRef.current) + config.startLevel - 1;
     setLevel(lvl);
-    const gap = gonogoGapMs(lvl) + Math.random() * GAP_JITTER_MS;
+    setStatus('Watch the center.');
+    const gap = Math.max(240, gonogoGapMs(lvl) + config.gapShiftMs) + Math.random() * GAP_JITTER_MS;
     after(gap, () => {
       if (overRef.current) return;
-      const isGo = Math.random() > NOGO_PROBABILITY;
-      const windowMs = gonogoWindowMs(lvl);
+      const activeConfig = MODE_CONFIG[modeRef.current];
+      const isGo = Math.random() > activeConfig.noGoProbability;
+      const windowMs = Math.max(420, gonogoWindowMs(lvl) + activeConfig.windowShiftMs);
       trialRef.current = { isGo, shownAt: Date.now(), windowMs, handled: false };
       setStimulus(isGo ? 'go' : 'nogo');
+      setStatus(isGo ? 'Tap now.' : 'Hold back.');
       pop.setValue(0.3);
       Animated.spring(pop, { toValue: 1, useNativeDriver: true, damping: 11, stiffness: 260 }).start();
+      windowMeter.setValue(1);
+      Animated.timing(windowMeter, {
+        toValue: 0,
+        duration: windowMs,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start();
 
       // Window closes: a missed GO costs a life; a withheld NO-GO scores.
       after(windowMs, () => {
@@ -190,9 +248,12 @@ export default function GoNoGo() {
         t.handled = true;
         trialsRef.current += 1;
         if (t.isGo) {
+          setStatus('Missed green.');
           loseLife();
         } else {
-          scoreCorrect(holdPoints(comboRef.current), 'clear');
+          const points = Math.round(holdPoints(comboRef.current) * MODE_CONFIG[modeRef.current].scoreBoost);
+          setStatus('Clean hold.');
+          scoreCorrect(points, 'clear');
         }
         hideStimulus();
         scheduleNext();
@@ -204,13 +265,17 @@ export default function GoNoGo() {
     if (phase !== 'playing') return;
     const t = trialRef.current;
     if (!t || t.handled) return; // taps between stimuli are simply ignored
+    windowMeter.stopAnimation();
     t.handled = true;
     trialsRef.current += 1;
     if (t.isGo) {
       const rt = Date.now() - t.shownAt;
       reactionsRef.current.push(rt);
-      scoreCorrect(goPoints(rt, t.windowMs, comboRef.current), 'place');
+      const points = Math.round(goPoints(rt, t.windowMs, comboRef.current) * MODE_CONFIG[modeRef.current].scoreBoost);
+      setStatus(rt < 320 ? 'Lightning tap.' : 'Good tap.');
+      scoreCorrect(points, 'place');
     } else {
+      setStatus('False tap on red.');
       loseLife();
     }
     hideStimulus();
@@ -232,6 +297,7 @@ export default function GoNoGo() {
     setStimulus(null);
     setFloat(null);
     setVerdict(null);
+    setStatus('Get ready.');
     setCelebrate(false);
     setResult(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -246,22 +312,27 @@ export default function GoNoGo() {
     opacity: ring.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] }),
     transform: [{ scale: ring.interpolate({ inputRange: [0, 1], outputRange: [1.5, 1] }) }],
   };
+  const meterStyle = {
+    width: windowMeter.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+    backgroundColor: stimulus === 'nogo' ? NOGO_COLOR : GO_COLOR,
+  };
+  const activeColor = stimulus === 'nogo' ? NOGO_COLOR : GO_COLOR;
+  const activeSoft = stimulus === 'nogo' ? NOGO_SOFT : GO_SOFT;
+  const modeConfig = MODE_CONFIG[mode];
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
       <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
           <BackButton fallback="/games" />
-          <Text variant="title2" style={{ flex: 1 }}>Go / No-Go</Text>
+          <View style={{ flex: 1 }}>
+            <Text variant="title2">Go / No-Go</Text>
+            <Text variant="caption" dim>{modeConfig.label} reflex round</Text>
+          </View>
           <TutorialInfoButton onPress={tutorial.open} />
-          <Text variant="footnote" dim style={{ fontVariant: ['tabular-nums'] }}>
-            Best {games.gonogoBest.toLocaleString()}
-          </Text>
         </View>
 
-        {/* HUD */}
-        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.xs }}>
           <HudStat label="Score" value={score.toLocaleString()} />
           <HudStat label="Level" value={`${level}`} />
           <View style={{ flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card, padding: spacing.md, alignItems: 'center', justifyContent: 'center', gap: 4 }}>
@@ -274,13 +345,12 @@ export default function GoNoGo() {
           <ChallengeChip target={target} done={challengeDone} />
         </View>
 
-        {/* Play area */}
         <Pressable
           onPress={onTap}
           disabled={phase !== 'playing'}
           accessibilityLabel={
-            stimulus === 'go' ? 'Green circle — tap now'
-            : stimulus === 'nogo' ? 'Red circle — do not tap'
+            stimulus === 'go' ? 'Green circle - tap now'
+            : stimulus === 'nogo' ? 'Red circle - do not tap'
             : 'Play area'
           }
           style={{ flex: 1 }}
@@ -288,8 +358,34 @@ export default function GoNoGo() {
           {phase === 'countdown' ? (
             <Countdown onDone={() => { setPhase('playing'); scheduleNext(); }} />
           ) : phase === 'playing' ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              {/* Verdict ring */}
+            <View style={{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg }}>
+              <View
+                style={{
+                  flex: 1,
+                  borderRadius: radius.sheet,
+                  backgroundColor: theme.color.surface,
+                  borderWidth: 1,
+                  borderColor: theme.color.hairline,
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: spacing.lg,
+                  overflow: 'hidden',
+                }}
+              >
+                <View style={{ width: '100%', gap: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}>
+                    <Text variant="footnote" color={activeColor} style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+                      {stimulus === 'nogo' ? 'NO-GO SIGNAL' : stimulus === 'go' ? 'GO SIGNAL' : 'READY'}
+                    </Text>
+                    <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'] }}>
+                      Best {games.gonogoBest.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={{ height: 8, borderRadius: 999, backgroundColor: theme.color.surfaceAlt, overflow: 'hidden' }}>
+                    <Animated.View style={[{ height: '100%', borderRadius: 999 }, meterStyle]} />
+                  </View>
+                </View>
+
               {verdict && (
                 <Animated.View
                   pointerEvents="none"
@@ -301,54 +397,151 @@ export default function GoNoGo() {
                   }, ringStyle]}
                 />
               )}
-              {stimulus ? (
-                <Animated.View
+
+                <View style={{ alignItems: 'center', justifyContent: 'center', gap: spacing.lg }}>
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      width: circleSize * 1.55,
+                      height: circleSize * 1.55,
+                      borderRadius: circleSize,
+                      backgroundColor: stimulus ? activeSoft : theme.color.surfaceAlt,
+                      opacity: theme.mode === 'dark' ? 0.18 : 1,
+                    }}
+                  />
+                  <Animated.View
                   style={{
                     width: circleSize, height: circleSize, borderRadius: circleSize / 2,
-                    backgroundColor: stimulus === 'go' ? GO_COLOR : NOGO_COLOR,
+                    backgroundColor: stimulus ? activeColor : theme.color.surfaceAlt,
                     alignItems: 'center', justifyContent: 'center',
-                    transform: [{ scale: pop }],
-                    shadowColor: stimulus === 'go' ? GO_COLOR : NOGO_COLOR,
-                    shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8,
+                    transform: [{ scale: stimulus ? pop : 1 }],
+                    shadowColor: stimulus ? activeColor : theme.color.text,
+                    shadowOffset: { width: 0, height: 10 }, shadowOpacity: stimulus ? 0.32 : 0.08, shadowRadius: 20, elevation: stimulus ? 10 : 2,
                   }}
                 >
-                  <Ionicons name={stimulus === 'go' ? 'flash' : 'close'} size={54} color="#FFFFFF" />
-                  <Text variant="headline" color="#FFFFFF" style={{ marginTop: 2 }}>
-                    {stimulus === 'go' ? 'TAP!' : "DON'T"}
+                    <Ionicons name={stimulus === 'go' ? 'flash' : stimulus === 'nogo' ? 'close' : 'radio-button-on'} size={isCompact ? 46 : 58} color={stimulus ? '#FFFFFF' : theme.color.textDim} />
+                    <Text variant="title2" color={stimulus ? '#FFFFFF' : theme.color.textDim} style={{ marginTop: 4, fontFamily: 'Nunito_900Black' }}>
+                    {stimulus === 'go' ? 'TAP' : stimulus === 'nogo' ? 'HOLD' : 'WAIT'}
                   </Text>
                 </Animated.View>
-              ) : (
-                <Text variant="callout" dim>Get ready…</Text>
-              )}
+                </View>
+
+                <View style={{ width: '100%', gap: spacing.md }}>
+                  <View
+                    style={{
+                      minHeight: 54,
+                      borderRadius: radius.button,
+                      backgroundColor: stimulus ? activeSoft : theme.color.surfaceAlt,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: spacing.lg,
+                    }}
+                  >
+                    <Text variant="headline" color={stimulus ? activeColor : theme.color.textDim} center>
+                      {status}
+                    </Text>
+                  </View>
+                  <Text variant="caption" dim center>
+                    Tap anywhere on the arena for green. Keep your finger off for red.
+                  </Text>
+                </View>
               {float && <PointsFloat amount={float.amount} id={float.id} />}
+              </View>
             </View>
           ) : (
-            /* Idle / over — start panel */
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, gap: spacing.lg }}>
-              <View style={{ flexDirection: 'row', gap: spacing.lg }}>
-                <View style={{ alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: GO_COLOR, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="flash" size={30} color="#FFF" />
+            <View style={{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between', gap: spacing.lg }}>
+              <View style={{ alignItems: 'center', gap: spacing.md }}>
+                <View
+                  style={{
+                    width: Math.min(170, width * 0.42),
+                    height: Math.min(170, width * 0.42),
+                    borderRadius: 999,
+                    backgroundColor: GO_SOFT,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 10,
+                    borderColor: NOGO_SOFT,
+                  }}
+                >
+                  <View style={{ width: '58%', height: '58%', borderRadius: 999, backgroundColor: GO_COLOR, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="flash" size={42} color="#FFFFFF" />
                   </View>
-                  <Text variant="footnote" color={theme.color.success}>Green — tap</Text>
                 </View>
-                <View style={{ alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: NOGO_COLOR, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="close" size={30} color="#FFF" />
-                  </View>
-                  <Text variant="footnote" color={theme.color.danger}>Red — hold back</Text>
+                <View style={{ alignItems: 'center', gap: spacing.xs }}>
+                  <Text variant="display" center style={{ fontSize: isCompact ? 34 : 40, lineHeight: isCompact ? 38 : 46 }}>
+                    Reflex Arena
+                  </Text>
+                  <Text variant="callout" dim center style={{ maxWidth: 340 }}>
+                    Green means tap. Red means freeze. One mistake costs focus.
+                  </Text>
                 </View>
               </View>
-              <Text variant="callout" dim center style={{ lineHeight: 22 }}>
-                Tap green the instant it appears. When red shows, do nothing — even mid-reach.
-                The pace climbs every level.
-              </Text>
+
+              <View style={{ gap: spacing.md }}>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  {(Object.keys(MODE_CONFIG) as Mode[]).map((m) => {
+                    const selected = mode === m;
+                    const hard = m === 'extreme';
+                    return (
+                      <Pressable
+                        key={m}
+                        onPress={() => {
+                          setMode(m);
+                          setStatus(`${MODE_CONFIG[m].label} mode selected.`);
+                          Haptics.selectionAsync().catch(() => {});
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={`${MODE_CONFIG[m].label} mode`}
+                        style={({ pressed }) => ({
+                          flex: 1,
+                          minHeight: 98,
+                          borderRadius: radius.card,
+                          backgroundColor: selected ? (hard ? NOGO_SOFT : GO_SOFT) : theme.color.surface,
+                          borderWidth: 2,
+                          borderColor: selected ? (hard ? NOGO_COLOR : GO_COLOR) : theme.color.hairline,
+                          padding: spacing.md,
+                          justifyContent: 'space-between',
+                          opacity: pressed ? 0.78 : 1,
+                        })}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }}>
+                          <Ionicons name={hard ? 'flame' : 'leaf'} size={20} color={hard ? NOGO_COLOR : GO_COLOR} />
+                          {selected && <Ionicons name="checkmark-circle" size={18} color={hard ? NOGO_COLOR : GO_COLOR} />}
+                        </View>
+                        <View>
+                          <Text variant="headline" color={hard ? NOGO_COLOR : GO_COLOR}>{MODE_CONFIG[m].label}</Text>
+                          <Text variant="caption" dim>{MODE_CONFIG[m].sublabel}</Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    gap: spacing.sm,
+                    backgroundColor: theme.color.surface,
+                    borderRadius: radius.card,
+                    borderWidth: 1,
+                    borderColor: theme.color.hairline,
+                    padding: spacing.md,
+                  }}
+                >
+                  <SignalKey color={GO_COLOR} icon="flash" label="Tap green" />
+                  <SignalKey color={NOGO_COLOR} icon="close" label="Hold red" />
+                  <SignalKey color={theme.color.primary} icon="heart" label="3 focus" />
+                </View>
+              </View>
+
               <Pressable
                 onPress={start}
                 accessibilityRole="button"
                 accessibilityLabel="Start round"
                 style={({ pressed }) => ({
-                  height: 54, paddingHorizontal: spacing.xxl, borderRadius: radius.button,
+                  minHeight: 58, paddingHorizontal: spacing.xxl, borderRadius: radius.button,
                   backgroundColor: theme.color.primary, alignItems: 'center', justifyContent: 'center',
                   flexDirection: 'row', gap: spacing.sm,
                   transform: [{ scale: pressed ? 0.97 : 1 }],
@@ -356,7 +549,7 @@ export default function GoNoGo() {
               >
                 <Ionicons name="play" size={18} color={theme.color.onPrimary} />
                 <Text variant="headline" color={theme.color.onPrimary}>
-                  {phase === 'over' ? 'Play again' : 'Start'}
+                  {phase === 'over' ? 'Run it back' : `Start ${modeConfig.label}`}
                 </Text>
               </Pressable>
             </View>
@@ -380,7 +573,7 @@ export default function GoNoGo() {
         score={{ label: 'Final score', value: result?.finalScore ?? score }}
         stats={[
           { label: 'Accuracy', value: `${Math.round((result?.accuracy ?? 0) * 100)}%` },
-          { label: 'Avg reaction', value: result?.avgReactionMs ? `${result.avgReactionMs} ms` : '—' },
+          { label: 'Avg reaction', value: result?.avgReactionMs ? `${result.avgReactionMs} ms` : '-' },
           { label: 'Best combo', value: `${result?.maxCombo ?? 0}` },
         ]}
         unlocked={result?.unlocked ?? []}
@@ -392,6 +585,25 @@ export default function GoNoGo() {
           router.push({ pathname: '/share-achievement', params: { id: a.id } });
         }}
       />
+    </View>
+  );
+}
+
+function SignalKey({
+  color,
+  icon,
+  label,
+}: {
+  color: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+}) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', gap: spacing.xs }}>
+      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={icon} size={18} color="#FFFFFF" />
+      </View>
+      <Text variant="caption" dim center>{label}</Text>
     </View>
   );
 }

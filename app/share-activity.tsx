@@ -96,7 +96,7 @@ export default function ShareActivity() {
     ? (params.id as AlternativeId)
     : null;
 
-  // Navigation is a side effect — never call it during render.
+  // Navigation is a side effect - never call it during render.
   useEffect(() => {
     if (!id) safeBack();
   }, [id, safeBack]);
@@ -118,14 +118,14 @@ export default function ShareActivity() {
   const sessionGlasses = Math.max(0, parseInt(params.glasses ?? '0', 10) || 0);
   const sessionStretches = Math.max(0, parseInt(params.stretches ?? '0', 10) || 0);
 
-  // Three stats that make the session feel earned — tuned per activity.
+  // Three stats that make the session feel earned - tuned per activity.
   const stats: { label: string; value: string }[] = (() => {
     switch (id) {
       case 'walk': {
         const pace = formatPace(seconds, sessionMeters);
         return [
-          { label: 'Steps', value: sessionSteps > 0 ? sessionSteps.toLocaleString() : '—' },
-          { label: 'Distance', value: sessionMeters > 0 ? formatDistance(sessionMeters) : '—' },
+          { label: 'Steps', value: sessionSteps > 0 ? sessionSteps.toLocaleString() : '-' },
+          { label: 'Distance', value: sessionMeters > 0 ? formatDistance(sessionMeters) : '-' },
           pace != null
             ? { label: 'Avg pace', value: pace }
             : { label: 'Day streak', value: `${streak}` },
@@ -139,7 +139,7 @@ export default function ShareActivity() {
         ];
       case 'stretch':
         return [
-          { label: 'Stretches', value: sessionStretches > 0 ? `${sessionStretches}` : '—' },
+          { label: 'Stretches', value: sessionStretches > 0 ? `${sessionStretches}` : '-' },
           { label: 'Sessions', value: `${sessions}` },
           { label: 'Total time', value: fmtTotal(totalSeconds) },
         ];
@@ -156,7 +156,7 @@ export default function ShareActivity() {
           { label: 'Clean days', value: `${journal.filter((j) => j.gambled === false).length}` },
           { label: 'Day streak', value: `${streak}` },
         ];
-      default: // water — glasses instead of duration
+      default: // water - glasses instead of duration
         return [
           { label: 'Today', value: `${sessionGlasses}/${WATER_GOAL_GLASSES}` },
           { label: 'Days logged', value: `${daysDone}` },
@@ -178,9 +178,9 @@ export default function ShareActivity() {
         ].filter(Boolean).join(' · ')
       : '';
   const summary =
-    `${HERO_LABEL[id]}${timed ? ` — ${fmtClock(seconds)}` : ''}${walkDetail ? ` · ${walkDetail}` : ''} ✅\n` +
+    `${HERO_LABEL[id]}${timed ? ` - ${fmtClock(seconds)}` : ''}${walkDetail ? ` · ${walkDetail}` : ''} ✅\n` +
     `${TAGLINE[id]}\n` +
-    `Day ${streak} of recovery, one calm choice at a time. — Unchain`;
+    `Day ${streak} of recovery, one calm choice at a time. - Unchain`;
 
   const shareImage = async () => {
     setBusy(true);
@@ -210,7 +210,7 @@ export default function ShareActivity() {
         </View>
 
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl }}>
-          {/* Capture target — 4:5 card */}
+          {/* Capture target - 4:5 card */}
           <View
             ref={cardRef}
             collapsable={false}

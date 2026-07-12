@@ -1,5 +1,5 @@
 /**
- * JournalScreen — premium iOS-native list view.
+ * JournalScreen - premium iOS-native list view.
  *
  * Design highlights:
  * ─────────────────
@@ -51,7 +51,7 @@ type Filter = 'all' | 'clean' | 'gambled' | 'watched';
 type DateRange = 'all_time' | 'today' | 'week' | 'month' | 'year';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mood helpers — text only, no emoji
+// Mood helpers - text only, no emoji
 // ─────────────────────────────────────────────────────────────────────────────
 function moodLabel(mood: number): string {
   if (mood <= 2) return 'Very low';
@@ -69,7 +69,7 @@ function moodColor(mood: number, danger: string, celebrate: string, honey: strin
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Stat card — glassmorphism tinted by meaning
+// Stat card - glassmorphism tinted by meaning
 // ─────────────────────────────────────────────────────────────────────────────
 function StatCard({
   icon, value, label, color, entering, delay,
@@ -113,7 +113,7 @@ function StatCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Entry card — animated expand, accent stroke, mood emoji badge
+// Entry card - animated expand, accent stroke, mood emoji badge
 // Supports both gambling entries (gambled field) and porn entries (watched field).
 // ─────────────────────────────────────────────────────────────────────────────
 function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: number; currency: string }) {
@@ -307,7 +307,7 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
               <View style={{ height: 1, backgroundColor: theme.color.hairline, marginBottom: spacing.sm }} />
 
               {entry.mood != null && (
-                <DetailRow icon="bar-chart-outline" color={theme.color.primary} label="Mood" value={`${entry.mood}/10 — ${moodLabel(entry.mood)}`} />
+                <DetailRow icon="bar-chart-outline" color={theme.color.primary} label="Mood" value={`${entry.mood}/10 - ${moodLabel(entry.mood)}`} />
               )}
 
               {/* ── Gambling-specific rows ── */}
@@ -401,7 +401,7 @@ function DetailRow({ icon, color, label, value }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Search bar — slides down when active
+// Search bar - slides down when active
 // ─────────────────────────────────────────────────────────────────────────────
 function SearchBar({ query, onChange }: { query: string; onChange: (s: string) => void }) {
   const theme = useTheme();
@@ -456,7 +456,7 @@ function SearchBar({ query, onChange }: { query: string; onChange: (s: string) =
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAB — glowing add button
+// FAB - glowing add button
 // ─────────────────────────────────────────────────────────────────────────────
 function FAB({ onPress }: { onPress: () => void }) {
   const theme = useTheme();
@@ -542,7 +542,7 @@ export function JournalScreen() {
   const filtered = useMemo(() => {
     const now = Date.now();
 
-    // Date-range cutoff — local calendar boundaries so "this week" means
+    // Date-range cutoff - local calendar boundaries so "this week" means
     // Mon 00:00:00 of the current week, not exactly 7 × 24h ago.
     let cutoff = 0;
     if (dateRange !== 'all_time') {
@@ -596,7 +596,7 @@ export function JournalScreen() {
           <Text variant="title1" style={{ fontFamily: 'Nunito_900Black' }}>Journal</Text>
           <Text variant="footnote" dim style={{ marginTop: 3 }}>
             {entries.length === 0
-              ? 'Start writing — every entry counts'
+              ? 'Start writing - every entry counts'
               : `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · your private space`}
           </Text>
         </View>
