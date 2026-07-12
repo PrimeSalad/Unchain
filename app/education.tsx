@@ -32,7 +32,7 @@ export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/App
 function SectionHeader({ title, meta }: { title: string; meta?: string }) {
   const theme = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md, marginBottom: spacing.md }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md, marginTop: spacing.xxl, marginBottom: spacing.md }}>
       <Text variant="headline" style={{ flex: 1 }}>{title}</Text>
       {meta ? <Text variant="caption" color={theme.color.textDim}>{meta}</Text> : null}
     </View>

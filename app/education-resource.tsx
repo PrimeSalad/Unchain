@@ -3,8 +3,17 @@
  * Everything shown here is bundled in the app. No browser handoff.
  */
 
-import { useCallback, useState } from 'react';
-import { FlatList, Platform, Pressable, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  FlatList,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ViewToken,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +52,19 @@ const BOOKS: Record<string, BookPayload> = {
 };
 
 type ParagraphKind = 'body' | 'heading' | 'frontMatter';
+interface ReaderBlock {
+  key: string;
+  text: string;
+  kind: ParagraphKind;
+  chapterIndex: number;
+}
+
+interface ReaderChapter {
+  index: number;
+  title: string;
+  startBlock: number;
+}
+
 const READER_WIDTH = 620;
 const readerFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' });
 
@@ -64,6 +86,51 @@ function displayParagraph(text: string) {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+function isChapterBreak(text: string, index: number, kind: ParagraphKind) {
+  if (kind !== 'heading') return false;
+  const trimmed = displayParagraph(text);
+  const normalized = trimmed.replace(/[_"'.:,;!?()\[\]\s-]/g, '');
+  const isUpper = /[A-Za-z]/.test(trimmed) && normalized.length > 0 && normalized === normalized.toUpperCase();
+  return (
+    /^(chapter|book|part|section|preface|introduction|conclusion)\b/i.test(trimmed) ||
+    /^[IVXLCDM]+\.?$/.test(trimmed) ||
+    (index > 8 && isUpper && trimmed.length <= 96)
+  );
+}
+
+function chapterTitle(text: string, fallback: string) {
+  const cleaned = displayParagraph(text);
+  if (!cleaned) return fallback;
+  return cleaned.length > 72 ? `${cleaned.slice(0, 69)}...` : cleaned;
+}
+
+function buildReaderModel(paragraphs: string[]) {
+  const chapters: ReaderChapter[] = [{ index: 0, title: 'Opening', startBlock: 0 }];
+  let chapterIndex = 0;
+
+  const blocks = paragraphs.map((paragraph, index): ReaderBlock => {
+    const kind = paragraphKind(paragraph, index);
+    if (isChapterBreak(paragraph, index, kind)) {
+      const duplicateOpening = chapters.length === 1 && chapters[0].startBlock === 0 && index <= 8;
+      chapterIndex = duplicateOpening ? 0 : chapters.length;
+      if (duplicateOpening) {
+        chapters[0] = { index: 0, title: chapterTitle(paragraph, 'Opening'), startBlock: index };
+      } else {
+        chapters.push({ index: chapterIndex, title: chapterTitle(paragraph, `Chapter ${chapterIndex + 1}`), startBlock: index });
+      }
+    }
+
+    return {
+      key: `${index}-${chapterIndex}`,
+      text: paragraph,
+      kind,
+      chapterIndex,
+    };
+  });
+
+  return { blocks, chapters };
+}
+
 export default function EducationResource() {
   const theme = useTheme();
   const safeBack = useSafeBack();
@@ -71,6 +138,14 @@ export default function EducationResource() {
   const resource = id ? resourceById(id) : undefined;
   const book = resource ? BOOKS[resource.bookId] : undefined;
   const [progress, setProgress] = useState(0);
+  const [currentChapter, setCurrentChapter] = useState(0);
+  const { blocks, chapters } = useMemo(() => buildReaderModel(book?.paragraphs ?? []), [book]);
+  const listRef = useRef<FlatList<ReaderBlock>>(null);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<ReaderBlock>[] }) => {
+    const visible = viewableItems.find((item) => item.item && item.item.kind !== 'frontMatter')?.item;
+    if (visible) setCurrentChapter(visible.chapterIndex);
+  }).current;
 
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -113,6 +188,9 @@ export default function EducationResource() {
           <View style={{ flex: 1 }}>
             <Text variant="caption" dim>Reading Shelf</Text>
             <Text variant="callout" numberOfLines={1}>{resource.title}</Text>
+            <Text variant="caption" dim numberOfLines={1}>
+              Chapter {Math.min(currentChapter + 1, chapters.length)} of {chapters.length}
+            </Text>
             <ProgressBar progress={progress} height={6} />
           </View>
           <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'], minWidth: 36, textAlign: 'right' }}>
@@ -121,9 +199,18 @@ export default function EducationResource() {
         </View>
 
         <FlatList
-          data={book.paragraphs}
-          keyExtractor={(_, index) => `${resource.id}-${index}`}
+          ref={listRef}
+          data={blocks}
+          keyExtractor={(item) => item.key}
           onScroll={onScroll}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={{ itemVisiblePercentThreshold: 35 }}
+          onScrollToIndexFailed={(info) => {
+            listRef.current?.scrollToOffset({
+              offset: Math.max(0, info.averageItemLength * info.index),
+              animated: true,
+            });
+          }}
           scrollEventThrottle={32}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge }}
@@ -172,6 +259,55 @@ export default function EducationResource() {
 
               <View
                 style={{
+                  marginBottom: spacing.xl,
+                  padding: spacing.md,
+                  backgroundColor: theme.color.surface,
+                  borderRadius: radius.card,
+                  borderWidth: 1,
+                  borderColor: theme.color.hairline,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <Ionicons name="list" size={16} color={theme.color.primary} />
+                  <Text variant="footnote" color={theme.color.primary} style={{ flex: 1 }}>
+                    Chapters
+                  </Text>
+                  <Text variant="caption" dim>{chapters.length}</Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: spacing.sm, paddingTop: spacing.md }}
+                >
+                  {chapters.map((chapter) => {
+                    const on = chapter.index === currentChapter;
+                    return (
+                      <Pressable
+                        key={chapter.index}
+                        onPress={() => listRef.current?.scrollToIndex({ index: chapter.startBlock, animated: true, viewPosition: 0.1 })}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Go to ${chapter.title}`}
+                        style={({ pressed }) => ({
+                          minHeight: 34,
+                          maxWidth: 240,
+                          paddingHorizontal: spacing.md,
+                          borderRadius: radius.round,
+                          backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
+                          justifyContent: 'center',
+                          opacity: pressed ? 0.75 : 1,
+                        })}
+                      >
+                        <Text variant="caption" color={on ? theme.color.onPrimary : theme.color.text} numberOfLines={1}>
+                          {chapter.index + 1}. {chapter.title}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              <View
+                style={{
                   marginTop: spacing.sm,
                   marginBottom: spacing.xl,
                   paddingLeft: spacing.lg,
@@ -185,9 +321,9 @@ export default function EducationResource() {
               </View>
             </View>
           )}
-          renderItem={({ item, index }) => {
-            const kind = paragraphKind(item, index);
-            const text = displayParagraph(item);
+          renderItem={({ item }) => {
+            const kind = item.kind;
+            const text = displayParagraph(item.text);
             if (kind === 'heading') {
               return (
                 <View style={{ width: '100%', alignItems: 'center' }}>
