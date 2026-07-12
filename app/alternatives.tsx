@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, Modal, Pressable, View } from 'react-native';
+import { Animated as RNAnimated, Easing, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -114,21 +114,21 @@ function SheetDone({
       <Animated.View entering={FadeInDown.springify().damping(14)}>
         <View
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 36,
+            width: 60,
+            height: 60,
+            borderRadius: 30,
             backgroundColor: theme.color.successSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Ionicons name="checkmark" size={38} color={theme.color.success} />
+          <Ionicons name="checkmark" size={30} color={theme.color.success} />
         </View>
       </Animated.View>
-      <Text variant="title2" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+      <Text variant="headline" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
         {title}
       </Text>
-      <Text variant="callout" dim center style={{ lineHeight: 22, paddingHorizontal: spacing.md }}>
+      <Text variant="footnote" dim center style={{ lineHeight: 19, paddingHorizontal: spacing.sm }}>
         {message}
       </Text>
       {stats && stats.length > 0 && (
@@ -143,7 +143,7 @@ function SheetDone({
         >
           {stats.map((st) => (
             <View key={st.label} style={{ flex: 1, alignItems: 'center' }}>
-              <Text variant="headline" style={{ fontVariant: ['tabular-nums'] }}>{st.value}</Text>
+              <Text variant="callout" style={{ fontVariant: ['tabular-nums'], fontFamily: 'Nunito_700Bold' }}>{st.value}</Text>
               <Text variant="caption" dim style={{ marginTop: 2 }} center>{st.label}</Text>
             </View>
           ))}
@@ -159,12 +159,12 @@ function SheetDone({
 
 function SheetHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <View style={{ marginBottom: spacing.lg }}>
-      <Text variant="title2" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+    <View style={{ marginBottom: spacing.md }}>
+      <Text variant="headline" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
         {title}
       </Text>
       {subtitle ? (
-        <Text variant="callout" dim center style={{ marginTop: spacing.xs, lineHeight: 22 }}>
+        <Text variant="footnote" dim center style={{ marginTop: spacing.xs, lineHeight: 19 }}>
           {subtitle}
         </Text>
       ) : null}
@@ -470,7 +470,7 @@ function WalkSheet({
                 }}
               >
                 <Ionicons name={icon} size={18} color={theme.color.success} />
-                <Text variant="callout" style={{ flex: 1 }}>{text}</Text>
+                <Text variant="footnote" style={{ flex: 1, lineHeight: 19 }}>{text}</Text>
               </View>
             ))}
           </View>
@@ -850,7 +850,7 @@ function StretchSheet({
             }}
           >
             <Ionicons name="shuffle" size={18} color={theme.color.primary} />
-            <Text variant="callout" style={{ flex: 1 }}>
+            <Text variant="footnote" style={{ flex: 1, lineHeight: 19 }}>
               {count} stretches · about {estMinutes} minute{estMinutes === 1 ? '' : 's'} - a fresh mix from {STRETCH_STEPS.length} moves
             </Text>
           </View>
@@ -865,7 +865,7 @@ function StretchSheet({
           <SheetHeading title={step.title} />
           {/* Animated demo - move along with the figure. */}
           <StretchFigure title={step.title} size={132} />
-          <Text variant="callout" dim center style={{ lineHeight: 22, paddingHorizontal: spacing.md }}>
+          <Text variant="footnote" dim center style={{ lineHeight: 19, paddingHorizontal: spacing.sm }}>
             {step.instruction}
           </Text>
           <Text
@@ -1224,10 +1224,10 @@ function JournalDoneSheet({
         >
           <Ionicons name="checkmark" size={28} color={theme.color.success} />
         </View>
-        <Text variant="title2" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+        <Text variant="headline" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
           Today's journal is complete
         </Text>
-        <Text variant="callout" dim center style={{ lineHeight: 22 }}>
+        <Text variant="footnote" dim center style={{ lineHeight: 19 }}>
           {completedAt ? `Written at ${fmtTime(completedAt)}. ` : ''}
           One honest entry per day - you already did the work.
         </Text>
@@ -1282,7 +1282,7 @@ function MetricTile({
         >
           <Ionicons name={icon} size={15} color={tint} />
         </View>
-        <Text variant="headline" style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+        <Text variant="callout" style={{ fontVariant: ['tabular-nums'], fontFamily: 'Nunito_700Bold' }} numberOfLines={1}>
           {value}
         </Text>
         <Text variant="caption" dim numberOfLines={1}>{label}</Text>
@@ -1314,7 +1314,7 @@ function HealthMetrics() {
   return (
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: spacing.sm }}>
-        <Text variant="headline" style={{ flex: 1 }}>Health Metrics</Text>
+        <Text variant="callout" style={{ flex: 1, fontFamily: 'Nunito_700Bold' }}>Health Metrics</Text>
         <Text variant="caption" dim>All measured on this device</Text>
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -1336,12 +1336,14 @@ function ActivityCard({
   done,
   completedAt,
   onPress,
+  onLayout,
 }: {
   alt: Alternative;
   index: number;
   done: boolean;
   completedAt?: number;
   onPress: () => void;
+  onLayout?: (y: number) => void;
 }) {
   const theme = useTheme();
   const tintColor =
@@ -1362,7 +1364,7 @@ function ActivityCard({
           : theme.color.primarySoft;
 
   return (
-    <View>
+    <View onLayout={(e) => onLayout?.(e.nativeEvent.layout.y)}>
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -1384,7 +1386,7 @@ function ActivityCard({
             gap: spacing.md,
             backgroundColor: done ? theme.color.successSoft : theme.color.surface,
             borderRadius: radius.card,
-            padding: spacing.lg,
+            padding: spacing.md,
             borderWidth: 1,
             borderColor: done ? theme.color.success + '40' : theme.color.hairline,
           }}
@@ -1392,21 +1394,21 @@ function ActivityCard({
           {/* Icon chip */}
           <View
             style={{
-              width: 46,
-              height: 46,
-              borderRadius: 23,
+              width: 40,
+              height: 40,
+              borderRadius: 20,
               backgroundColor: done ? theme.color.success + '22' : tintSoft,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Ionicons name={alt.icon as any} size={22} color={done ? theme.color.success : tintColor} />
+            <Ionicons name={alt.icon as any} size={20} color={done ? theme.color.success : tintColor} />
           </View>
 
           {/* Labels */}
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="headline" numberOfLines={2}>{alt.title}</Text>
-            <Text variant="footnote" dim style={{ marginTop: 2 }} numberOfLines={2}>
+            <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }} numberOfLines={2}>{alt.title}</Text>
+            <Text variant="caption" dim style={{ marginTop: 2, lineHeight: 17 }} numberOfLines={2}>
               {done && completedAt != null
                 ? `Completed today · ${fmtTime(completedAt)}`
                 : alt.subtitle}
@@ -1418,9 +1420,9 @@ function ActivityCard({
             <Animated.View entering={FadeInDown.springify().damping(14)}>
               <View
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
                   backgroundColor: theme.color.success,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1460,6 +1462,8 @@ export default function Alternatives() {
   // route below still picks the correct addiction-specific flow.
   const todayJournal = useTodayAnyJournal();
   const journalRoute = profile?.addictionType === 'pornography' ? '/porn-journal-entry' : '/journal-entry';
+  const scrollRef = useRef<ScrollView>(null);
+  const cardYRef = useRef<Record<string, number>>({});
 
   const [sheet, setSheet] = useState<AlternativeId | null>(null);
   // Achievements unlocked mid-sheet are celebrated after the sheet closes -
@@ -1519,6 +1523,12 @@ export default function Alternatives() {
     id === 'journal' ? todayJournal?.at : completions[id];
 
   const open = (id: AlternativeId) => {
+    const y = cardYRef.current[id];
+    if (typeof y === 'number') {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true });
+      });
+    }
     if (id === 'journal') {
       if (todayJournal) setSheet('journal');
       else router.push(journalRoute as Parameters<typeof router.push>[0]);
@@ -1530,11 +1540,11 @@ export default function Alternatives() {
   const doneCount = ALTERNATIVES.filter((a) => isDone(a.id)).length;
 
   return (
-    <Screen edges={['top', 'bottom']}>
+    <Screen edges={['top', 'bottom']} scrollRef={scrollRef}>
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm }}>
         <View style={{ flex: 1 }}>
-          <Text variant="title1">Healthy Alternatives</Text>
+          <Text variant="headline">Healthy Alternatives</Text>
           <Text variant="footnote" dim style={{ marginTop: 2 }}>
             Real actions that outlast an urge - each counts once a day.
           </Text>
@@ -1559,7 +1569,7 @@ export default function Alternatives() {
       </View>
 
       {/* Daily progress */}
-      <View style={{ marginTop: spacing.lg, marginBottom: spacing.lg, gap: spacing.sm }}>
+      <View style={{ marginTop: spacing.md, marginBottom: spacing.md, gap: spacing.sm }}>
         <ProgressBar progress={doneCount / ALTERNATIVES.length} height={8} />
         <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'] }}>
           {doneCount} of {ALTERNATIVES.length} completed today
@@ -1567,12 +1577,12 @@ export default function Alternatives() {
       </View>
 
       {/* Health metrics dashboard */}
-      <View style={{ marginBottom: spacing.xl }}>
+      <View style={{ marginBottom: spacing.lg }}>
         <HealthMetrics />
       </View>
 
       {/* Activity cards */}
-      <View style={{ gap: spacing.md }}>
+      <View style={{ gap: spacing.sm }}>
         {ALTERNATIVES.map((alt, i) => (
           <ActivityCard
             key={alt.id}
@@ -1581,12 +1591,13 @@ export default function Alternatives() {
             done={isDone(alt.id)}
             completedAt={isDone(alt.id) ? doneAt(alt.id) : undefined}
             onPress={() => open(alt.id)}
+            onLayout={(y) => { cardYRef.current[alt.id] = y; }}
           />
         ))}
       </View>
 
       {/* Habit achievements */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+      <Text variant="callout" style={{ marginTop: spacing.lg, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
         Achievements · {Object.keys(altAchievements).length}/{ALT_ACHIEVEMENTS.length}
       </Text>
       <View
@@ -1723,7 +1734,7 @@ function AchievementRow({
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.md,
-        padding: spacing.lg,
+        padding: spacing.md,
         borderTopWidth: first ? 0 : 1,
         borderTopColor: theme.color.hairline,
         opacity: pressed ? 0.7 : 1,
@@ -1731,9 +1742,9 @@ function AchievementRow({
     >
       <View
         style={{
-          width: 44,
-          height: 44,
-          borderRadius: 22,
+          width: 38,
+          height: 38,
+          borderRadius: 19,
           backgroundColor: unlocked ? '#E3B34C' : theme.color.surfaceAlt,
           alignItems: 'center',
           justifyContent: 'center',
@@ -1741,12 +1752,12 @@ function AchievementRow({
       >
         <Ionicons
           name={a.icon as keyof typeof Ionicons.glyphMap}
-          size={22}
+          size={19}
           color={unlocked ? '#FFFFFF' : theme.color.textDim}
         />
       </View>
       <View style={{ flex: 1 }}>
-        <Text variant="callout" color={unlocked ? theme.color.text : theme.color.textDim}>
+        <Text variant="footnote" color={unlocked ? theme.color.text : theme.color.textDim} style={{ fontFamily: 'Nunito_700Bold' }}>
           {a.title}
         </Text>
         <Text variant="caption" dim style={{ marginTop: 2 }}>{a.desc}</Text>

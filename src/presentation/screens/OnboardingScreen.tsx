@@ -55,7 +55,7 @@ export function OnboardingScreen() {
   const complete = useStore((s) => s.completeSetup);
 
   const [index, setIndex] = useState(0);
-  const [name, setName] = useState('');
+  const [nickname, setNickname] = useState('');
   const [age, setAge] = useState('');
   const [atype, setAType] = useState<AddictionType | null>(null);
   const [detail, setDetail] = useState('');
@@ -83,7 +83,7 @@ export function OnboardingScreen() {
 
   const finish = () => {
     complete({
-      name: name.trim() || 'Friend',
+      name: nickname.trim() || 'Friend',
       age: age ? parseInt(age, 10) : undefined,
       addictionType: atype ?? 'other',
       addictionDetail: detail.trim() || undefined,
@@ -155,7 +155,7 @@ export function OnboardingScreen() {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Mascot state="happy" size={180} />
           <Text variant="display" center style={{ marginTop: spacing.lg, fontSize: 34, lineHeight: 40 }}>
-            Welcome to Unchain
+            Welcome to Unchainly
           </Text>
           <Text variant="body" dim center style={{ marginTop: spacing.md, paddingHorizontal: spacing.md }}>
             Your private companion for breaking free - one day at a time. Everything stays on your device. No account, no internet, no judgment.
@@ -167,15 +167,15 @@ export function OnboardingScreen() {
       {/* ── Identity ────────────────────────────────────────────────────── */}
       {step === 'identity' && (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <Text variant="title1">What's your name?</Text>
+          <Text variant="title1">What's your nickname?</Text>
           <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
-            So Unchain can speak to you personally. This never leaves your device.
+            Add a nickname Unchainly can use in check-ins. This never leaves your device.
           </Text>
-          <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>Name</Text>
+          <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>Nickname</Text>
           <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Your name"
+            value={nickname}
+            onChangeText={setNickname}
+            placeholder="Your nickname"
             placeholderTextColor={theme.color.textDim}
             style={inputStyle}
           />
@@ -189,7 +189,7 @@ export function OnboardingScreen() {
             style={inputStyle}
           />
           <View style={{ flex: 1 }} />
-          <Button label="Continue" onPress={next} disabled={!name.trim()} full />
+          <Button label="Continue" onPress={next} disabled={!nickname.trim()} full />
         </KeyboardAvoidingView>
       )}
 
@@ -375,7 +375,7 @@ export function OnboardingScreen() {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Mascot state="braced" size={170} />
           <Text variant="title1" center style={{ marginTop: spacing.lg }}>
-            You're ready, {name.trim() || 'friend'}.
+            You're ready, {nickname.trim() || 'friend'}.
           </Text>
           <Text variant="body" dim center style={{ marginTop: spacing.md, paddingHorizontal: spacing.md }}>
             Your recovery begins now. One day at a time.

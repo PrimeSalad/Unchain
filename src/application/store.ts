@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import type * as ZustandMiddleware from 'zustand/middleware';
+
+// Use the CommonJS middleware entry at runtime so web bundling doesn't pull
+// zustand's ESM middleware path, which can leak import.meta into the browser
+// bundle and white-screen Expo web.
+const middleware = require('zustand/middleware') as typeof ZustandMiddleware;
+const { persist, createJSONStorage } = middleware;
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RecoveryProfile } from '@/domain/gambling';
 import { streakDays, currentStreakStart } from '@/domain/gambling';
@@ -263,7 +269,7 @@ interface RecoveryState {
   syncAchievements: () => Badge[];
   updateProfile: (patch: Partial<RecoveryProfile>) => void;
   submitCheckIn: (data: Omit<DailyCheckIn, 'id' | 'at'>) => void;
-  logUrge: (data: Omit<UrgeLog, 'id' | 'at'>) => void;
+  logUrge: (data: Omit<UrgeLog, 'id' | 'at'>) => string;
   updateUrge: (id: string, data: Omit<UrgeLog, 'id' | 'at'>) => void;
   deleteUrge: (id: string) => void;
   logRelapse: (data: Omit<RelapseEvent, 'id' | 'at'>) => void;
@@ -288,7 +294,40 @@ function evt(type: TimelineType, label: string): TimelineEvent {
   return { id: uid(), at: Date.now(), type, label };
 }
 
-const PERSIST_KEY = 'unchained-gambling-v1';
+function resistedCounterPatch(
+  s: Pick<RecoveryState, 'urgesResisted' | 'urgesResistedWeek'>,
+  now = Date.now(),
+) {
+  const weekStart = currentWeekStart(now);
+  const sameWeek = s.urgesResistedWeek === weekStart;
+  return {
+    urgesResisted: sameWeek ? s.urgesResisted + 1 : 1,
+    urgesResistedWeek: weekStart,
+  };
+}
+
+const PERSIST_KEY = 'unchainly-gambling-v1';
+const LEGACY_PERSIST_KEY = 'unchained-gambling-v1';
+
+const persistentStorage = {
+  async getItem(name: string) {
+    const current = await AsyncStorage.getItem(name);
+    if (current != null || name !== PERSIST_KEY) return current;
+
+    const legacy = await AsyncStorage.getItem(LEGACY_PERSIST_KEY);
+    if (legacy != null) {
+      await AsyncStorage.setItem(PERSIST_KEY, legacy);
+    }
+    return legacy;
+  },
+  setItem: (name: string, value: string) => AsyncStorage.setItem(name, value),
+  async removeItem(name: string) {
+    await AsyncStorage.removeItem(name);
+    if (name === PERSIST_KEY) {
+      await AsyncStorage.removeItem(LEGACY_PERSIST_KEY);
+    }
+  },
+};
 
 /** True when every Healthy Alternative has been completed today -
  *  the journal activity is derived from the journal entries themselves. */
@@ -865,12 +904,15 @@ export const useStore = create<RecoveryState>()(
       },
 
       logUrge: (data) => {
-        const entry: UrgeLog = { ...data, id: uid(), at: Date.now() };
+        const now = Date.now();
+        const entry: UrgeLog = { ...data, id: uid(), at: now };
         set((s) => ({
           urges: [entry, ...s.urges],
           points: s.points + 5,
+          ...(data.resisted ? resistedCounterPatch(s, now) : {}),
           timeline: [evt('urge', `Logged urge - intensity ${data.intensity}/10`), ...s.timeline],
         }));
+        return entry.id;
       },
 
       updateUrge: (id, data) => set((s) => ({
@@ -991,17 +1033,54 @@ export const useStore = create<RecoveryState>()(
 
           if (data.watched === false) {
             const now = Date.now();
-            const weekStart = currentWeekStart(now);
-            const sameWeek = s.urgesResistedWeek === weekStart;
+            const cleanTriggers = data.triggersEncountered ?? (data.trigger ? [data.trigger] : undefined);
+            const urgeEntry: UrgeLog = {
+              id: uid(),
+              at: now,
+              intensity: data.urgeIntensity ?? 1,
+              trigger: cleanTriggers?.[0] ?? 'Daily journal',
+              triggers: cleanTriggers,
+              notes: data.whatHelped ?? data.text,
+              resisted: true,
+              mood: data.mood,
+            };
             return {
               journal: journalAfter,
+              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              urgesResisted: sameWeek ? s.urgesResisted + 1 : 1,
-              urgesResistedWeek: weekStart,
+              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
+                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          if (data.gambled === false) {
+            const now = Date.now();
+            const urgeEntry: UrgeLog = {
+              id: uid(),
+              at: now,
+              intensity: 1,
+              trigger: 'Daily journal',
+              triggers: ['Daily journal'],
+              notes: data.text,
+              resisted: true,
+              mood: data.mood,
+            };
+            return {
+              journal: journalAfter,
+              urges: [urgeEntry, ...s.urges],
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...resistedCounterPatch(s, now),
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Wrote a journal entry - clean day'),
+                evt('urge', 'Logged a clean-day urge check from journal'),
                 ...s.timeline,
               ],
             };
@@ -1055,7 +1134,7 @@ export const useStore = create<RecoveryState>()(
       resetAll: () => {
         // Remove the AsyncStorage key so wiped state persists across restarts.
         // Without this, Zustand would rehydrate the old data on next launch.
-        AsyncStorage.removeItem(PERSIST_KEY).catch(() => {});
+        persistentStorage.removeItem(PERSIST_KEY).catch(() => {});
         set({
           onboarded: false,
           profile: null,
@@ -1098,7 +1177,7 @@ export const useStore = create<RecoveryState>()(
     }),
     {
       name: PERSIST_KEY,
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => persistentStorage),
       // Deep-merge the games slice so users upgrading from an older build get
       // defaults for fields that didn't exist when their state was saved.
       // Also normalise dailyMissions to today so the selector never has to

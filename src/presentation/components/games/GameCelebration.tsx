@@ -86,13 +86,13 @@ export function GameCelebration({
       </Animated.View>
 
       {/* Card */}
-      <View pointerEvents="box-none" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl }}>
+      <View pointerEvents="box-none" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg }}>
         <Animated.View
           style={{
             width: '100%', maxWidth: 380,
             backgroundColor: theme.color.surface,
             borderRadius: radius.sheet,
-            padding: spacing.xl,
+            padding: spacing.lg,
             ...elevation.e2,
             opacity: anim,
             transform: [
@@ -103,23 +103,23 @@ export function GameCelebration({
         >
           {tone === 'win' && <ConfettiBurst play={visible} />}
 
-          <Text variant="title1" center>{title}</Text>
+          <Text variant="headline" center>{title}</Text>
           {subtitle ? (
-            <Text variant="body" dim center style={{ marginTop: spacing.sm }}>{subtitle}</Text>
+            <Text variant="footnote" dim center style={{ marginTop: spacing.xs, lineHeight: 19 }}>{subtitle}</Text>
           ) : null}
 
           {score && (
-            <View style={{ alignItems: 'center', marginTop: spacing.lg }}>
+            <View style={{ alignItems: 'center', marginTop: spacing.md }}>
               <CountUp value={score.value} />
               <Text variant="footnote" dim style={{ marginTop: 2 }}>{score.label}</Text>
             </View>
           )}
 
           {stats && stats.length > 0 && (
-            <View style={{ flexDirection: 'row', marginTop: spacing.lg, backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md }}>
+            <View style={{ flexDirection: 'row', marginTop: spacing.md, backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.sm }}>
               {stats.map((st) => (
                 <View key={st.label} style={{ flex: 1, alignItems: 'center' }}>
-                  <Text variant="headline" style={{ fontVariant: ['tabular-nums'] }}>{st.value}</Text>
+                  <Text variant="callout" style={{ fontVariant: ['tabular-nums'], fontFamily: 'Nunito_700Bold' }}>{st.value}</Text>
                   <Text variant="caption" dim style={{ marginTop: 2 }} center>{st.label}</Text>
                 </View>
               ))}
@@ -127,7 +127,7 @@ export function GameCelebration({
           )}
 
           {unlocked && unlocked.length > 0 && (
-            <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
               {unlocked.map((a, i) => (
                 <AchievementRow key={a.id} a={a} index={i} onPress={onShareAchievement ? () => onShareAchievement(a) : undefined} />
               ))}
@@ -135,10 +135,10 @@ export function GameCelebration({
           )}
 
           {hint ? (
-            <Text variant="caption" dim center style={{ marginTop: spacing.lg }}>{hint}</Text>
+            <Text variant="caption" dim center style={{ marginTop: spacing.md }}>{hint}</Text>
           ) : null}
 
-          <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
+          <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
             {primary && <Button label={primary.label} onPress={primary.onPress} full />}
             {secondary && <Button label={secondary.label} kind="secondary" onPress={secondary.onPress} full />}
           </View>
@@ -170,7 +170,7 @@ function CountUp({ value }: { value: number }) {
   }, [value]);
 
   return (
-    <Text color={theme.color.primary} style={{ fontSize: 44, lineHeight: 50, fontVariant: ['tabular-nums'] }}>
+    <Text color={theme.color.primary} style={{ fontSize: 36, lineHeight: 42, fontVariant: ['tabular-nums'] }}>
       {display.toLocaleString()}
     </Text>
   );
@@ -200,17 +200,17 @@ function AchievementRow({ a, index, onPress }: { a: UnlockedAchievement; index: 
         onPress={onPress}
         disabled={!onPress}
         style={({ pressed }) => ({
-          flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-          backgroundColor: theme.color.primarySoft, borderRadius: radius.card, padding: spacing.md,
+          flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+          backgroundColor: theme.color.primarySoft, borderRadius: radius.card, padding: spacing.sm,
           opacity: pressed ? 0.8 : 1,
         })}
       >
-        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#E3B34C', alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name={a.icon as keyof typeof Ionicons.glyphMap} size={20} color="#FFFFFF" />
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#E3B34C', alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={a.icon as keyof typeof Ionicons.glyphMap} size={18} color="#FFFFFF" />
         </View>
         <View style={{ flex: 1 }}>
           <Text variant="caption" color={theme.color.primary}>Achievement unlocked</Text>
-          <Text variant="headline">{a.title}</Text>
+          <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>{a.title}</Text>
         </View>
         {onPress && <Ionicons name="share-outline" size={18} color={theme.color.primary} />}
       </Pressable>

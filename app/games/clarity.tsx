@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameLoadingScreen, useGameLoading } from '@/presentation/components/games/GameLoadingScreen';
 import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
@@ -62,26 +63,28 @@ const REVEAL_TOTAL = FLIP_STAGGER * (WORD_LENGTH - 1) + FLIP_DURATION + 80;
 function useClarityLayout() {
   const { width, height } = useWindowDimensions();
 
-  // Leave 16 pt safe margin on each side (matches the app gutter token).
-  const SIDE_MARGIN = 16;
-  const tileGap = width < 360 ? 4 : 5;
-  // Board fills the available width exactly - no maxWidth cap needed because
-  // we already express it as available pixels, not a hard number.
-  const boardWidth = width - SIDE_MARGIN * 2;
+  const compact = height < 700 || width < 360;
+  const tiny = height < 620 || width < 340;
+  const SIDE_MARGIN = tiny ? 10 : compact ? 12 : 16;
+  const tileGap = compact ? 4 : 5;
+  const rowGap = tiny ? 3 : compact ? 4 : Math.round(Math.max(5, Math.min(height * 0.008, 7)));
+  const keyHeight = Math.round(
+    Math.max(tiny ? 29 : 32, Math.min(height * (compact ? 0.055 : 0.058), compact ? 40 : 48)),
+  );
+  const keyGap = compact ? 3 : 4;
+  const keyboardHeight = keyHeight * 3 + keyGap * 2 + (compact ? 10 : 16);
+  const chromeHeight = tiny ? 244 : compact ? 270 : 308;
+  const maxBoardHeight = Math.max(tiny ? 176 : 214, height - chromeHeight - keyboardHeight);
+  const tileFromHeight = (maxBoardHeight - rowGap * (MAX_GUESSES - 1)) / MAX_GUESSES;
+  const boardFromHeight = tileFromHeight * WORD_LENGTH + tileGap * (WORD_LENGTH - 1);
+  const maxBoardWidth = tiny ? 270 : compact ? 292 : 312;
+  const boardWidth = Math.floor(Math.min(width - SIDE_MARGIN * 2, boardFromHeight, maxBoardWidth));
   // 5 tiles across, separated by 4 gaps.
   const tileSize = (boardWidth - tileGap * (WORD_LENGTH - 1)) / WORD_LENGTH;
   // 56 % of tile size gives natural letter weight; hard-clamp for a11y.
   const tileFontSize = Math.round(Math.max(13, Math.min(tileSize * 0.56, 28)));
 
-  // Remaining vertical space after fixed chrome (rough budget):
-  //   header ~56, toggle ~64, status 30, message 46, safe-areas ~40 → ~236 left
-  //   on SE (568 pt total).  Split ~55% board / 45% keyboard.
-  // Key height: use 6.5% of screen height, tight floor on small screens.
-  const keyHeight = Math.round(Math.max(34, Math.min(height * 0.065, 52)));
-  const keyGap = width < 360 ? 3 : 4;
-  const rowGap = Math.round(Math.max(4, Math.min(height * 0.009, 8)));
-
-  return { boardWidth, tileGap, tileSize, tileFontSize, keyHeight, keyGap, rowGap };
+  return { boardWidth, tileGap, tileSize, tileFontSize, keyHeight, keyGap, rowGap, compact, tiny };
 }
 
 export default function Clarity() {
@@ -242,14 +245,19 @@ export default function Clarity() {
     inputRange: [0, 0.15, 0.35, 0.55, 0.75, 0.9, 1],
     outputRange: [0, -9, 8, -6, 5, -3, 0],
   });
+  const loading = useGameLoading();
+
+  if (loading) {
+    return <GameLoadingScreen title="Clarity" subtitle="Loading the word board" />;
+  }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+    <View style={{ flex: 1, backgroundColor: theme.color.bg, overflow: 'hidden' }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <BackButton fallback="/games" />
-          <Text variant="title2" style={{ flex: 1 }}>Clarity</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? 2 : spacing.sm }}>
+          <BackButton fallback="/games" confirmExit />
+          <Text variant="headline" style={{ flex: 1 }}>Clarity</Text>
           <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
@@ -257,7 +265,7 @@ export default function Clarity() {
         <View style={{
           flexDirection: 'row',
           marginHorizontal: spacing.lg,
-          marginTop: spacing.xs ?? 4,
+          marginTop: layout.compact ? 2 : 4,
           borderRadius: radius.chip,
           backgroundColor: theme.color.surfaceAlt,
           overflow: 'hidden',
@@ -265,16 +273,16 @@ export default function Clarity() {
           {mode === 'daily' ? (
             <>
               {/* Daily # */}
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
                 <Text variant="caption" dim style={{ marginBottom: 2 }}>Puzzle</Text>
                 <Text variant="headline" color={theme.color.text}>#{daily.day}</Text>
               </View>
 
               {/* Divider */}
-              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
               {/* Streak */}
-              <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+              <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
                 <Text variant="caption" dim style={{ marginBottom: 2 }}>Streak</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                   <Ionicons name="flame" size={14} color={games.clarityStreak > 0 ? theme.color.primary : theme.color.textDim} />
@@ -283,10 +291,10 @@ export default function Clarity() {
               </View>
 
               {/* Divider */}
-              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
               {/* Win rate */}
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
                 <Text variant="caption" dim style={{ marginBottom: 2 }}>Win Rate</Text>
                 <Text variant="headline" color={theme.color.text}>{winRate}%</Text>
               </View>
@@ -294,29 +302,29 @@ export default function Clarity() {
           ) : (
             <>
               {/* Played */}
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
                 <Text variant="caption" dim style={{ marginBottom: 2 }}>Played</Text>
                 <Text variant="headline" color={theme.color.text}>{games.clarityPracticePlayed}</Text>
               </View>
 
               {/* Divider */}
-              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
               {/* Win rate */}
-              <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+              <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
                 <Text variant="caption" dim style={{ marginBottom: 2 }}>Win Rate</Text>
                 <Text variant="headline" color={theme.color.text}>{winRate}%</Text>
               </View>
 
               {/* Divider */}
-              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+              <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
               {/* New word — only visible once round is done */}
               <Pressable
                 onPress={doneRevealed ? newRound : undefined}
                 hitSlop={8}
                 style={({ pressed }) => ({
-                  flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10,
+                  flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10,
                   opacity: doneRevealed ? (pressed ? 0.6 : 1) : 0.35,
                 })}
               >
@@ -328,7 +336,7 @@ export default function Clarity() {
         </View>
 
         {/* Mode toggle */}
-        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? 6 : spacing.sm, paddingBottom: layout.compact ? spacing.md : spacing.lg }}>
           {(['daily', 'practice'] as const).map((m) => {
             const on = mode === m;
             return (
@@ -336,7 +344,7 @@ export default function Clarity() {
                 key={m}
                 onPress={() => mode !== m && setMode(m)}
                 style={({ pressed }) => ({
-                  flex: 1, height: 38, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
+                  flex: 1, height: layout.compact ? 34 : 38, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
                   transform: [{ scale: pressed ? 0.97 : 1 }],
                 })}
@@ -350,7 +358,7 @@ export default function Clarity() {
         </View>
 
         {/* Board - no horizontal padding here; boardWidth already accounts for margins */}
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 0 }}>
           <View style={{ width: layout.boardWidth, gap: layout.rowGap }}>
             {Array.from({ length: MAX_GUESSES }).map((_, r) => {
               const submitted = rows[r];
@@ -389,7 +397,7 @@ export default function Clarity() {
           </View>
 
           {/* Message */}
-          <View style={{ height: 30, justifyContent: 'center', marginTop: spacing.md }}>
+          <View style={{ height: layout.compact ? 24 : 30, justifyContent: 'center', marginTop: layout.compact ? spacing.xs : spacing.md }}>
             {message ? (
               <Text variant="callout" color={won ? theme.color.success : theme.color.text}>{message}</Text>
             ) : null}
@@ -398,8 +406,8 @@ export default function Clarity() {
 
         {/* Keyboard - swapped for round actions once the round completes */}
         {doneRevealed ? (
-          <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.sm }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.xl, marginBottom: spacing.sm }}>
+          <View style={{ paddingHorizontal: spacing.lg, paddingBottom: layout.compact ? spacing.sm : spacing.lg, gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: layout.compact ? spacing.md : spacing.xl, marginBottom: layout.compact ? spacing.xs : spacing.sm }}>
               <MiniStat label="Streak" value={`${games.clarityStreak}`} />
               <MiniStat label="Win rate" value={`${winRate}%`} />
               <MiniStat label="Solved" value={`${wonTotal}`} />
@@ -407,19 +415,19 @@ export default function Clarity() {
             <Pressable
               onPress={newRound}
               style={({ pressed }) => ({
-                height: 52, borderRadius: radius.button, backgroundColor: theme.color.primary,
+                height: layout.compact ? 46 : 52, borderRadius: radius.button, backgroundColor: theme.color.primary,
                 alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.sm,
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               })}
             >
               <Ionicons name="refresh" size={18} color={theme.color.onPrimary} />
-              <Text variant="headline" color={theme.color.onPrimary}>
-                {mode === 'daily' ? 'Keep playing - practice word' : 'New word'}
+              <Text variant={layout.compact ? 'callout' : 'headline'} color={theme.color.onPrimary}>
+                {mode === 'daily' ? (layout.compact ? 'Practice word' : 'Keep playing - practice word') : 'New word'}
               </Text>
             </Pressable>
           </View>
         ) : (
-          <View style={{ paddingHorizontal: spacing.sm, paddingBottom: spacing.md, gap: layout.keyGap }}>
+          <View style={{ paddingHorizontal: spacing.sm, paddingBottom: layout.compact ? spacing.xs : spacing.md, gap: layout.keyGap }}>
             {KEYS.map((row, ri) => (
               <View key={ri} style={{ flexDirection: 'row', justifyContent: 'center', gap: layout.keyGap }}>
                 {ri === 2 && <Key label="ENTER" flex={1.6} onPress={onEnter} height={layout.keyHeight} />}

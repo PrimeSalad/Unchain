@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,6 +58,7 @@ export function HomeScreen() {
   const now = useNow();
   const profile = useProfile();
   const { ringSize } = useResponsive();
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   const timeline = useStore((s) => s.timeline);
   const journal = useStore((s) => s.journal);
@@ -67,6 +68,7 @@ export function HomeScreen() {
   const longestStreak = useStore((s) => s.longestStreak);
   const lastCheckedIn = useStore((s) => s.lastCheckedIn);
   const urgesResisted = useStore((s) => s.urgesResisted);
+  const recordedUrges = useStore((s) => s.urges.filter((urge) => urge.resisted).length);
   const healthyHabitsCount = useStore((s) => s.healthyHabitsCount);
 
   // Derive the current streak start from the event log - never from startedAt
@@ -82,6 +84,7 @@ export function HomeScreen() {
   // are never added. Neither fact changes the streak or calendar.
   const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? '₱';
+  const managedUrges = Math.max(recordedUrges, urgesResisted);
 
   // Auto-complete the daily_log mission the moment a journal entry exists
   // for today. Derived directly from the store (not from the ticking `now`)
@@ -89,6 +92,10 @@ export function HomeScreen() {
   const hasTodayJournal = useStore((s) =>
     s.journal.some((j) => sameDay(j.at, Date.now())),
   );
+  const activityLimit = 4;
+  const hasMoreActivity = timeline.length > activityLimit;
+  const activityItems = showAllActivity ? timeline : timeline.slice(0, activityLimit);
+
   useEffect(() => {
     if (hasTodayJournal) {
       completeMission('daily_log');
@@ -117,12 +124,14 @@ export function HomeScreen() {
       {/* Greeting */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }}>
         <View style={{ flex: 1 }}>
-          <Text variant="caption" dim style={{ letterSpacing: 1.2, textTransform: 'uppercase' }}>
+          <Text variant="caption" dim style={{ textTransform: 'uppercase' }}>
             {new Date(now).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
-          <Text variant="title1" style={{ marginTop: 2 }}>{greeting()}, {profile.name}</Text>
+          <Text variant="headline" numberOfLines={2} style={{ marginTop: 2, fontSize: 19, lineHeight: 24 }}>
+            {greeting()}, {profile.name}
+          </Text>
         </View>
-        <Mascot state={days > 0 ? 'happy' : 'braced'} size={72} />
+        <Mascot state={days > 0 ? 'happy' : 'braced'} size={58} />
       </View>
 
       {/* Recovery Dashboard - flat, sits directly on the page */}
@@ -197,6 +206,17 @@ export function HomeScreen() {
                   tone="primarySoft"
                 />
               </View>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <StatTile
+                  value={managedUrges.toLocaleString()}
+                  label="Urges managed"
+                />
+                <StatTile
+                  value={journal.length.toLocaleString()}
+                  label="Journal entries"
+                  tone="primarySoft"
+                />
+              </View>
             </>
           )}
         </View>
@@ -240,7 +260,7 @@ export function HomeScreen() {
       </Pressable>
 
       {/* Daily motivation - today's quote first, saved favorites after. */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+      <Text variant="callout" style={{ marginTop: spacing.xl, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
         Daily Motivation
       </Text>
       <QuoteFeed />
@@ -251,7 +271,7 @@ export function HomeScreen() {
       </View>
 
       {/* Quick Actions */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+      <Text variant="callout" style={{ marginTop: spacing.xl, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
         Quick Actions
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -264,7 +284,7 @@ export function HomeScreen() {
       </View>
 
       {/* Recreational Games */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+      <Text variant="callout" style={{ marginTop: spacing.xl, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
         Take a Break
       </Text>
       <Pressable
@@ -299,9 +319,31 @@ export function HomeScreen() {
       </Pressable>
 
       {/* Recent activity */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Recent Activity
-      </Text>
+      <View style={{ marginTop: spacing.xl, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <Text variant="callout" style={{ flex: 1, fontFamily: 'Nunito_700Bold' }}>
+          Recent Activity
+        </Text>
+        {hasMoreActivity ? (
+          <Pressable
+            onPress={() => setShowAllActivity((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={showAllActivity ? 'Show less activity' : 'Show all activity'}
+            hitSlop={10}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              minHeight: 36,
+              opacity: pressed ? 0.65 : 1,
+            })}
+          >
+            <Text variant="footnote" color={theme.color.primary}>
+              {showAllActivity ? 'Show less' : 'Show all'}
+            </Text>
+            <Ionicons name={showAllActivity ? 'chevron-up' : 'chevron-down'} size={15} color={theme.color.primary} />
+          </Pressable>
+        ) : null}
+      </View>
       <View
         style={{
           backgroundColor: theme.color.surface,
@@ -317,7 +359,7 @@ export function HomeScreen() {
             </Text>
           </View>
         ) : (
-          timeline.slice(0, 8).map((e, i) => (
+          activityItems.map((e, i) => (
             <View
               key={e.id}
               style={{

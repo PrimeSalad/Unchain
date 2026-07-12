@@ -1,21 +1,21 @@
 {
   "expo": {
-    "name": "Unchain",
-    "slug": "unchain",
+    "name": "Unchainly",
+    "slug": "unchainly",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "unchain",
+    "scheme": "unchainly",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dotorbit.unchain",
+      "bundleIdentifier": "com.dotorbit.unchainly",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.dotorbit.unchain",
+      "package": "com.dotorbit.unchainly",
       "adaptiveIcon": {
         "backgroundColor": "#5A2E7A",
         "foregroundImage": "./assets/images/adaptive-icon.png"
@@ -44,7 +44,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Unchain uses a photo only as the background for the progress card you choose to share. Photos never leave your device otherwise."
+          "photosPermission": "Unchainly uses a photo only as the background for the progress card you choose to share. Photos never leave your device otherwise."
         }
       ],
       "expo-audio",
@@ -53,14 +53,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Unchain uses your location only while a walk session is running, to measure how far you walked. Your location never leaves this device.",
+          "locationWhenInUsePermission": "Unchainly uses your location only while a walk session is running, to measure how far you walked. Your location never leaves this device.",
           "isAndroidBackgroundLocationEnabled": false
         }
       ],
       [
         "expo-sensors",
         {
-          "motionPermission": "Unchain uses motion data only to count your steps during walk sessions. Step data never leaves this device."
+          "motionPermission": "Unchainly uses motion data only to count your steps during walk sessions. Step data never leaves this device."
         }
       ]
     ],

@@ -30,19 +30,6 @@ export interface BlockedSite {
 }
 
 /**
- * Purely OPTIONAL suggestions - never added automatically. Each requires an
- * explicit Add tap from the user before it enters their personal blocklist.
- */
-export const SUGGESTED_SITES: string[] = [
-  'bet365.com',
-  'stake.com',
-  'bitstarz.com',
-  'bitstarz.io',
-  '1xbet.com',
-  '888casino.com',
-];
-
-/**
  * Reduce any URL-ish input to its bare hostname:
  *   "HTTPS://user@M.YouTube.com.:8080/watch?v=1#t" → "m.youtube.com"
  * Handles percent-encoding, protocol-relative URLs, backslashes, userinfo,

@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameLoadingScreen, useGameLoading } from '@/presentation/components/games/GameLoadingScreen';
 import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
 import {
   ChallengeChip,
@@ -96,9 +97,13 @@ export default function GoNoGo() {
   const recordInhibition = useStore((s) => s.recordInhibition);
   const completeMission = useStore((s) => s.completeMission);
   const tutorial = useGameTutorial('gonogo');
-  const { width } = useWindowDimensions();
-  const isCompact = width < 380;
-  const circleSize = Math.min(isCompact ? 176 : 208, width * 0.52);
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 380 || height < 700;
+  const isTiny = width < 340 || height < 620;
+  const circleSize = Math.floor(Math.min(isTiny ? 132 : isCompact ? 156 : 208, width * 0.5, height * 0.24));
+  const previewHeight = isTiny ? 76 : isCompact ? 86 : 106;
+  const goSoft = theme.mode === 'dark' ? '#203428' : GO_SOFT;
+  const noGoSoft = theme.mode === 'dark' ? '#3A2428' : NOGO_SOFT;
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [score, setScore] = useState(0);
@@ -316,16 +321,21 @@ export default function GoNoGo() {
     backgroundColor: stimulus === 'nogo' ? NOGO_COLOR : GO_COLOR,
   };
   const activeColor = stimulus === 'nogo' ? NOGO_COLOR : GO_COLOR;
-  const activeSoft = stimulus === 'nogo' ? NOGO_SOFT : GO_SOFT;
+  const activeSoft = stimulus === 'nogo' ? noGoSoft : goSoft;
   const modeConfig = MODE_CONFIG[mode];
+  const loading = useGameLoading();
+
+  if (loading) {
+    return <GameLoadingScreen title="Go / No-Go" subtitle="Calibrating the round" />;
+  }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+    <View style={{ flex: 1, backgroundColor: theme.color.bg, overflow: 'hidden' }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
-          <BackButton fallback="/games" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: isCompact ? 2 : spacing.sm, paddingBottom: isCompact ? spacing.xs : spacing.sm }}>
+          <BackButton fallback="/games" confirmExit />
           <View style={{ flex: 1 }}>
-            <Text variant="title2">Go / No-Go</Text>
+            <Text variant="headline">Go / No-Go</Text>
             <Text variant="caption" dim>{modeConfig.label} reflex round</Text>
           </View>
           <TutorialInfoButton onPress={tutorial.open} />
@@ -335,36 +345,36 @@ export default function GoNoGo() {
         <View style={{
           flexDirection: 'row',
           marginHorizontal: spacing.lg,
-          marginTop: spacing.xs,
+          marginTop: isCompact ? 2 : spacing.xs,
           borderRadius: radius.chip,
           backgroundColor: theme.color.surfaceAlt,
           overflow: 'hidden',
         }}>
           {/* Score */}
-          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: isCompact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Score</Text>
             <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{score.toLocaleString()}</Text>
           </View>
 
           {/* Divider */}
-          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: isCompact ? 6 : 8 }} />
 
           {/* Level */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: isCompact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Level</Text>
             <Text variant="headline" color={theme.color.text}>{level}</Text>
           </View>
 
           {/* Divider */}
-          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: isCompact ? 6 : 8 }} />
 
           {/* Focus */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: isCompact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Focus</Text>
             <LivesRow lives={lives} />
           </View>
         </View>
-        <View style={{ paddingTop: spacing.sm, gap: spacing.xs }}>
+        <View style={{ paddingTop: isCompact ? spacing.xs : spacing.sm, gap: spacing.xs }}>
           <ComboBadge combo={combo} />
           <ChallengeChip target={target} done={challengeDone} />
         </View>
@@ -382,7 +392,7 @@ export default function GoNoGo() {
           {phase === 'countdown' ? (
             <Countdown onDone={() => { setPhase('playing'); scheduleNext(); }} />
           ) : phase === 'playing' ? (
-            <View style={{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg }}>
+            <View style={{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: isCompact ? spacing.xs : spacing.md, paddingBottom: isCompact ? spacing.xs : spacing.lg }}>
               <View
                 style={{
                   flex: 1,
@@ -392,7 +402,7 @@ export default function GoNoGo() {
                   borderColor: theme.color.hairline,
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: spacing.lg,
+                  padding: isCompact ? spacing.md : spacing.lg,
                   overflow: 'hidden',
                 }}
               >
@@ -422,7 +432,7 @@ export default function GoNoGo() {
                 />
               )}
 
-                <View style={{ alignItems: 'center', justifyContent: 'center', gap: spacing.lg }}>
+                <View style={{ alignItems: 'center', justifyContent: 'center', gap: isCompact ? spacing.md : spacing.lg }}>
                   <View
                     pointerEvents="none"
                     style={{
@@ -444,8 +454,8 @@ export default function GoNoGo() {
                     shadowOffset: { width: 0, height: 10 }, shadowOpacity: stimulus ? 0.32 : 0.08, shadowRadius: 20, elevation: stimulus ? 10 : 2,
                   }}
                 >
-                    <Ionicons name={stimulus === 'go' ? 'radio-button-on' : stimulus === 'nogo' ? 'close' : 'ellipse-outline'} size={isCompact ? 46 : 58} color={stimulus ? '#FFFFFF' : theme.color.textDim} />
-                    <Text variant="title2" color={stimulus ? '#FFFFFF' : theme.color.textDim} style={{ marginTop: 4, fontFamily: 'Nunito_900Black' }}>
+                    <Ionicons name={stimulus === 'go' ? 'radio-button-on' : stimulus === 'nogo' ? 'close' : 'ellipse-outline'} size={isCompact ? 40 : 58} color={stimulus ? '#FFFFFF' : theme.color.textDim} />
+                    <Text variant="headline" color={stimulus ? '#FFFFFF' : theme.color.textDim} style={{ marginTop: 4, fontFamily: 'Nunito_900Black' }}>
                     {stimulus === 'go' ? 'TAP' : stimulus === 'nogo' ? 'HOLD' : 'WAIT'}
                   </Text>
                 </Animated.View>
@@ -454,7 +464,7 @@ export default function GoNoGo() {
                 <View style={{ width: '100%', gap: spacing.md }}>
                   <View
                     style={{
-                      minHeight: 54,
+                      minHeight: isCompact ? 44 : 54,
                       borderRadius: radius.button,
                       backgroundColor: stimulus ? activeSoft : theme.color.surfaceAlt,
                       alignItems: 'center',
@@ -462,7 +472,7 @@ export default function GoNoGo() {
                       paddingHorizontal: spacing.lg,
                     }}
                   >
-                    <Text variant="headline" color={stimulus ? activeColor : theme.color.textDim} center>
+                    <Text variant="callout" color={stimulus ? activeColor : theme.color.textDim} center style={{ fontFamily: 'Nunito_700Bold' }}>
                       {status}
                     </Text>
                   </View>
@@ -474,35 +484,37 @@ export default function GoNoGo() {
               </View>
             </View>
           ) : (
-            <View style={{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between', gap: spacing.lg }}>
-              <View style={{ alignItems: 'center', gap: spacing.md }}>
-                <View
-                  style={{
-                    width: Math.min(170, width * 0.42),
-                    height: Math.min(170, width * 0.42),
-                    borderRadius: 999,
-                    backgroundColor: GO_SOFT,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 10,
-                    borderColor: NOGO_SOFT,
-                  }}
-                >
-                  <View style={{ width: '58%', height: '58%', borderRadius: 999, backgroundColor: GO_COLOR, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="radio-button-on" size={42} color="#FFFFFF" />
-                  </View>
-                </View>
+            <View style={{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: isCompact ? spacing.xs : spacing.md, paddingBottom: isCompact ? spacing.xs : spacing.lg, justifyContent: 'space-between', gap: isCompact ? spacing.sm : spacing.lg }}>
+              <View style={{ gap: isCompact ? spacing.sm : spacing.md }}>
                 <View style={{ alignItems: 'center', gap: spacing.xs }}>
-                  <Text variant="display" center style={{ fontSize: isCompact ? 34 : 40, lineHeight: isCompact ? 38 : 46 }}>
-                    Go / No-Go
+                  <Text variant="headline" center style={{ fontSize: isCompact ? 23 : 28, lineHeight: isCompact ? 28 : 34, fontFamily: 'Nunito_900Black' }}>
+                    Reflex Control
                   </Text>
-                  <Text variant="callout" dim center style={{ maxWidth: 340 }}>
-                    Tap green. Do not tap red. One mistake costs focus.
+                  <Text variant="footnote" dim center style={{ maxWidth: 340, lineHeight: 19 }}>
+                    Fast on green. Still on red. Keep your focus points alive.
                   </Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <CommandPreview
+                    height={previewHeight}
+                    bg={goSoft}
+                    color={GO_COLOR}
+                    icon="radio-button-on"
+                    label="GREEN"
+                    command="TAP"
+                  />
+                  <CommandPreview
+                    height={previewHeight}
+                    bg={noGoSoft}
+                    color={NOGO_COLOR}
+                    icon="close"
+                    label="RED"
+                    command="HOLD"
+                  />
                 </View>
               </View>
 
-              <View style={{ gap: spacing.md }}>
+              <View style={{ gap: isCompact ? spacing.sm : spacing.md }}>
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   {(Object.keys(MODE_CONFIG) as Mode[]).map((m) => {
                     const selected = mode === m;
@@ -520,12 +532,12 @@ export default function GoNoGo() {
                         accessibilityLabel={`${MODE_CONFIG[m].label} mode`}
                         style={({ pressed }) => ({
                           flex: 1,
-                          minHeight: 98,
+                          minHeight: isCompact ? 74 : 98,
                           borderRadius: radius.card,
-                          backgroundColor: selected ? (hard ? NOGO_SOFT : GO_SOFT) : theme.color.surface,
+                          backgroundColor: selected ? (hard ? noGoSoft : goSoft) : theme.color.surface,
                           borderWidth: 2,
                           borderColor: selected ? (hard ? NOGO_COLOR : GO_COLOR) : theme.color.hairline,
-                          padding: spacing.md,
+                          padding: isCompact ? spacing.sm : spacing.md,
                           justifyContent: 'space-between',
                           opacity: pressed ? 0.78 : 1,
                         })}
@@ -535,7 +547,7 @@ export default function GoNoGo() {
                           {selected && <Ionicons name="checkmark-circle" size={18} color={hard ? NOGO_COLOR : GO_COLOR} />}
                         </View>
                         <View>
-                          <Text variant="headline" color={hard ? NOGO_COLOR : GO_COLOR}>{MODE_CONFIG[m].label}</Text>
+                          <Text variant="callout" color={hard ? NOGO_COLOR : GO_COLOR} style={{ fontFamily: 'Nunito_800ExtraBold' }}>{MODE_CONFIG[m].label}</Text>
                           <Text variant="caption" dim>{MODE_CONFIG[m].sublabel}</Text>
                         </View>
                       </Pressable>
@@ -543,17 +555,7 @@ export default function GoNoGo() {
                   })}
                 </View>
 
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    gap: spacing.sm,
-                    backgroundColor: theme.color.surface,
-                    borderRadius: radius.card,
-                    borderWidth: 1,
-                    borderColor: theme.color.hairline,
-                    padding: spacing.md,
-                  }}
-                >
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <SignalKey color={GO_COLOR} icon="radio-button-on" label="Tap green" />
                   <SignalKey color={NOGO_COLOR} icon="close" label="Hold red" />
                   <SignalKey color={theme.color.primary} icon="heart" label="3 focus" />
@@ -565,14 +567,14 @@ export default function GoNoGo() {
                 accessibilityRole="button"
                 accessibilityLabel="Start round"
                 style={({ pressed }) => ({
-                  minHeight: 58, paddingHorizontal: spacing.xxl, borderRadius: radius.button,
+                  minHeight: isCompact ? 50 : 58, paddingHorizontal: spacing.xxl, borderRadius: radius.button,
                   backgroundColor: theme.color.primary, alignItems: 'center', justifyContent: 'center',
                   flexDirection: 'row', gap: spacing.sm,
                   transform: [{ scale: pressed ? 0.97 : 1 }],
                 })}
               >
                 <Ionicons name="play" size={18} color={theme.color.onPrimary} />
-                <Text variant="headline" color={theme.color.onPrimary}>
+                <Text variant="callout" color={theme.color.onPrimary} style={{ fontFamily: 'Nunito_800ExtraBold' }}>
                   {phase === 'over' ? 'Play again' : `Start ${modeConfig.label}`}
                 </Text>
               </Pressable>
@@ -628,6 +630,47 @@ function SignalKey({
         <Ionicons name={icon} size={18} color="#FFFFFF" />
       </View>
       <Text variant="caption" dim center>{label}</Text>
+    </View>
+  );
+}
+
+function CommandPreview({
+  height,
+  bg,
+  color,
+  icon,
+  label,
+  command,
+}: {
+  height: number;
+  bg: string;
+  color: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  command: string;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        minHeight: height,
+        borderRadius: radius.card,
+        backgroundColor: bg,
+        borderWidth: 1,
+        borderColor: color + '55',
+        padding: spacing.md,
+        justifyContent: 'space-between',
+      }}
+    >
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm }}>
+        <Text variant="caption" color={color} style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+          {label}
+        </Text>
+        <Ionicons name={icon} size={18} color={color} />
+      </View>
+      <Text variant="headline" color={color} style={{ fontFamily: 'Nunito_900Black' }}>
+        {command}
+      </Text>
     </View>
   );
 }

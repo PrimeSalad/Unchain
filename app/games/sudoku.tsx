@@ -7,7 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameLoadingScreen, useGameLoading } from '@/presentation/components/games/GameLoadingScreen';
 import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
+import { useSquareBoardSize } from '@/presentation/components/games/useGameLayout';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
@@ -51,16 +53,18 @@ export default function Sudoku() {
   // Synchronous hint counter - state alone can be raced by rapid taps.
   const hintsRef = useRef(0);
   const tutorial = useGameTutorial('sudoku');
+  const loading = useGameLoading();
+  const layout = useSquareBoardSize({ reservedHeight: 384, horizontalPadding: spacing.lg * 2, max: 328 });
 
   const givens = useMemo(() => new Set(puzzle.map((v, i) => (v !== 0 ? i : -1)).filter((i) => i >= 0)), [puzzle]);
   const bad = useMemo(() => conflicts(grid), [grid]);
 
   // Timer.
   useEffect(() => {
-    if (done) return;
+    if (done || loading) return;
     const id = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
-  }, [done]);
+  }, [done, loading]);
 
   const newGame = (lvl: SudokuLevel) => {
     const p = generate(lvl);
@@ -177,22 +181,26 @@ export default function Sudoku() {
   const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
   const ss = String(seconds % 60).padStart(2, '0');
 
+  if (loading) {
+    return <GameLoadingScreen title="Sudoku" subtitle="Generating a fresh grid" />;
+  }
+
   return (
-    <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+    <View style={{ flex: 1, backgroundColor: theme.color.bg, overflow: 'hidden' }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <BackButton fallback="/games" />
-          <Text variant="title2" style={{ flex: 1 }}>Sudoku</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? 2 : spacing.sm }}>
+          <BackButton fallback="/games" confirmExit />
+          <Text variant="headline" style={{ flex: 1 }}>Sudoku</Text>
           <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
         {/* Difficulty */}
-        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.xs : spacing.sm }}>
           {LEVELS.map((l) => {
             const on = level === l;
             return (
-              <Pressable key={l} onPress={() => newGame(l)} style={{ flex: 1, height: 34, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt }}>
+              <Pressable key={l} onPress={() => newGame(l)} style={{ flex: 1, height: layout.compact ? 30 : 34, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt }}>
                 <Text variant="caption" color={on ? theme.color.onPrimary : theme.color.text} style={{ textTransform: 'capitalize' }}>{l}</Text>
               </Pressable>
             );
@@ -203,40 +211,40 @@ export default function Sudoku() {
         <View style={{
           flexDirection: 'row',
           marginHorizontal: spacing.lg,
-          marginTop: spacing.sm,
-          marginBottom: spacing.xs ?? 4,
+          marginTop: layout.compact ? spacing.xs : spacing.sm,
+          marginBottom: layout.compact ? 2 : 4,
           borderRadius: radius.chip,
           backgroundColor: theme.color.surfaceAlt,
           overflow: 'hidden',
         }}>
           {/* Mistakes */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Mistakes</Text>
             <Text variant="headline" color={mistakes > 0 ? theme.color.danger : theme.color.text}>{mistakes}</Text>
           </View>
 
           {/* Divider */}
-          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
           {/* Timer */}
-          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Time</Text>
             <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{mm}:{ss}</Text>
           </View>
 
           {/* Divider */}
-          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
           {/* Hints */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Hints</Text>
             <Text variant="headline" color={hintsLeft <= 0 ? theme.color.textDim : theme.color.primary}>{hints}/{HINT_LIMIT}</Text>
           </View>
         </View>
 
         {/* Board */}
-        <View style={{ alignItems: 'center', paddingHorizontal: spacing.lg }}>
-          <View style={{ width: '100%', maxWidth: 380, aspectRatio: 1, borderRadius: radius.chip, overflow: 'hidden', borderWidth: 2, borderColor: theme.color.text }}>
+        <View style={{ flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.xs : spacing.sm }}>
+          <View style={{ width: layout.boardSize, height: layout.boardSize, borderRadius: radius.chip, overflow: 'hidden', borderWidth: 2, borderColor: theme.color.text }}>
             {Array.from({ length: 9 }).map((_, r) => (
               <View key={r} style={{ flex: 1, flexDirection: 'row' }}>
                 {Array.from({ length: 9 }).map((__, c) => {
@@ -280,12 +288,13 @@ export default function Sudoku() {
                           value={v}
                           color={conflict ? theme.color.danger : given ? theme.color.text : theme.color.primary}
                           pop={popCell === idx && !given}
+                          fontSize={Math.max(14, Math.min(22, layout.boardSize / 15))}
                         />
                       ) : noteMask ? (
                         <View style={{ width: '92%', height: '92%', flexDirection: 'row', flexWrap: 'wrap' }}>
                           {Array.from({ length: 9 }).map((___, d) => (
                             <View key={d} style={{ width: '33.3%', height: '33.3%', alignItems: 'center', justifyContent: 'center' }}>
-                              <Text style={{ fontSize: 9, color: theme.color.textDim }}>
+                              <Text style={{ fontSize: Math.max(6, Math.min(9, layout.boardSize / 42)), color: theme.color.textDim }}>
                                 {noteMask & (1 << d) ? d + 1 : ''}
                               </Text>
                             </View>
@@ -303,7 +312,7 @@ export default function Sudoku() {
         {/* Completion strip (celebration popup carries the details) */}
         {done && (
           <View style={{ alignItems: 'center', marginTop: spacing.md }}>
-            <Text variant="headline" color={theme.color.success}>Solved in {fmt(seconds)} 🎉</Text>
+            <Text variant="headline" color={theme.color.success}>Solved in {fmt(seconds)}</Text>
             <Pressable
               onPress={() => newGame(level)}
               style={({ pressed }) => ({
@@ -319,24 +328,25 @@ export default function Sudoku() {
 
         {/* Controls */}
         {!done && (
-          <View style={{ marginTop: 'auto', padding: spacing.lg, gap: spacing.md }}>
+          <View style={{ paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.xs : spacing.sm, paddingBottom: layout.compact ? spacing.xs : spacing.md, gap: layout.compact ? spacing.sm : spacing.md }}>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                <Pressable key={n} onPress={() => input(n)} style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 8, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-                  <Text variant="title2" color={theme.color.text} style={{ fontSize: 20 }}>{n}</Text>
+                <Pressable key={n} onPress={() => input(n)} style={({ pressed }) => ({ flex: 1, height: layout.compact ? 38 : 46, borderRadius: 8, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+                  <Text variant="title2" color={theme.color.text} style={{ fontSize: layout.compact ? 17 : 20 }}>{n}</Text>
                 </Pressable>
               ))}
             </View>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Control icon="backspace-outline" label="Erase" onPress={() => input(0)} />
-              <Control icon={notesMode ? 'pencil' : 'pencil-outline'} label="Notes" active={notesMode} onPress={() => setNotesMode((v) => !v)} />
+              <Control icon="backspace-outline" label="Erase" compact={layout.compact} onPress={() => input(0)} />
+              <Control icon={notesMode ? 'pencil' : 'pencil-outline'} label="Notes" compact={layout.compact} active={notesMode} onPress={() => setNotesMode((v) => !v)} />
               <Control
                 icon="bulb-outline"
                 label={hintsLeft > 0 ? `Hint (${hintsLeft})` : 'No hints'}
+                compact={layout.compact}
                 onPress={hint}
                 disabled={hintsLeft <= 0}
               />
-              <Control icon="refresh" label="New" onPress={() => newGame(level)} />
+              <Control icon="refresh" label="New" compact={layout.compact} onPress={() => newGame(level)} />
             </View>
           </View>
         )}
@@ -374,7 +384,7 @@ export default function Sudoku() {
 }
 
 /** Cell number that pops in when the player places it. */
-function CellValue({ value, color, pop }: { value: number; color: string; pop: boolean }) {
+function CellValue({ value, color, pop, fontSize }: { value: number; color: string; pop: boolean; fontSize: number }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -385,7 +395,7 @@ function CellValue({ value, color, pop }: { value: number; color: string; pop: b
 
   return (
     <Animated.View style={{ transform: [{ scale: pop ? scale : 1 }] }}>
-      <Text variant="title2" color={color} style={{ fontSize: 22 }}>
+      <Text variant="title2" color={color} style={{ fontSize }}>
         {value}
       </Text>
     </Animated.View>
@@ -394,21 +404,21 @@ function CellValue({ value, color, pop }: { value: number; color: string; pop: b
 
 const box = (i: number) => Math.floor(Math.floor(i / 9) / 3) * 3 + Math.floor((i % 9) / 3);
 
-function Control({ icon, label, onPress, active, disabled }: { icon: any; label: string; onPress: () => void; active?: boolean; disabled?: boolean }) {
+function Control({ icon, label, onPress, active, disabled, compact }: { icon: any; label: string; onPress: () => void; active?: boolean; disabled?: boolean; compact?: boolean }) {
   const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => ({
-        flex: 1, height: 52, borderRadius: 10,
+        flex: 1, height: compact ? 44 : 52, borderRadius: 10,
         backgroundColor: active ? theme.color.primary : theme.color.surfaceAlt,
         alignItems: 'center', justifyContent: 'center', gap: 2,
         opacity: disabled ? 0.35 : pressed ? 0.6 : 1,
         transform: [{ scale: pressed && !disabled ? 0.96 : 1 }],
       })}
     >
-      <Ionicons name={icon} size={18} color={active ? theme.color.onPrimary : disabled ? theme.color.textDim : theme.color.primary} />
+      <Ionicons name={icon} size={compact ? 16 : 18} color={active ? theme.color.onPrimary : disabled ? theme.color.textDim : theme.color.primary} />
       <Text variant="caption" color={active ? theme.color.onPrimary : theme.color.text}>{label}</Text>
     </Pressable>
   );

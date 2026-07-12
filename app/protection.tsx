@@ -5,8 +5,8 @@
  * and stays protected indefinitely. There are no timers, no sessions, no
  * expiry, and no pause switch - the ONLY way a site stops being protected is
  * the user deleting it, behind a destructive confirmation. The user builds
- * the whole list themselves; suggestions require an explicit Add tap. No
- * browsing data is read or collected, and the list never leaves the device.
+ * the whole list themselves. No browsing data is read or collected, and the
+ * list never leaves the device.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -26,7 +26,7 @@ import { useStore, useProfile, useTodayAnyJournal } from '@/application/store';
 import { currentStreakStart, streakDays } from '@/domain/gambling';
 import { ALTERNATIVES } from '@/domain/alternatives';
 import { sameDay } from '@/domain/records';
-import { SUGGESTED_SITES, siteLabel, type BlockedSite } from '@/domain/protection';
+import { siteLabel, type BlockedSite } from '@/domain/protection';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
 
@@ -87,23 +87,23 @@ function ConfirmDialog({ visible, siteName, onCancel, onConfirm }: ConfirmDialog
         >
           {/* Stop scrim from firing when user taps inside the card */}
           <Pressable onPress={() => {}}>
-            <View style={{ padding: spacing.xl, gap: spacing.sm }}>
+            <View style={{ padding: spacing.lg, gap: spacing.sm }}>
               {/* Icon */}
               <View style={{ alignItems: 'center', marginBottom: spacing.sm }}>
                 <View
                   style={{
-                    width: 52, height: 52, borderRadius: 26,
+                    width: 46, height: 46, borderRadius: 23,
                     backgroundColor: theme.color.danger + '18',
                     alignItems: 'center', justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name="trash-outline" size={26} color={theme.color.danger} />
+                  <Ionicons name="trash-outline" size={22} color={theme.color.danger} />
                 </View>
               </View>
 
               {/* Title */}
               <Text
-                variant="title2"
+                variant="headline"
                 center
                 style={{ fontFamily: 'Nunito_800ExtraBold' }}
               >
@@ -111,9 +111,9 @@ function ConfirmDialog({ visible, siteName, onCancel, onConfirm }: ConfirmDialog
               </Text>
 
               {/* Message */}
-              <Text variant="callout" dim center style={{ lineHeight: 22 }}>
+              <Text variant="footnote" dim center style={{ lineHeight: 19 }}>
                 Are you sure you want to remove{' '}
-                <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold', color: theme.color.text }}>
+                <Text variant="footnote" style={{ fontFamily: 'Nunito_700Bold', color: theme.color.text }}>
                   {siteName}
                 </Text>
                 {' '}from your blocklist?
@@ -193,9 +193,9 @@ function DomainFields({
     backgroundColor: theme.color.surfaceAlt,
     borderWidth: 1,
     borderColor: error ? theme.color.danger : theme.color.hairline,
-    padding: spacing.lg,
+    padding: spacing.md,
     color: theme.color.text,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: 'Nunito_600SemiBold',
   } as const;
 
@@ -268,7 +268,7 @@ function AddSiteSheet({ visible, onClose }: { visible: boolean; onClose: () => v
 
   return (
     <ActionSheet visible={visible} onClose={onClose}>
-      <Text variant="title2" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.xs }}>
+      <Text variant="headline" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.xs }}>
         Add Website
       </Text>
       <Text variant="footnote" dim style={{ marginBottom: spacing.lg, lineHeight: 19 }}>
@@ -281,7 +281,7 @@ function AddSiteSheet({ visible, onClose }: { visible: boolean; onClose: () => v
         onDomain={(v) => { setDomain(v); setError(null); }}
         onNickname={setNickname}
       />
-      <View style={{ gap: spacing.sm, marginTop: spacing.xl }}>
+      <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
         <Button label="Add & Protect" onPress={save} disabled={!domain.trim()} full />
         <Button label="Cancel" kind="secondary" onPress={onClose} full />
       </View>
@@ -357,7 +357,7 @@ function EditSiteSheet({ siteId, onClose }: { siteId: string | null; onClose: ()
 
   return (
     <ActionSheet visible={open} onClose={handleClose}>
-      <Text variant="title2" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.lg }}>
+      <Text variant="headline" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.md }}>
         Edit Website
       </Text>
       <DomainFields
@@ -368,7 +368,7 @@ function EditSiteSheet({ siteId, onClose }: { siteId: string | null; onClose: ()
         onDomain={(v) => { setDomain(v); setError(null); }}
         onNickname={setNickname}
       />
-      <View style={{ gap: spacing.sm, marginTop: spacing.xl }}>
+      <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
         <Button
           label={saveLabel}
           onPress={save}
@@ -418,7 +418,7 @@ function SiteRow({
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: theme.color.hairline,
-    padding: spacing.lg,
+    padding: spacing.md,
   };
 
   return (
@@ -435,18 +435,18 @@ function SiteRow({
       >
         <View
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: 21,
+            width: 38,
+            height: 38,
+            borderRadius: 19,
             backgroundColor: theme.color.success + '18',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Ionicons name="shield-checkmark" size={20} color={theme.color.success} />
+          <Ionicons name="shield-checkmark" size={18} color={theme.color.success} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="headline" numberOfLines={1}>{siteLabel(site)}</Text>
+          <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }} numberOfLines={1}>{siteLabel(site)}</Text>
           {site.nickname ? (
             <Text variant="caption" dim numberOfLines={1}>{site.domain}</Text>
           ) : null}
@@ -486,7 +486,6 @@ export default function Protection() {
   const safeBack = useSafeBack();
   const profile = useProfile();
   const blockedSites = useStore((s) => s.blockedSites);
-  const addBlockedSite = useStore((s) => s.addBlockedSite);
   const removeBlockedSite = useStore((s) => s.removeBlockedSite);
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
@@ -532,17 +531,13 @@ export default function Protection() {
     const q = query.trim().toLowerCase();
     const filtered = q
       ? blockedSites.filter(
-          (s) => s.domain.includes(q) || (s.nickname ?? '').toLowerCase().includes(q),
+          (s) => s.domain.toLowerCase().includes(q) || (s.nickname ?? '').toLowerCase().includes(q),
         )
       : blockedSites;
     return [...filtered].sort((a, b) =>
       sort === 'az' ? siteLabel(a).localeCompare(siteLabel(b)) : b.addedAt - a.addedAt,
     );
   }, [blockedSites, query, sort]);
-
-  const suggestions = SUGGESTED_SITES.filter(
-    (d) => !blockedSites.some((s) => s.domain === d),
-  );
 
   const hasSites = blockedSites.length > 0;
 
@@ -551,7 +546,7 @@ export default function Protection() {
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm }}>
         <View style={{ flex: 1 }}>
-          <Text variant="title1">Focus Protection</Text>
+          <Text variant="headline">Focus Protection</Text>
           <Text variant="footnote" dim style={{ marginTop: 2 }}>
             Permanent by design - protection only ends when you remove a website.
           </Text>
@@ -573,23 +568,23 @@ export default function Protection() {
       </View>
 
       {/* Dashboard */}
-      <Card tone={hasSites ? 'successSoft' : 'surface'} style={{ marginTop: spacing.lg, gap: spacing.md }}>
+      <Card tone={hasSites ? 'successSoft' : 'surface'} style={{ marginTop: spacing.md, gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <View
             style={{
-              width: 46, height: 46, borderRadius: 23,
+              width: 40, height: 40, borderRadius: 20,
               backgroundColor: (hasSites ? theme.color.success : theme.color.primary) + '20',
               alignItems: 'center', justifyContent: 'center',
             }}
           >
             <Ionicons
               name={hasSites ? 'shield-checkmark' : 'shield-outline'}
-              size={24}
+              size={21}
               color={hasSites ? theme.color.success : theme.color.primary}
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Text variant="headline">
+            <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>
               {hasSites ? 'Protection Always On' : 'No websites protected yet'}
             </Text>
             <Text variant="footnote" dim style={{ marginTop: 1 }}>
@@ -608,8 +603,8 @@ export default function Protection() {
       </Card>
 
       {/* Blocklist */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.md }}>
-        <Text variant="headline" style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.sm }}>
+        <Text variant="callout" style={{ flex: 1, fontFamily: 'Nunito_700Bold' }}>
           My Blocklist · {blockedSites.length}
         </Text>
         <Pressable
@@ -624,7 +619,7 @@ export default function Protection() {
           })}
         >
           <Ionicons name="add-circle" size={18} color={theme.color.primary} />
-          <Text variant="footnote" color={theme.color.primary}>Add Website</Text>
+          <Text variant="footnote" color={theme.color.primary}>Add</Text>
         </Pressable>
       </View>
 
@@ -677,10 +672,10 @@ export default function Protection() {
       )}
 
       {!hasSites ? (
-        <Card tone="primarySoft" style={{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm }}>
-          <Ionicons name="shield-outline" size={30} color={theme.color.primary} />
+        <Card tone="primarySoft" style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.sm }}>
+          <Ionicons name="shield-outline" size={26} color={theme.color.primary} />
           <Text variant="callout" center>Your blocklist is empty</Text>
-          <Text variant="footnote" dim center style={{ paddingHorizontal: spacing.lg, lineHeight: 19 }}>
+          <Text variant="footnote" dim center style={{ paddingHorizontal: spacing.sm, lineHeight: 19 }}>
             Add the websites you want out of your life. Once added, they stay protected until you remove them yourself.
           </Text>
           <Button label="Add your first website" onPress={() => setAddOpen(true)} style={{ marginTop: spacing.sm }} />
@@ -703,52 +698,11 @@ export default function Protection() {
         </View>
       )}
 
-      {/* Suggestions - optional, never auto-added */}
-      {suggestions.length > 0 && (
-        <>
-          <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.xs }}>
-            Suggested Gambling Websites
-          </Text>
-          <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 19 }}>
-            Common gambling sites people choose to block. These are only suggestions - nothing is added unless you tap Add.
-          </Text>
-          <Card padding={0}>
-            {suggestions.map((d, i) => (
-              <View
-                key={d}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
-                  borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.color.hairline,
-                }}
-              >
-                <Ionicons name="globe-outline" size={18} color={theme.color.textDim} />
-                <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }}>{d}</Text>
-                <Pressable
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                    addBlockedSite(d);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add ${d} to blocklist`}
-                  style={({ pressed }) => ({
-                    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
-                    borderRadius: radius.round, backgroundColor: theme.color.primarySoft,
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <Text variant="footnote" color={theme.color.primary} style={{ fontFamily: 'Nunito_700Bold' }}>Add</Text>
-                </Pressable>
-              </View>
-            ))}
-          </Card>
-        </>
-      )}
-
       {/* Privacy */}
-      <Card tone="primarySoft" style={{ marginTop: spacing.xl, marginBottom: spacing.xl }}>
+      <Card tone="primarySoft" style={{ marginTop: spacing.lg, marginBottom: spacing.xl }}>
         <Text variant="footnote" color={theme.color.primary}>Private by design</Text>
-        <Text variant="callout" dim style={{ marginTop: 4, lineHeight: 22 }}>
-          Your blocklist never leaves this device. Unchain does not read your browsing history, collect analytics about
+        <Text variant="footnote" dim style={{ marginTop: 4, lineHeight: 19 }}>
+          Your blocklist never leaves this device. Unchainly does not read your browsing history, collect analytics about
           blocked websites, or upload anything anywhere.
         </Text>
       </Card>
@@ -777,11 +731,11 @@ function DashStat({ value, label }: { value: string; label: string }) {
         flex: 1,
         backgroundColor: theme.color.surfaceAlt + '80',
         borderRadius: radius.input,
-        paddingVertical: spacing.md,
+        paddingVertical: spacing.sm,
         alignItems: 'center',
       }}
     >
-      <Text variant="headline" style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
+      <Text variant="callout" style={{ fontVariant: ['tabular-nums'], fontFamily: 'Nunito_700Bold' }}>{value}</Text>
       <Text variant="caption" dim style={{ marginTop: 1 }}>{label}</Text>
     </View>
   );

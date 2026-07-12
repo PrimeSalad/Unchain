@@ -203,6 +203,7 @@ export default function Sos() {
   const protectedCount = useStore((s) => s.blockedSites.length);
   const urgesResisted = useStore((s) => s.urges.filter((urge) => urge.resisted).length);
   const healthyHabits = useStore((s) => s.healthyHabitsCount);
+  const logUrge = useStore((s) => s.logUrge);
 
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
@@ -250,7 +251,7 @@ export default function Sos() {
         >
           {/* Hero */}
           <PulseHero reduce={reduce} />
-          <Text variant="caption" center color={palette.grape300} style={{ letterSpacing: 3, textTransform: 'uppercase', marginTop: spacing.md }}>
+          <Text variant="caption" center color={palette.grape300} style={{ textTransform: 'uppercase', marginTop: spacing.md }}>
             Emergency pause
           </Text>
           <Text variant="title1" center color={palette.fog} style={{ marginTop: spacing.xs }}>
@@ -320,7 +321,14 @@ export default function Sos() {
           <Pressable
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
-              router.push('/log-urge' as Href);
+              const entryId = logUrge({
+                intensity: 8,
+                trigger: 'SOS',
+                triggers: ['SOS'],
+                notes: 'Started from SOS.',
+                resisted: true,
+              });
+              router.push(`/log-urge?id=${encodeURIComponent(entryId)}` as Href);
             }}
             accessibilityRole="button"
             accessibilityLabel="I'm having an urge — log it now"

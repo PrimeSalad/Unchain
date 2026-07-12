@@ -55,7 +55,7 @@ export default function GamesHub() {
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md }}>
           <BackButton />
-          <Text variant="title1" style={{ flex: 1 }}>Games</Text>
+          <Text variant="headline" style={{ flex: 1 }}>Games</Text>
           <Pressable
             onPress={() => router.push('/games/achievements' as Href)}
             hitSlop={12}
@@ -69,7 +69,7 @@ export default function GamesHub() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.md }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.sm }} showsVerticalScrollIndicator={false}>
           <Text variant="footnote" dim style={{ marginBottom: spacing.xs }}>
             A calm distraction when a craving hits. All offline.
           </Text>
@@ -81,22 +81,22 @@ export default function GamesHub() {
                 accessibilityLabel={`${g.title} - ${g.desc}`}
                 style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
               >
-                <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+                <Card padding={spacing.md} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                   {g.icon ? (
-                    <Image source={g.icon} style={{ width: 56, height: 56, borderRadius: radius.card }} />
+                    <Image source={g.icon} style={{ width: 50, height: 50, borderRadius: radius.card }} />
                   ) : (
                     <View
                       style={{
-                        width: 56, height: 56, borderRadius: radius.card,
+                        width: 50, height: 50, borderRadius: radius.card,
                         backgroundColor: (g.tint ?? theme.color.primary) + '22',
                         alignItems: 'center', justifyContent: 'center',
                       }}
                     >
-                      <Ionicons name={g.ionIcon ?? 'game-controller'} size={28} color={g.tint ?? theme.color.primary} />
+                      <Ionicons name={g.ionIcon ?? 'game-controller'} size={24} color={g.tint ?? theme.color.primary} />
                     </View>
                   )}
                   <View style={{ flex: 1 }}>
-                    <Text variant="headline">{g.title}</Text>
+                    <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>{g.title}</Text>
                     <Text variant="footnote" dim style={{ marginTop: 2 }}>{g.desc}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 }}>
                       <Text variant="caption" color={theme.color.primary}>{g.stat}</Text>

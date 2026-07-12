@@ -8,7 +8,9 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameLoadingScreen, useGameLoading } from '@/presentation/components/games/GameLoadingScreen';
 import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
+import { useSquareBoardSize } from '@/presentation/components/games/useGameLayout';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
@@ -32,8 +34,6 @@ import {
 export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
 
 const BLOCK_COLORS = ['#5A2E7A', '#E8697A', '#D0A070', '#4E7A5A', '#4A6FA5', '#3E9C9C'];
-const TRAY_CELL = 20;
-
 interface Drag {
   index: number;
   row: number;
@@ -69,6 +69,8 @@ export default function Blocks() {
 
   const gridBoxRef = useRef<View>(null);
   const tutorial = useGameTutorial('blocks');
+  const layout = useSquareBoardSize({ reservedHeight: 378, horizontalPadding: spacing.lg * 2, max: 328 });
+  const trayCell = layout.compact ? 16 : 20;
 
   // Refs so the gesture handlers always read the latest state.
   const gridRef = useRef(grid); gridRef.current = grid;
@@ -225,14 +227,23 @@ export default function Blocks() {
     }
     return set;
   }, [drag]);
+  const loading = useGameLoading();
+  const boardFrame = theme.mode === 'dark' ? '#17101D' : '#D9C7E5';
+  const emptyCell = theme.mode === 'dark' ? '#21182A' : '#FFF9F2';
+  const emptyBorder = theme.mode === 'dark' ? '#33263F' : '#E5D9ED';
+  const ghostBg = theme.mode === 'dark' ? '#B98FD6' : '#5A2E7A';
+
+  if (loading) {
+    return <GameLoadingScreen title="Block Puzzle" subtitle="Preparing the tray" />;
+  }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+    <View style={{ flex: 1, backgroundColor: theme.color.bg, overflow: 'hidden' }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <BackButton fallback="/games" />
-          <Text variant="title2" style={{ flex: 1 }}>Block Puzzle</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? 2 : spacing.sm }}>
+          <BackButton fallback="/games" confirmExit />
+          <Text variant="headline" style={{ flex: 1 }}>Block Puzzle</Text>
           <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
@@ -240,42 +251,51 @@ export default function Blocks() {
         <View style={{
           flexDirection: 'row',
           marginHorizontal: spacing.lg,
-          marginTop: spacing.sm,
+          marginTop: layout.compact ? spacing.xs : spacing.sm,
           borderRadius: radius.chip,
           backgroundColor: theme.color.surfaceAlt,
           overflow: 'hidden',
         }}>
           {/* Score */}
-          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Score</Text>
             <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{score.toLocaleString()}</Text>
           </View>
 
           {/* Divider */}
-          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
           {/* Best */}
-          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Best</Text>
             <Text variant="headline" color={theme.color.text} style={{ fontVariant: ['tabular-nums'] }}>{Math.max(best, score).toLocaleString()}</Text>
           </View>
 
           {/* Divider */}
-          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
           {/* Combo */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Combo</Text>
             <Text variant="headline" color={combo > 1 ? theme.color.accent : theme.color.textDim}>{combo > 1 ? `×${combo}` : '—'}</Text>
           </View>
         </View>
 
         {/* Board */}
-        <View style={{ alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
+        <View style={{ flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.xs : spacing.sm }}>
           <View
             ref={gridBoxRef}
             onLayout={measure}
-            style={{ width: '100%', maxWidth: 380, aspectRatio: 1, borderRadius: radius.card, overflow: 'hidden', backgroundColor: theme.color.hairline, padding: 2 }}
+            style={{
+              width: layout.boardSize,
+              height: layout.boardSize,
+              borderRadius: radius.card,
+              overflow: 'hidden',
+              backgroundColor: boardFrame,
+              borderWidth: 1,
+              borderColor: theme.color.hairline,
+              padding: layout.compact ? 4 : 5,
+            }}
           >
             {Array.from({ length: SIZE }).map((_, r) => (
               <View key={r} style={{ flex: 1, flexDirection: 'row' }}>
@@ -285,23 +305,65 @@ export default function Blocks() {
                   const ghost = hoverCells.has(idx);
                   const flashing = flashCells.has(idx);
                   return (
-                    <View key={c} style={{ flex: 1, padding: 1.5 }}>
+                    <View key={c} style={{ flex: 1, padding: layout.compact ? 1.5 : 2 }}>
                       <View
                         style={{
-                          flex: 1, borderRadius: 5,
-                          backgroundColor: v ? BLOCK_COLORS[v - 1] : ghost ? theme.color.primary : theme.color.surface,
-                          opacity: ghost && !v ? 0.55 : 1,
+                          flex: 1,
+                          borderRadius: layout.compact ? 5 : 6,
+                          backgroundColor: v ? BLOCK_COLORS[v - 1] : ghost ? ghostBg : emptyCell,
+                          borderWidth: v ? 0 : 1,
+                          borderColor: ghost ? theme.color.primary : emptyBorder,
+                          opacity: ghost && !v ? 0.5 : 1,
+                          overflow: 'hidden',
                         }}
-                      />
-                      {flashing && (
-                        <Animated.View
-                          pointerEvents="none"
-                          style={{
-                            position: 'absolute', left: 1.5, right: 1.5, top: 1.5, bottom: 1.5,
-                            borderRadius: 5, backgroundColor: '#FFFFFF', opacity: flashAnim,
-                          }}
-                        />
-                      )}
+                      >
+                        {v ? (
+                          <View
+                            pointerEvents="none"
+                            style={{
+                              position: 'absolute',
+                              left: 2,
+                              right: 2,
+                              top: 2,
+                              height: '34%',
+                              borderRadius: 5,
+                              backgroundColor: '#FFFFFF',
+                              opacity: 0.16,
+                            }}
+                          />
+                        ) : null}
+                        {ghost && !v ? (
+                          <View
+                            pointerEvents="none"
+                            style={{
+                              position: 'absolute',
+                              left: 3,
+                              right: 3,
+                              top: 3,
+                              bottom: 3,
+                              borderRadius: 4,
+                              borderWidth: 1,
+                              borderColor: '#FFFFFF',
+                              opacity: 0.35,
+                            }}
+                          />
+                        ) : null}
+                        {flashing && (
+                          <Animated.View
+                            pointerEvents="none"
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              borderRadius: layout.compact ? 5 : 6,
+                              backgroundColor: '#FFFFFF',
+                              opacity: flashAnim,
+                            }}
+                          />
+                        )}
+                      </View>
                     </View>
                   );
                 })}
@@ -314,17 +376,17 @@ export default function Blocks() {
         </View>
 
         {/* Tray */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.xl, minHeight: 120 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.sm : spacing.lg, minHeight: layout.compact ? 88 : 112, paddingBottom: layout.compact ? spacing.xs : spacing.md }}>
           {pieces.map((p, i) => {
             // A piece with no legal placement reads as clearly "stuck".
             const stuck = p != null && !canPlaceAnywhere(grid, p.shape);
             return (
-              <View key={i} style={{ width: 100, height: 100, alignItems: 'center', justifyContent: 'center' }}>
+              <View key={i} style={{ width: layout.compact ? 82 : 100, height: layout.compact ? 82 : 100, alignItems: 'center', justifyContent: 'center' }}>
                 {p && !over && (
                   <GestureDetector gesture={gestures[i]}>
                     <View style={{ opacity: drag?.index === i ? 0.25 : stuck ? 0.3 : 1 }}>
                       <TrayPopIn key={p.id} index={i}>
-                        <PiecePreview piece={p} cell={TRAY_CELL} />
+                        <PiecePreview piece={p} cell={trayCell} />
                       </TrayPopIn>
                     </View>
                   </GestureDetector>

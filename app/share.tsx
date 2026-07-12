@@ -53,7 +53,7 @@ export default function ShareCard() {
   const summary =
     `${days} days ${freeLabel.toLowerCase()} 💜\n` +
     `${formatMoney(money.total, currency)} saved · ${stats.urgesResisted} urges resisted · ${earned} badges\n` +
-    `My recovery, one day at a time. - Unchain`;
+    `My recovery, one day at a time. - Unchainly`;
 
   const pickPhoto = async () => {
     try {
@@ -104,7 +104,7 @@ export default function ShareCard() {
           style={{ width: 32, height: 32, borderRadius: 9 }}
           resizeMode="cover"
         />
-        <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchain</Text>
+        <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchainly</Text>
         <View style={{ flex: 1 }} />
         <Text variant="caption" color="rgba(255,255,255,0.75)">
           {new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}

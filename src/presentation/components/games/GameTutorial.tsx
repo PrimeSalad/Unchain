@@ -22,31 +22,25 @@ const TUTORIALS: Record<GameId, { title: string; steps: TutorialStep[] }> = {
   clarity: {
     title: 'How to play Clarity',
     steps: [
-      { icon: 'text', text: 'Guess the hidden five-letter word. You have six tries.' },
-      { icon: 'checkmark-circle', text: 'Green tile - right letter in the right spot.' },
-      { icon: 'swap-horizontal', text: 'Yellow tile - the letter is in the word, but in a different spot.' },
-      { icon: 'close-circle-outline', text: 'Gray tile - the letter is not in the word at all.' },
-      { icon: 'flame', text: 'One daily word keeps your streak; Practice mode gives unlimited words.' },
+      { icon: 'text', text: 'Guess the hidden five-letter word in six tries.' },
+      { icon: 'checkmark-circle', text: 'Green is correct. Yellow is the right letter in the wrong spot.' },
+      { icon: 'flame', text: 'Daily keeps your streak. Practice gives unlimited words.' },
     ],
   },
   checkers: {
     title: 'How to play Checkers',
     steps: [
       { icon: 'hand-left', text: 'You play the coral pieces. Tap a piece, then tap a green dot to move.' },
-      { icon: 'arrow-up', text: 'Pieces move diagonally forward on the dark squares.' },
-      { icon: 'flash', text: 'Jump over an AI piece to capture it - chains of jumps are allowed.' },
-      { icon: 'ribbon', text: 'Reach the far row to crown a King, which can also move backward.' },
-      { icon: 'trophy', text: 'Win by capturing every AI piece or leaving it no legal move.' },
+      { icon: 'flash', text: 'Jump over an AI piece to capture it. Chain jumps when available.' },
+      { icon: 'ribbon', text: 'Reach the far row to crown a King and win by trapping the AI.' },
     ],
   },
   sudoku: {
     title: 'How to play Sudoku',
     steps: [
-      { icon: 'grid', text: 'Fill the grid so every row, column, and 3×3 box has the numbers 1–9 exactly once.' },
+      { icon: 'grid', text: 'Fill every row, column, and 3x3 box with 1 to 9.' },
       { icon: 'hand-left', text: 'Tap an empty cell, then tap a number below to place it.' },
-      { icon: 'pencil', text: 'Notes mode writes small pencil marks instead - great for possibilities.' },
-      { icon: 'bulb', text: 'Stuck? You have 3 hints per puzzle. Erase clears a cell.' },
-      { icon: 'time', text: 'Solve it to log your time - beat your best on each difficulty.' },
+      { icon: 'pencil', text: 'Use Notes for possibilities. Erase and hints are in the control row.' },
     ],
   },
   blocks: {
@@ -54,19 +48,15 @@ const TUTORIALS: Record<GameId, { title: string; steps: TutorialStep[] }> = {
     steps: [
       { icon: 'move', text: 'Drag pieces from the tray anywhere they fit on the board.' },
       { icon: 'reorder-four', text: 'Fill a whole row or column to clear it and score.' },
-      { icon: 'flame', text: 'Clear lines back-to-back to build combos for bonus points.' },
-      { icon: 'alert-circle-outline', text: 'The game ends when none of your pieces fit - plan ahead!' },
+      { icon: 'alert-circle-outline', text: 'The game ends when none of your pieces fit. Plan ahead.' },
     ],
   },
   gonogo: {
     title: 'How to play Go / No-Go',
     steps: [
-      { icon: 'radio-button-on', text: 'A GREEN circle means TAP - as fast as you can.' },
-      { icon: 'close-circle', text: 'A RED circle means DO NOT tap. Hold back, even mid-reach.' },
-      { icon: 'speedometer', text: 'The pace quickens every level - shorter windows, trickier timing.' },
-      { icon: 'flame', text: 'Consecutive correct answers build a combo multiplier (up to ×5).' },
-      { icon: 'heart', text: 'You have 3 focus points. A wrong tap or a miss costs one.' },
-      { icon: 'fitness', text: 'This trains real impulse control - the same "wait" muscle recovery uses.' },
+      { icon: 'radio-button-on', text: 'Green means tap fast. Red means hold back.' },
+      { icon: 'heart', text: 'A wrong tap or missed green costs focus.' },
+      { icon: 'speedometer', text: 'Extreme mode is faster and rewards cleaner streaks.' },
     ],
   },
 };
@@ -117,12 +107,10 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
-      {/* Scrim and card are SIBLINGS - nesting the card in a Pressable would
-          nest buttons inside a button (invalid on web). */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl }}>
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={close}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.58)' }]}
           onPress={close}
           accessibilityRole="button"
           accessibilityLabel="Dismiss"
@@ -130,87 +118,137 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
         <View
           style={{
             width: '100%',
-            maxWidth: 380,
-            maxHeight: '85%',
+            maxWidth: 430,
+            maxHeight: '82%',
+            alignSelf: 'center',
             backgroundColor: theme.color.surface,
-            borderRadius: radius.sheet,
-            padding: spacing.xl,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: 1,
+            borderColor: theme.color.hairline,
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.lg,
             ...elevation.e2,
           }}
         >
-          {/* Header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg }}>
-            <View
-              style={{
-                width: 40, height: 40, borderRadius: 20,
-                backgroundColor: theme.color.primarySoft,
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Ionicons name="school" size={20} color={theme.color.primary} />
-            </View>
-            <Text variant="title2" style={{ flex: 1, fontFamily: 'Nunito_800ExtraBold' }}>
-              {title}
-            </Text>
+          <View style={{ alignItems: 'center', paddingBottom: spacing.sm }}>
+            <View style={{ width: 42, height: 4, borderRadius: 2, backgroundColor: theme.color.hairline }} />
           </View>
 
-          {/* Steps */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: theme.color.primarySoft,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="school" size={17} color={theme.color.primary} />
+            </View>
+            <Text variant="headline" style={{ flex: 1, fontFamily: 'Nunito_800ExtraBold' }}>
+              {title}
+            </Text>
+            <Pressable
+              onPress={close}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Close tutorial"
+              style={({ pressed }) => ({
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme.color.surfaceAlt,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Ionicons name="close" size={18} color={theme.color.textDim} />
+            </Pressable>
+          </View>
+
           <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
-            <View style={{ gap: spacing.md }}>
-              {steps.map((s) => (
-                <View key={s.text} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+            <View style={{ gap: spacing.sm }}>
+              {steps.map((s, i) => (
+                <View
+                  key={s.text}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.md,
+                    minHeight: 52,
+                    paddingVertical: spacing.xs,
+                  }}
+                >
                   <View
                     style={{
-                      width: 30, height: 30, borderRadius: 15,
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
                       backgroundColor: theme.color.surfaceAlt,
-                      alignItems: 'center', justifyContent: 'center',
-                      marginTop: 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name={s.icon} size={15} color={theme.color.primary} />
+                    <Ionicons name={s.icon} size={16} color={theme.color.primary} />
                   </View>
-                  <Text variant="callout" style={{ flex: 1, lineHeight: 22 }}>
-                    {s.text}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="caption" color={theme.color.primary} style={{ fontVariant: ['tabular-nums'], fontFamily: 'Nunito_800ExtraBold' }}>
+                      {i + 1} / {steps.length}
+                    </Text>
+                    <Text variant="callout" style={{ lineHeight: 21 }}>
+                      {s.text}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>
           </ScrollView>
 
-          {/* Don't show again - first-visit popup only */}
           {showOptOut && (
-          <Pressable
-            onPress={toggle}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: dontShow }}
-            accessibilityLabel="Don't show this again"
-            style={({ pressed }) => ({
-              flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-              marginTop: spacing.xl, opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <View
-              style={{
-                width: 22, height: 22, borderRadius: 6,
-                borderWidth: 2,
-                borderColor: dontShow ? theme.color.primary : theme.color.textDim,
-                backgroundColor: dontShow ? theme.color.primary : 'transparent',
-                alignItems: 'center', justifyContent: 'center',
-              }}
+            <Pressable
+              onPress={toggle}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: dontShow }}
+              accessibilityLabel="Don't show this again"
+              style={({ pressed }) => ({
+                minHeight: 44,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                marginTop: spacing.md,
+                opacity: pressed ? 0.7 : 1,
+              })}
             >
-              {dontShow && <Ionicons name="checkmark" size={15} color={theme.color.onPrimary} />}
-            </View>
-            <Text variant="callout" dim>
-              Don't show this again
-            </Text>
-          </Pressable>
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  borderWidth: 2,
+                  borderColor: dontShow ? theme.color.primary : theme.color.textDim,
+                  backgroundColor: dontShow ? theme.color.primary : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {dontShow && <Ionicons name="checkmark" size={15} color={theme.color.onPrimary} />}
+              </View>
+              <Text variant="footnote" dim>
+                Don't show this again
+              </Text>
+            </Pressable>
           )}
 
           <Button
             label={showOptOut ? 'Got it' : 'Close'}
             onPress={close}
             full
-            style={{ marginTop: showOptOut ? spacing.lg : spacing.xl }}
+            style={{ marginTop: spacing.md }}
           />
         </View>
       </View>

@@ -18,7 +18,6 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeIn,
@@ -28,9 +27,10 @@ import Animated, {
   withSequence,
   withSpring,
 } from 'react-native-reanimated';
-import { palette, radius, spacing } from '../theme/tokens';
+import { radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
+import { Mascot } from './Mascot';
 import { useStore } from '@/application/store';
 import { QUOTES, type FavoriteQuote, type Quote } from '@/domain/quotes';
 
@@ -41,8 +41,10 @@ const GAP = spacing.md;
 // ─────────────────────────────────────────────────────────────────────────────
 
 function HeartButton({ active, onToggle }: { active: boolean; onToggle: () => void }) {
+  const theme = useTheme();
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const color = active ? theme.color.accent : theme.color.textDim;
 
   const press = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -63,7 +65,7 @@ function HeartButton({ active, onToggle }: { active: boolean; onToggle: () => vo
       style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
     >
       <Animated.View style={anim}>
-        <Ionicons name={active ? 'heart' : 'heart-outline'} size={24} color="#FFFFFF" />
+        <Ionicons name={active ? 'heart' : 'heart-outline'} size={22} color={color} />
       </Animated.View>
     </Pressable>
   );
@@ -167,7 +169,7 @@ export function QuoteFeed() {
     const text = isToday ? item.quote.text : item.fav.text;
     const author = isToday ? item.quote.author : item.fav.author;
     const chip = isToday
-      ? 'Today'
+      ? 'Unchainly says'
       : `Saved ${new Date(item.fav.savedAt).toLocaleDateString()}`;
     const hearted = isToday ? item.favorited : true;
 
@@ -176,65 +178,63 @@ export function QuoteFeed() {
         style={{
           width,
           borderRadius: radius.card,
-          overflow: 'hidden',
-          shadowColor: palette.grapeDeep,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.25,
-          shadowRadius: 18,
-          elevation: 6,
+          backgroundColor: theme.color.surface,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
+          padding: spacing.md,
+          shadowColor: theme.color.primaryDeep,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: theme.mode === 'light' ? 0.08 : 0,
+          shadowRadius: 12,
+          elevation: theme.mode === 'light' ? 2 : 0,
         }}
         accessibilityLabel={`${isToday ? 'Daily recovery quote' : 'Favorite quote'}: ${text}`}
       >
-        <LinearGradient
-          colors={[palette.grape, palette.grapeDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ padding: spacing.xl, minHeight: 170 }}
-        >
-          {/* Header row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.16)',
-                borderRadius: radius.round,
-                paddingHorizontal: spacing.md,
-                paddingVertical: 3,
-              }}
-            >
-              <Text variant="caption" color={palette.white} style={{ letterSpacing: 0.5 }}>
-                {chip}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }} />
-            <HeartButton
-              active={hearted}
-              onToggle={() => (isToday ? heartToday() : unheartFavorite(item.fav))}
-            />
-          </View>
-
-          {/* Oversized quotation mark */}
-          <Text
-            color="rgba(255,255,255,0.22)"
-            style={{ fontSize: 64, lineHeight: 64, fontFamily: 'Nunito_900Black', marginTop: -4 }}
-            importantForAccessibility="no"
-            accessibilityElementsHidden
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <View
+            style={{
+              backgroundColor: theme.color.primarySoft,
+              borderRadius: radius.round,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: 3,
+            }}
           >
-            “
-          </Text>
-
-          <Text
-            variant="title2"
-            color={palette.white}
-            style={{ marginTop: -30, lineHeight: 30, fontFamily: 'Nunito_700Bold' }}
-          >
-            {text}
-          </Text>
-          {author ? (
-            <Text variant="footnote" color="rgba(255,255,255,0.75)" style={{ marginTop: spacing.sm }}>
-              - {author}
+            <Text variant="caption" color={theme.color.primary}>
+              {chip}
             </Text>
-          ) : null}
-        </LinearGradient>
+          </View>
+          <View style={{ flex: 1 }} />
+          <HeartButton
+            active={hearted}
+            onToggle={() => (isToday ? heartToday() : unheartFavorite(item.fav))}
+          />
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.sm }}>
+          <Mascot state={isToday ? 'happy' : 'comfort'} size={52} still />
+          <View
+            style={{
+              flex: 1,
+              minWidth: 0,
+              borderRadius: 18,
+              borderTopLeftRadius: 8,
+              backgroundColor: theme.color.surfaceAlt,
+              borderWidth: 1,
+              borderColor: theme.color.hairline,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
+            }}
+          >
+            <Text variant="callout" color={theme.color.text} style={{ lineHeight: 21, fontFamily: 'Nunito_700Bold' }}>
+              {text}
+            </Text>
+            {author ? (
+              <Text variant="caption" dim style={{ marginTop: spacing.xs }}>
+                - {author}
+              </Text>
+            ) : null}
+          </View>
+        </View>
       </View>
     );
   };

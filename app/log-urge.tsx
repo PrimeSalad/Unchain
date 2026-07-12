@@ -150,15 +150,15 @@ export default function LogUrge() {
         <View style={{ flex: 1, justifyContent: 'center' }}>
           {level === 'low' && (
             <>
-              <Text variant="title1" center>You caught it early.</Text>
-              <Text variant="body" dim center style={{ marginTop: spacing.md }}>Nice awareness. Carry on with your day - you've got this.</Text>
+              <Text variant="headline" center>You caught it early.</Text>
+              <Text variant="footnote" dim center style={{ marginTop: spacing.sm, lineHeight: 19 }}>Awareness logged. Keep moving with your day.</Text>
             </>
           )}
           {level === 'medium' && (
             <>
-              <Text variant="title1" center>Let's take the edge off.</Text>
-              <Text variant="body" dim center style={{ marginTop: spacing.md, marginBottom: spacing.xl }}>Pick one - the urge will pass.</Text>
-              <View style={{ gap: spacing.md }}>
+              <Text variant="headline" center>Take the edge off.</Text>
+              <Text variant="footnote" dim center style={{ marginTop: spacing.sm, marginBottom: spacing.lg, lineHeight: 19 }}>Pick one action before the urge gets louder.</Text>
+              <View style={{ gap: spacing.sm }}>
                 <ActionBtn icon="leaf" label="Take a Mindful Pause" onPress={() => router.replace('/mindful-pause' as Href)} />
                 <ActionBtn icon="book" label="Open Journal" onPress={() => router.replace('/(tabs)/journal')} />
                 {profile?.reason ? (
@@ -169,9 +169,9 @@ export default function LogUrge() {
           )}
           {level === 'high' && (
             <>
-              <Text variant="title1" center color={theme.color.accentText}>This is a strong urge.</Text>
-              <Text variant="body" dim center style={{ marginTop: spacing.md, marginBottom: spacing.xl }}>Don't decide anything yet. Do this first.</Text>
-              <View style={{ gap: spacing.md }}>
+              <Text variant="headline" center color={theme.color.accentText}>Strong urge detected.</Text>
+              <Text variant="footnote" dim center style={{ marginTop: spacing.sm, marginBottom: spacing.lg, lineHeight: 19 }}>Do not decide yet. Start with one stabilizing action.</Text>
+              <View style={{ gap: spacing.sm }}>
                 <ActionBtn icon="warning" label="Open SOS now" accent onPress={() => router.replace('/sos')} />
                 <ActionBtn icon="time" label="Start a Mindful Pause" onPress={() => router.replace('/mindful-pause' as Href)} />
                 <ActionBtn icon="book" label="Journal it out" onPress={() => router.replace('/(tabs)/journal')} />
@@ -206,13 +206,13 @@ export default function LogUrge() {
           keyboardDismissMode="on-drag"
           contentContainerStyle={{ paddingBottom: spacing.lg }}
         >
-          <Text variant="title1" style={{ marginTop: spacing.sm }}>{existing ? 'Edit urge' : 'Log an urge'}</Text>
-          <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
+          <Text variant="headline" style={{ marginTop: spacing.xs }}>{existing ? 'Edit urge' : 'Log an urge'}</Text>
+          <Text variant="footnote" dim style={{ marginTop: spacing.xs, marginBottom: spacing.lg, lineHeight: 19 }}>
             Logging it before acting is a win in itself.
           </Text>
 
           {/* Urge intensity */}
-          <Text variant="headline" style={{ marginBottom: spacing.sm }}>
+          <Text variant="callout" style={{ marginBottom: spacing.xs, fontFamily: 'Nunito_700Bold' }}>
             How strong is your urge?
           </Text>
           <Text variant="caption" dim style={{ marginBottom: spacing.md }}>
@@ -223,7 +223,7 @@ export default function LogUrge() {
           </Card>
 
           {/* Trigger */}
-          <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
+          <Text variant="callout" style={{ marginTop: spacing.lg, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
             What triggered it?
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -232,13 +232,14 @@ export default function LogUrge() {
                 key={t}
                 label={t}
                 active={triggers.includes(t)}
+                size="compact"
                 onPress={() => setTriggers((current) => current.includes(t) ? current.filter((value) => value !== t) : [...current, t])}
               />
             ))}
           </View>
 
           {/* Mood */}
-          <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>
+          <Text variant="callout" style={{ marginTop: spacing.lg, marginBottom: spacing.xs, fontFamily: 'Nunito_700Bold' }}>
             How's your mood right now?
           </Text>
           <Text variant="caption" dim style={{ marginBottom: spacing.md }}>
@@ -256,13 +257,13 @@ export default function LogUrge() {
             placeholderTextColor={theme.color.textDim}
             multiline
             style={{
-              marginTop: spacing.xl,
-              minHeight: 80,
+              marginTop: spacing.lg,
+              minHeight: 74,
               borderRadius: radius.input,
               backgroundColor: theme.color.surface,
               borderWidth: 1,
               borderColor: theme.color.hairline,
-              padding: spacing.lg,
+              padding: spacing.md,
               color: theme.color.text,
               fontSize: 16,
               textAlignVertical: 'top',
@@ -298,7 +299,7 @@ function ActionBtn({
     >
       <Card tone={accent ? 'accentSoft' : 'surface'} style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Ionicons name={icon} size={22} color={accent ? theme.color.accentText : theme.color.primary} />
-        <Text variant="headline" style={{ flex: 1, marginLeft: spacing.md }} color={accent ? theme.color.accentText : theme.color.text}>
+        <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md, fontFamily: 'Nunito_700Bold' }} color={accent ? theme.color.accentText : theme.color.text}>
           {label}
         </Text>
         <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />

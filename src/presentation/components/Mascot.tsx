@@ -11,8 +11,8 @@ import Animated, {
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 /**
- * Maria - the sheep. State-driven, with a gentle idle bob for life (calm, not
- * hyperactive). Honors Reduce Motion. Ethics (docs/plan.md §3.4): Maria mirrors
+ * Unchainly - the sheep. State-driven, with a gentle idle bob for life (calm, not
+ * hyperactive). Honors Reduce Motion. Ethics (docs/plan.md §3.4): Unchainly mirrors
  * the user's state with compassion - she never shames or drives re-engagement.
  */
 
@@ -60,7 +60,7 @@ export function Mascot({ state = 'happy', size = 132, style, still }: MascotProp
     <Animated.Image
       source={SOURCES[state]}
       accessibilityRole="image"
-      accessibilityLabel={`Maria the lamb, ${state}`}
+      accessibilityLabel={`Unchainly the lamb, ${state}`}
       resizeMode="contain"
       style={[{ width: size, height: size }, anim, style]}
     />

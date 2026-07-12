@@ -219,7 +219,8 @@ function MissionRow({
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
-          padding: spacing.lg,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.md,
           borderTopWidth: index === 0 ? 0 : 1,
           borderTopColor: theme.color.hairline,
           opacity: pressed ? 0.72 : 1,
@@ -228,7 +229,7 @@ function MissionRow({
         {/* Icon chip */}
         <View
           style={{
-            width: 44, height: 44, borderRadius: 22,
+            width: 38, height: 38, borderRadius: 19,
             backgroundColor: done ? theme.color.successSoft : tint.soft,
             alignItems: 'center', justifyContent: 'center',
           }}
@@ -239,7 +240,7 @@ function MissionRow({
                 ? 'checkmark'
                 : (mission.icon as keyof typeof Ionicons.glyphMap)
             }
-            size={21}
+            size={19}
             color={done ? theme.color.success : tint.icon}
           />
         </View>
@@ -297,23 +298,23 @@ function AllDoneState() {
     <Animated.View
       entering={reduced ? undefined : ZoomIn.springify().damping(14)}
       style={{
-        alignItems: 'center', paddingVertical: spacing.xxl,
-        paddingHorizontal: spacing.xl, gap: spacing.md,
+        alignItems: 'center', paddingVertical: spacing.xl,
+        paddingHorizontal: spacing.lg, gap: spacing.sm,
       }}
     >
       <View
         style={{
-          width: 72, height: 72, borderRadius: 36,
+          width: 60, height: 60, borderRadius: 30,
           backgroundColor: theme.color.successSoft,
           alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <Ionicons name="checkmark-done-circle" size={44} color={theme.color.success} />
+        <Ionicons name="checkmark-done-circle" size={36} color={theme.color.success} />
       </View>
-      <Text variant="title2" style={{ textAlign: 'center' }}>
-        All Missions Complete! 🎉
+      <Text variant="headline" style={{ textAlign: 'center' }}>
+        All missions complete
       </Text>
-      <Text variant="callout" dim style={{ textAlign: 'center', lineHeight: 22 }}>
+      <Text variant="footnote" dim style={{ textAlign: 'center', lineHeight: 19 }}>
         Amazing work today. Come back tomorrow for a fresh set of missions.
       </Text>
     </Animated.View>
@@ -338,9 +339,9 @@ export function DailyMissions() {
   return (
     <View>
       {/* Section header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
         <View style={{ flex: 1 }}>
-          <Text variant="headline">Daily Missions</Text>
+          <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>Daily Missions</Text>
           <Text variant="caption" dim style={{ marginTop: 1 }}>
             Resets each day · {done}/{total} complete
           </Text>
@@ -348,14 +349,14 @@ export function DailyMissions() {
         {/* Completion badge */}
         <View
           style={{
-            width: 44, height: 44, borderRadius: 22,
+            width: 36, height: 36, borderRadius: 18,
             backgroundColor: allDone ? theme.color.successSoft : theme.color.primarySoft,
             alignItems: 'center', justifyContent: 'center',
           }}
           accessibilityLabel={`${done} of ${total} missions completed`}
         >
           <Text
-            variant="headline"
+            variant="callout"
             color={allDone ? theme.color.success : theme.color.primary}
             style={{ fontFamily: 'Nunito_800ExtraBold' }}
           >

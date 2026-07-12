@@ -99,7 +99,7 @@ export default function ShareAchievement() {
     }
   })();
 
-  const summary = `Achievement unlocked: ${achievement.title} - ${categoryLabel} 🏆\n${achievement.desc}\nRecovering, one calm day at a time. - Unchain`;
+  const summary = `Achievement unlocked: ${achievement.title} - ${categoryLabel} 🏆\n${achievement.desc}\nRecovering, one calm day at a time. - Unchainly`;
 
   const shareImage = async () => {
     setBusy(true);
@@ -144,7 +144,7 @@ export default function ShareAchievement() {
                   style={{ width: 32, height: 32, borderRadius: 9 }}
                   resizeMode="cover"
                 />
-                <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchain</Text>
+                <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchainly</Text>
                 <View style={{ flex: 1 }} />
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: 4 }}>
                   <Text variant="caption" color={palette.white}>{categoryLabel}</Text>
@@ -187,7 +187,7 @@ export default function ShareAchievement() {
                   ))}
                 </View>
                 <Text variant="caption" center color="rgba(255,255,255,0.7)" style={{ marginTop: spacing.md }}>
-                  {date} · Unchain
+                  {date} · Unchainly
                 </Text>
               </View>
             </LinearGradient>

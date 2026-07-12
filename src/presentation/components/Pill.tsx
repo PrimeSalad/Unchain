@@ -16,15 +16,17 @@ interface PillProps {
   active?: boolean;
   onPress?: () => void;
   emoji?: string;
+  size?: 'regular' | 'compact';
 }
 
 /**
  * Selectable chip - animated scale + colour spring on press.
  * Larger tap target (minimum 44pt), smooth active/inactive transitions.
  */
-export function Pill({ label, active, onPress, emoji }: PillProps) {
+export function Pill({ label, active, onPress, emoji, size = 'regular' }: PillProps) {
   const theme = useTheme();
   const pressed = useSharedValue(0);
+  const compact = size === 'compact';
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: withSpring(pressed.value ? 0.94 : 1, motion.spring) }],
@@ -48,7 +50,7 @@ export function Pill({ label, active, onPress, emoji }: PillProps) {
       onPress={handle}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      hitSlop={4}
+      hitSlop={compact ? 8 : 4}
     >
       <Animated.View
         style={[
@@ -56,12 +58,13 @@ export function Pill({ label, active, onPress, emoji }: PillProps) {
             flexDirection: 'row',
             alignItems: 'center',
             gap: spacing.xs,
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.sm + 3,
+            minHeight: compact ? 34 : 44,
+            paddingHorizontal: compact ? spacing.md : spacing.lg,
+            paddingVertical: compact ? 5 : spacing.sm + 3,
             borderRadius: radius.round,
             backgroundColor: bg,
             // Active glow
-            ...(active && {
+            ...(active && !compact && {
               shadowColor: theme.color.primary,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.35,
@@ -76,7 +79,7 @@ export function Pill({ label, active, onPress, emoji }: PillProps) {
           <Text style={{ fontSize: 14, lineHeight: 18 }}>{emoji}</Text>
         ) : null}
         <Text
-          variant="callout"
+          variant={compact ? 'footnote' : 'callout'}
           color={fg}
           style={{ fontFamily: 'Nunito_700Bold' }}
         >

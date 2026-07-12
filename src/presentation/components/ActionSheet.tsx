@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -27,9 +27,11 @@ interface ActionSheetProps {
 export function ActionSheet({ visible, onClose, dismissable = true, children }: ActionSheetProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const requestClose = () => {
     if (dismissable) onClose();
   };
+  const sheetMaxHeight = Math.max(360, height - insets.top - Math.max(insets.bottom, spacing.xl) - 72);
 
   return (
     <Modal
@@ -55,8 +57,8 @@ export function ActionSheet({ visible, onClose, dismissable = true, children }: 
             backgroundColor: theme.color.surface,
             borderTopLeftRadius: radius.sheet,
             borderTopRightRadius: radius.sheet,
-            paddingHorizontal: spacing.xl,
-            paddingTop: spacing.lg,
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
             paddingBottom: Math.max(insets.bottom, spacing.xl),
             ...elevation.e2,
           }}
@@ -69,10 +71,18 @@ export function ActionSheet({ visible, onClose, dismissable = true, children }: 
               borderRadius: 2,
               backgroundColor: theme.color.hairline,
               alignSelf: 'center',
-              marginBottom: spacing.lg,
+              marginBottom: spacing.md,
             }}
           />
-          {children}
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={{ maxHeight: sheetMaxHeight }}
+            contentContainerStyle={{ paddingBottom: spacing.xs }}
+          >
+            {children}
+          </ScrollView>
         </View>
       </View>
     </Modal>

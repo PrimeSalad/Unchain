@@ -121,7 +121,7 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1A1420' }}>
         <ActivityIndicator color="#B98FD6" />
-        <NativeText style={{ marginTop: 12, color: '#ECE6F2', fontFamily: 'system-ui' }}>Opening Unchain…</NativeText>
+        <NativeText style={{ marginTop: 12, color: '#ECE6F2', fontFamily: 'system-ui' }}>Opening Unchainly...</NativeText>
       </View>
     );
   }
@@ -153,6 +153,10 @@ export default function RootLayout() {
             <Stack.Screen name="share" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="share-achievement" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="share-activity" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen
+              name="games"
+              options={{ presentation: 'card', animation: 'slide_from_right', gestureEnabled: false, fullScreenGestureEnabled: false }}
+            />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>

@@ -51,7 +51,7 @@ const BOOKS: Record<string, BookPayload> = {
   'self-help': require('../assets/books/self-help.json'),
 };
 
-type ParagraphKind = 'body' | 'heading' | 'frontMatter';
+type ParagraphKind = 'body' | 'heading' | 'frontMatter' | 'chapter';
 interface ReaderBlock {
   key: string;
   text: string;
@@ -67,6 +67,26 @@ interface ReaderChapter {
 
 const READER_WIDTH = 620;
 const readerFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' });
+
+function MetaPill({ children }: { children: string }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        paddingHorizontal: spacing.md,
+        paddingVertical: 6,
+        borderRadius: radius.round,
+        backgroundColor: theme.color.surfaceAlt,
+        borderWidth: 1,
+        borderColor: theme.color.hairline,
+      }}
+    >
+      <Text variant="caption" color={theme.color.textDim}>
+        {children}
+      </Text>
+    </View>
+  );
+}
 
 function paragraphKind(text: string, index: number): ParagraphKind {
   const trimmed = text.trim();
@@ -101,6 +121,9 @@ function isChapterBreak(text: string, index: number, kind: ParagraphKind) {
 function chapterTitle(text: string, fallback: string) {
   const cleaned = displayParagraph(text);
   if (!cleaned) return fallback;
+  if (/^[IVXLCDM]+\.?$/.test(cleaned)) return `Chapter ${cleaned.replace(/\.$/, '')}`;
+  if (/^\d+\.?$/.test(cleaned)) return `Chapter ${cleaned.replace(/\.$/, '')}`;
+  if (/^contents$/i.test(cleaned)) return 'Contents';
   return cleaned.length > 72 ? `${cleaned.slice(0, 69)}...` : cleaned;
 }
 
@@ -123,7 +146,7 @@ function buildReaderModel(paragraphs: string[]) {
     return {
       key: `${index}-${chapterIndex}`,
       text: paragraph,
-      kind,
+      kind: isChapterBreak(paragraph, index, kind) ? 'chapter' : kind,
       chapterIndex,
     };
   });
@@ -253,9 +276,11 @@ export default function EducationResource() {
                 </View>
               </View>
 
-              <Text variant="caption" dim style={{ marginBottom: spacing.md }}>
-                {book.sourceId}
-              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xl }}>
+                <MetaPill>{book.source}</MetaPill>
+                <MetaPill>{resource.length}</MetaPill>
+                <MetaPill>{`${chapters.length} chapters`}</MetaPill>
+              </View>
 
               <View
                 style={{
@@ -324,6 +349,34 @@ export default function EducationResource() {
           renderItem={({ item }) => {
             const kind = item.kind;
             const text = displayParagraph(item.text);
+            if (kind === 'chapter') {
+              return (
+                <View style={{ width: '100%', alignItems: 'center' }}>
+                  <View
+                    style={{
+                      width: '100%',
+                      maxWidth: READER_WIDTH,
+                      marginTop: spacing.xl,
+                      marginBottom: spacing.sm,
+                      paddingVertical: spacing.md,
+                      paddingHorizontal: spacing.lg,
+                      borderRadius: radius.card,
+                      borderWidth: 1,
+                      borderColor: theme.color.hairline,
+                      backgroundColor: theme.color.surface,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.sm,
+                    }}
+                  >
+                    <Ionicons name="book" size={18} color={theme.color.primary} />
+                    <Text variant="headline" style={{ flex: 1, lineHeight: 22 }}>
+                      {text}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
             if (kind === 'heading') {
               return (
                 <View style={{ width: '100%', alignItems: 'center' }}>
@@ -370,8 +423,8 @@ export default function EducationResource() {
                     width: '100%',
                     maxWidth: READER_WIDTH,
                     fontFamily: readerFont,
-                    fontSize: 19,
-                    lineHeight: 32,
+                    fontSize: 18,
+                    lineHeight: 31,
                     marginTop: spacing.lg,
                   }}
                 >

@@ -1,11 +1,11 @@
-# Unchain - Mobile App Plan
+# Unchainly - Mobile App Plan
 
 **A recovery companion for people breaking free from compulsive habits.**
 React Native (Expo) · Clean Architecture · local-first · shame-free by design.
 
-> **What this file is.** The single source of truth for building the Unchain mobile app: brand, design system, screen specs, and technical architecture. It sits alongside the two research documents in this folder:
-> - `Unchain_Product_Research_and_Design_Documentation-1.docx` - the *why* (behavioral science, UX doctrine, personas).
-> - `Unchain_PH_Market_Launch_Plan.docx` - the *go-to-market* (the Tarsi-inspired Philippine launch).
+> **What this file is.** The single source of truth for building the Unchainly mobile app: brand, design system, screen specs, and technical architecture. It sits alongside the two research documents in this folder:
+> - `Unchainly_Product_Research_and_Design_Documentation-1.docx` - the *why* (behavioral science, UX doctrine, personas).
+> - `Unchainly_PH_Market_Launch_Plan.docx` - the *go-to-market* (the Tarsi-inspired Philippine launch).
 >
 > Where this plan and the research disagree, **this plan wins for build decisions** - because two research assumptions were deliberately changed by the team (see box below). Everything else in the research still holds and is treated as binding.
 
@@ -28,15 +28,15 @@ Everything else - the Shame-Free Charter, the 3-Second Lifeline, Recovery Streng
 
 ## 1. Product in one page
 
-**Unchain** helps anyone quit or cut back on a compulsive behavior - vaping, smoking, online gambling (*sugal*), alcohol, pornography, social media, gaming, shopping, or a custom habit. Unlike single-habit trackers, Unchain treats recovery as one shared problem: the same craving loop underneath, the same tools on top.
+**Unchainly** helps anyone quit or cut back on a compulsive behavior - vaping, smoking, online gambling (*sugal*), alcohol, pornography, social media, gaming, shopping, or a custom habit. Unlike single-habit trackers, Unchainly treats recovery as one shared problem: the same craving loop underneath, the same tools on top.
 
 Three ideas carry the whole product:
 
-1. **The craving moment is the product.** Every competitor is built around a streak counter. Unchain is built around the 90–180 seconds when a user is actively fighting an urge - a full-screen **SOS flow** reachable in one tap from anywhere.
-2. **Shame is what makes people quit the app.** A relapse must never reset progress to zero. Unchain uses **Recovery Strength** (0–100) that dips gently and rebuilds - lifetime effort is permanent.
+1. **The craving moment is the product.** Every competitor is built around a streak counter. Unchainly is built around the 90-180 seconds when a user is actively fighting an urge - a full-screen **SOS flow** reachable in one tap from anywhere.
+2. **Shame is what makes people quit the app.** A relapse must never reset progress to zero. Unchainly uses **Recovery Strength** (0-100) that dips gently and rebuilds - lifetime effort is permanent.
 3. **The sheep makes it human.** A soft, wordless companion that celebrates quietly, sits with you when it's hard, and helps break the chain link by link. It is the emotional layer the whole category is missing.
 
-**The one-line positioning** (from the launch plan): *For Filipinos who want to quit or cut back but relapse when cravings hit, Unchain intervenes at the craving moment and tracks progress without shame - unlike trackers that punish a slip with a reset to zero. Built in the Philippines by DotOrbit.*
+**The one-line positioning** (from the launch plan): *For Filipinos who want to quit or cut back but relapse when cravings hit, Unchainly intervenes at the craving moment and tracks progress without shame - unlike trackers that punish a slip with a reset to zero. Built in the Philippines by DotOrbit.*
 
 **Launch inspiration.** We follow the **Tarsi by Bryl Lim** playbook (see launch plan §2.2): a Philippines-first, build-in-public, zero-paid-ads launch that turns each milestone into content. The app is built to *feed that engine* - milestone moments are screenshot-worthy by design, aggregate outcomes (urges ridden out, pesos saved) are surfaceable as anonymized launch stats, and the mascot gives the story a face that travels on TikTok.
 
@@ -62,9 +62,9 @@ Five personas from the research, compressed to what changes the build. Full deta
 
 ### 3.1 The sheep
 
-The assets in `/assets` show a **lamb breaking free of chains** - the literal meaning of *Unchain*. A sheep that was bound and is now getting loose. It is soft, small, and brave: exactly the tone the research asks for ("the steady friend who's been there - calm, honest, quietly strong, warm without saccharine").
+The assets in `/assets` show a **lamb breaking free of chains** - the core promise behind *Unchainly*. A sheep that was bound and is now getting loose. It is soft, small, and brave: exactly the tone the research asks for ("the steady friend who's been there - calm, honest, quietly strong, warm without saccharine").
 
-**Name: "Maria."** Warm, familiar, unmistakably Filipino - a companion with a real name, not a cartoon. The lamb you're rooting for.
+**Name: "Unchainly."** The mascot carries the same name as the app: a small, brave companion that makes the brand feel alive without adding another thing for the user to remember.
 
 > **Asset housekeeping (do this before design lock):** `/assets` currently has **two different sheep designs** - `mascot 1 - *` (rounder, deep-purple hooves) and `mascot 2 - happy` (fluffier body). **Pick one and draw all states from it** for visual consistency. This plan assumes the **`mascot 1`** design as canonical because it has the fullest emotional range and the clearest chain motif. `mascot 2` becomes an alternate celebratory pose or is retired.
 
@@ -89,7 +89,7 @@ The research's living progress artifact was **the chain** (links forged/weakened
 These exist because the research warned that a mascot is exactly how habit apps manipulate people. We opt in to the mascot **only** under these constraints:
 
 1. **The sheep never expresses disappointment.** It has no "sad because *you* let me down" face. Its sad state is *empathy*, shown beside the user, gone by the next screen.
-2. **The sheep never drives re-engagement.** No "Maria misses you 😢" notifications. Guilt-based re-engagement is banned (research §14, launch plan §5.2).
+2. **The sheep never drives re-engagement.** No "Unchainly misses you" notifications. Guilt-based re-engagement is banned (research §14, launch plan §5.2).
 3. **The sheep never sells.** It never appears on a paywall to pressure an upgrade.
 4. **The sheep is skippable.** A "minimal mascot" setting reduces it to a small static logo for Robert/Hakim-type users who want gravity over cuteness, and for discreet public use.
 5. **The sheep celebrates effort and honesty, not just outcomes** - including celebrating an honestly-logged lapse (counter-programming shame).
@@ -190,10 +190,10 @@ Build these as the shared UI kit (`presentation/components`). Each ships with de
 **4 tabs + 1 raised SOS action.** The SOS button is *not* a tab - it's a raised, center-docked action (the "notch" pattern), because it's a **verb, not a place**, and must be the most salient tap target in the product.
 
 ```
-UNCHAIN
+UNCHAINLY
 │
 ├── TAB 1 · TODAY (home)
-│   ├── Maria (mascot, state-driven) + greeting
+│   ├── Unchainly (mascot, state-driven) + greeting
 │   ├── Recovery Strength ring + clean time (per habit, swipeable)
 │   ├── Morning intention / evening reflection card
 │   ├── Today's practice (one ≤2-min micro-lesson)
@@ -227,7 +227,7 @@ UNCHAIN
     ├── Coach (AI) conversation
     ├── Settings: privacy (Face ID lock, local-only, discreet icon,
     │   minimal-mascot), notifications, accessibility, data export/delete
-    └── Unchain Plus
+    └── Unchainly Plus
 ```
 
 **IA principles (kept):** 4 tabs max (low-cognitive-load ceiling), noun-labeled, always visible, no hamburger. SOS never more than one interaction away, also *outside* the app. Journal is top-level (a daily verb; burying it kills the habit). Multi-habit via swipe on Today, not separate silos - one identity, many chains. Privacy controls at the first level of Settings. Depth ≤ 3 levels everywhere.
@@ -242,7 +242,7 @@ The research recipe, exactly:
 1. **Value before demands** - the promise in ≤2 screens (mascot + one line: *"Installing this took guts. You've already started."*). Zero forms on screen one.
 2. **The quiz is therapy, not data capture** - short adaptive intake (habit → frequency → cost → triggers → your *why*), ~8–10 steps, visible progress bar. Caps investment without overwhelming.
 3. **The mirror moment** - reflect inputs as insight: *"Vaping is costing you ≈ ₱4,500/mo and you mostly reach for it when stressed at work."* This is the "aha" that converts.
-4. **Commitment ritual** - hold a button 3 seconds to *"help Maria break the first link."* Effortful-on-purpose; creates a memory anchor (Cialdini commitment/consistency).
+4. **Commitment ritual** - hold a button 3 seconds to *"help Unchainly break the first link."* Effortful-on-purpose; creates a memory anchor (Cialdini commitment/consistency).
 5. **Permissions in context** - ask for notifications *after* explaining craving interventions (roughly doubles opt-in vs a cold prompt). Use provisional/quiet auth first.
 6. **Never gate the first win behind the paywall.** Paywall appears after value, skippable, honest.
 7. User leaves onboarding with a **live dashboard, an armed SOS button, and a scheduled first check-in.**
@@ -252,7 +252,7 @@ The research recipe, exactly:
 ```
 ┌─────────────────────────────────────┐
 │ Magandang umaga, Dana      ☾  🔔     │  title2 semibold
-│              (Maria waves, happy)    │  MascotView, idle-happy
+│              (Unchainly waves, happy) │  MascotView, idle-happy
 │        ╭────────────╮                │  StrengthRing 168pt
 │        │     78     │  ← Grape ring   │  display numeral (Rounded)
 │        │  STRENGTH  │  on Wool bg     │  caption label, Slate
@@ -284,7 +284,7 @@ Reachable in ≤1 tap from anywhere: persistent raised button, lock-screen widge
 │                              ✕ tiny  │  Night bg even in light mode
 │           ╭─────────╮                │  BreathingOrb: Grape glow,
 │          (  breathe  )               │  4-2-6 pacing, haptic-synced
-│           ╰─────────╯                │  (Maria braces beside it)
+│           ╰─────────╯                │  (Unchainly braces beside it)
 │      "This wave will pass.           │  body 17/24, Fog
 │       Most cravings fade             │
 │       within minutes."               │
@@ -300,7 +300,7 @@ Reachable in ≤1 tap from anywhere: persistent raised button, lock-screen widge
 
 ### 6.4 Relapse flow (decides retention - Robert's screen)
 
-**Zero red. Zero broken-chain-shattering imagery. Maria sits beside the user (comfort state), briefly.**
+**Zero red. Zero broken-chain-shattering imagery. Unchainly sits beside the user (comfort state), briefly.**
 
 ```
 [I slipped]  (always available, never buried)
@@ -308,7 +308,7 @@ Reachable in ≤1 tap from anywhere: persistent raised button, lock-screen widge
    ▼ Screen 1 - COMPASSION (no data asked yet)
    │   "Okay. Take a breath. A slip is a moment, not a verdict.
    │    40–60% of recoveries include one. You're still in this."
-   │   (Maria, comfort state, beside the user)     [Continue]
+   │   (Unchainly, comfort state, beside the user) [Continue]
    ▼ Screen 2 - CONTEXT AS DATA (optional, skippable)
    │   When? Where? Feeling? (HALT chips)  Trigger?
    ▼ Screen 3 - REFRAME + PLAN
@@ -472,7 +472,7 @@ Global daily cap **3** (milestones exempt). Provisional/quiet auth first, full p
 | Evening reflection | 1/day | before historic danger window | warm close |
 | Danger-hour heads-up | ≤1/day, only if data supports | ~20 min before the user's vulnerable window | predictive, personal, pressure-free |
 | Milestone | event-driven | at achievement | pure celebration, zero ask |
-| Re-engagement | 1 after 48h, 1 after 7d, then stop | usual active hour | compassion, **never guilt** ("Maria misses you" is banned) |
+| Re-engagement | 1 after 48h, 1 after 7d, then stop | usual active hour | compassion, **never guilt** ("Unchainly misses you" is banned) |
 | Craving follow-up | event-driven | ~30 min after SOS | competence closure ("that urge you rode out - still proud. #13") |
 
 ---
@@ -503,7 +503,7 @@ Recovery correlates with ADHD/anxiety/depression and withdrawal impairs attentio
 
 ---
 
-## 13. Ethical monetization (Unchain Plus)
+## 13. Ethical monetization (Unchainly Plus)
 
 Three hard bans (research §15, launch plan §5.2), enforced in code and copy:
 1. **Never paywall SOS / crisis flow.** Monetizing panic is unconscionable and App-Store-review suicide.
@@ -520,7 +520,7 @@ Three hard bans (research §15, launch plan §5.2), enforced in code and copy:
 
 | Release | Scope | Success metric |
 |---|---|---|
-| **MVP (V1)** ~4–5 mo | Onboarding (quiz→mirror→commitment) · 1+ chains · Today dashboard (Strength ring, stats, healing timeline, mascot) · **full SOS flow + relapse flow** · daily check-ins · milestones · basic journal · notifications v1 · privacy suite (Face ID lock, local-first) · Wool & Chain design system · accessibility baseline. **iOS first; Android build kept green.** | D30 retention > 25%; ≥60% of actives use SOS ≥1×/wk in weeks 1–4; **post-lapse 7-day return rate > 50%** (the metric that proves the thesis). |
+| **MVP (V1)** ~4-5 mo | Onboarding (quiz→mirror→commitment) · 1+ chains · Today dashboard (Strength ring, stats, healing timeline, mascot) · **full SOS flow + relapse flow** · daily check-ins · milestones · basic journal · notifications v1 · privacy suite (Face ID lock, local-first) · Wool & Chain design system · accessibility baseline. **iOS first; Android build kept green.** | D30 retention > 25%; ≥60% of actives use SOS ≥1×/wk in weeks 1-4; **post-lapse 7-day return rate > 50%** (the metric that proves the thesis). |
 | **V1.x** | **Screen Time blocking (native module + entitlement)** · lock-screen SOS Widget · discreet alternate icon · voice journal · danger-hour JITAI notifications. | Blocking-enabled users show higher D90; SOS-from-lock-screen usage. |
 | **V2** ~+4 mo | **AI Recovery Coach** (Motivational-Interviewing grammar + safety rails) · trigger-pattern & danger-hour insights · Live Activities · Apple Watch · missions library (CBT/ACT) · **Premium launch** · **Android release** (capture the waitlist demand). | Free→paid 5–8%; coach weekly engagement > 40% of Plus. |
 | **V3** ~+6 mo | Moderated anonymous circles + mentor roles · HealthKit correlations · localization · clinician-referral partnerships · outcome-study partnership. | Organic ≥50% of installs; NPS > 60. |
@@ -543,7 +543,7 @@ The launch is Philippines-first, build-in-public, **zero paid ads** - the Tarsi/
 1. **The 3-Second Lifeline.** From any state of the phone, help is reachable in ≤3 seconds. Everything else is secondary.
 2. **Calm is a feature.** Every screen must lower arousal, not raise it. If a choice adds urgency, noise, or dread, it's wrong - even if it lifts a metric.
 3. **Progress is unbreakable.** No user action can erase the record of their effort. Displays may dip; history is granite.
-4. **The user is the author.** Unchain suggests; the user decides. Autonomy is never traded for engagement.
+4. **The user is the author.** Unchainly suggests; the user decides. Autonomy is never traded for engagement.
 5. **Honest by default.** Honest numbers, honest science, honest pricing. Nothing in the app may exploit the state it exists to heal - and the sheep never guilt-trips.
 
 ---
@@ -558,4 +558,4 @@ The launch is Philippines-first, build-in-public, **zero paid ads** - the Tarsi/
 
 ---
 
-*Prepared for DotOrbit · Unchain mobile app · React Native (Expo) · Clean Architecture. Palette sampled from `/assets`; behavioral doctrine inherited from the product research; launch inspiration from Tarsi by Bryl Lim.*
+*Prepared for DotOrbit · Unchainly mobile app · React Native (Expo) · Clean Architecture. Palette sampled from `/assets`; behavioral doctrine inherited from the product research; launch inspiration from Tarsi by Bryl Lim.*

@@ -7,7 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
+import { GameLoadingScreen, useGameLoading } from '@/presentation/components/games/GameLoadingScreen';
 import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
+import { useSquareBoardSize } from '@/presentation/components/games/useGameLayout';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
@@ -31,8 +33,6 @@ import {
 // A crash inside the game must never take navigation down with it.
 export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
 
-const RED = '#E8697A';
-const BLACK = '#5A2E7A';
 const DIFFS: Difficulty[] = ['easy', 'medium', 'hard'];
 const HOP_MS = 190;
 
@@ -69,6 +69,7 @@ export default function Checkers() {
   const recorded = useRef(false);
   const cell = boardW / 8;
   const tutorial = useGameTutorial('checkers');
+  const layout = useSquareBoardSize({ reservedHeight: 352, horizontalPadding: spacing.lg * 2, max: 332 });
 
   // Stable animation plumbing - values are created once and reused for every
   // move, so no Animated node is ever torn down mid-animation.
@@ -268,19 +269,26 @@ export default function Checkers() {
 
   const played = games.checkersWins + games.checkersLosses;
   const winRate = played ? Math.round((games.checkersWins / played) * 100) : 0;
+  const loading = useGameLoading();
+  const lightSquare = theme.mode === 'dark' ? '#201828' : '#F3EAF8';
+  const darkSquare = theme.mode === 'dark' ? '#3A2B47' : '#B995D0';
+
+  if (loading) {
+    return <GameLoadingScreen title="Checkers" subtitle="Setting up the board" />;
+  }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+    <View style={{ flex: 1, backgroundColor: theme.color.bg, overflow: 'hidden' }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-          <BackButton fallback="/games" />
-          <Text variant="title2" style={{ flex: 1 }}>Checkers</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? 2 : spacing.sm }}>
+          <BackButton fallback="/games" confirmExit />
+          <Text variant="headline" style={{ flex: 1 }}>Checkers</Text>
           <TutorialInfoButton onPress={tutorial.open} />
         </View>
 
         {/* Difficulty */}
-        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.xs : spacing.md }}>
           {DIFFS.map((d) => {
             const on = difficulty === d;
             return (
@@ -288,7 +296,7 @@ export default function Checkers() {
                 key={d}
                 onPress={() => setDifficulty(d)}
                 style={({ pressed }) => ({
-                  flex: 1, height: 36, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
+                  flex: 1, height: layout.compact ? 32 : 36, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
                   transform: [{ scale: pressed ? 0.97 : 1 }],
                 })}
@@ -303,41 +311,41 @@ export default function Checkers() {
         <View style={{
           flexDirection: 'row',
           marginHorizontal: spacing.lg,
-          marginTop: spacing.sm,
+          marginTop: layout.compact ? spacing.xs : spacing.sm,
           borderRadius: radius.chip,
           backgroundColor: theme.color.surfaceAlt,
           overflow: 'hidden',
         }}>
           {/* Wins */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Wins</Text>
             <Text variant="headline" color={games.checkersWins > 0 ? theme.color.success : theme.color.text}>{games.checkersWins}</Text>
           </View>
 
           {/* Divider */}
-          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
           {/* Win Rate */}
-          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1.2, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Win Rate</Text>
             <Text variant="headline" color={theme.color.text}>{winRate}%</Text>
           </View>
 
           {/* Divider */}
-          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: 8 }} />
+          <View style={{ width: 1, backgroundColor: theme.color.hairline, marginVertical: layout.compact ? 6 : 8 }} />
 
           {/* Losses */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: layout.compact ? 6 : 10 }}>
             <Text variant="caption" dim style={{ marginBottom: 2 }}>Losses</Text>
             <Text variant="headline" color={games.checkersLosses > 0 ? theme.color.danger : theme.color.text}>{games.checkersLosses}</Text>
           </View>
         </View>
 
         {/* Board */}
-        <View style={{ alignItems: 'center', paddingHorizontal: spacing.lg }}>
+        <View style={{ flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.xs : spacing.sm }}>
           <View
             onLayout={(e) => setBoardW(e.nativeEvent.layout.width)}
-            style={{ width: '100%', maxWidth: 380, aspectRatio: 1, borderRadius: radius.card, overflow: 'hidden', borderWidth: 2, borderColor: theme.color.hairline }}
+            style={{ width: layout.boardSize, height: layout.boardSize, borderRadius: radius.input, overflow: 'hidden', borderWidth: 2, borderColor: theme.color.hairline, backgroundColor: theme.color.hairline }}
           >
             {Array.from({ length: 8 }).map((_, r) => (
               <View key={r} style={{ flex: 1, flexDirection: 'row' }}>
@@ -357,7 +365,7 @@ export default function Checkers() {
                       onPress={() => onCell(idx)}
                       style={{
                         flex: 1, alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: dark ? (theme.mode === 'dark' ? '#2A2233' : '#E4D7EE') : (theme.mode === 'dark' ? '#1F1926' : '#F7F1FA'),
+                        backgroundColor: dark ? darkSquare : lightSquare,
                       }}
                     >
                       {isLast && (
@@ -402,9 +410,9 @@ export default function Checkers() {
         </View>
 
         {/* Status line */}
-        <View style={{ alignItems: 'center', paddingVertical: spacing.sm, minHeight: 36, justifyContent: 'center' }}>
+        <View style={{ alignItems: 'center', paddingVertical: layout.compact ? spacing.xs : spacing.sm, minHeight: layout.compact ? 30 : 36, justifyContent: 'center' }}>
           {over ? (
-            <Text variant="callout" dim>{winner === 'r' ? 'You win! 🎉' : 'AI wins - rematch?'}</Text>
+            <Text variant="callout" dim>{winner === 'r' ? 'You win.' : 'AI wins - rematch?'}</Text>
           ) : thinking ? (
             <ThinkingDots />
           ) : popIdx != null ? (
@@ -422,7 +430,8 @@ export default function Checkers() {
           flexDirection: 'row',
           gap: spacing.sm,
           paddingHorizontal: spacing.lg,
-          paddingTop: spacing.sm,
+          paddingTop: layout.compact ? spacing.xs : spacing.sm,
+          paddingBottom: layout.compact ? spacing.xs : spacing.md,
         }}>
           {/* Surrender — only shown mid-game */}
           {!over && (
@@ -524,14 +533,11 @@ function PieceDot({ piece, highlight, pop, shadow }: { piece: Piece; highlight: 
     ]).start();
   }, [pop, scale, crownScale]);
 
-  // King pieces have a gold border, brighter body, and a prominent crown.
-  // Men are solid-colour with a subtle inner ring.
   const isKing = piece.king;
   const isRed = piece.player === 'r';
-  const bodyColor = isKing
-    ? (isRed ? '#F08090' : '#7A4EA0')   // brightened body when promoted
-    : (isRed ? RED : BLACK);
-  const borderColor = isKing ? '#FFD700' : 'rgba(0,0,0,0.25)';
+  const bodyColor = isRed ? '#F17789' : '#9E7CBC';
+  const rimColor = isRed ? '#B23A4B' : '#5A3B72';
+  const borderColor = isKing ? '#D0A070' : rimColor;
   const borderWidth = isKing ? 3 : 2;
 
   return (
@@ -547,17 +553,16 @@ function PieceDot({ piece, highlight, pop, shadow }: { piece: Piece; highlight: 
           ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 8 }
           : undefined),
         ...(isKing
-          ? { shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 6, elevation: 6 }
+          ? { shadowColor: '#D0A070', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 6, elevation: 6 }
           : undefined),
       }}
     >
-      {/* Subtle inner highlight ring - gives pieces a 3-D button feel */}
       <View
         style={{
-          position: 'absolute', top: 4, left: 4, right: 4, bottom: 4,
+          position: 'absolute', top: 5, left: 5, right: 5, bottom: 5,
           borderRadius: 999,
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.25)',
+          borderColor: 'rgba(255,255,255,0.34)',
         }}
         pointerEvents="none"
       />
@@ -565,7 +570,7 @@ function PieceDot({ piece, highlight, pop, shadow }: { piece: Piece; highlight: 
       {/* King crown - animates in on promotion */}
       {isKing && (
         <Animated.View style={{ transform: [{ scale: crownScale.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }}>
-          <Foundation name="crown" size={18} color="#FFD700" />
+          <Foundation name="crown" size={18} color="#FFF2BF" />
         </Animated.View>
       )}
     </Animated.View>
@@ -634,5 +639,3 @@ function Dot({ delay }: { delay: number }) {
     <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.color.primary, opacity: anim }} />
   );
 }
-
-

@@ -14,7 +14,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
-import { Card } from '../components/Card';
 import { Pill } from '../components/Pill';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
@@ -23,7 +22,8 @@ import { shareCapturedContent } from '@/application/shareMedia';
 import { streakDays, addictionMeta, TRIGGERS, currentStreakStart } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
-const BACKUP_MARKER = 'unchain-backup';
+const BACKUP_MARKER = 'unchainly-backup';
+const LEGACY_BACKUP_MARKER = 'unchain-backup';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -94,6 +94,14 @@ export function ProfileScreen() {
   // Same event-derived streak as Home/Progress - never counts through a relapse.
   const days = streakDays(currentStreakStart(profile.startedAt, relapses, journal));
   const typeLabel = addictionMeta(profile.addictionType).label;
+  const initials = profile.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+    .slice(0, 2) || 'U';
+  const formatPeso = (value: number) => `₱${Math.max(0, Math.round(value)).toLocaleString('en-PH')}`;
 
   // ── Toast ────────────────────────────────────────────────────────────────
 
@@ -251,13 +259,13 @@ export function ProfileScreen() {
       const json = JSON.stringify(backup, null, 2);
       const stamp = new Date().toISOString().slice(0, 10);
       const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? '';
-      const fileUri = `${dir}unchain-backup-${stamp}.json`;
+      const fileUri = `${dir}unchainly-backup-${stamp}.json`;
       await FileSystem.writeAsStringAsync(fileUri, json);
 
       await shareCapturedContent({
         uri: fileUri,
         summary: json,
-        dialogTitle: 'Save your Unchain backup',
+        dialogTitle: 'Save your Unchainly backup',
         mimeType: 'application/json',
       });
       showToast('Backup file ready');
@@ -277,11 +285,14 @@ export function ProfileScreen() {
       const text = await FileSystem.readAsStringAsync(res.assets[0].uri);
       const parsed = JSON.parse(text);
       // Accept both the wrapped backup and a raw data object.
-      const data = parsed?.app === BACKUP_MARKER || parsed?.data ? parsed.data : parsed;
+      const data =
+        parsed?.app === BACKUP_MARKER || parsed?.app === LEGACY_BACKUP_MARKER || parsed?.data
+          ? parsed.data
+          : parsed;
 
       // Validate before touching the store, so a bad file can't corrupt state.
       if (!data || typeof data !== 'object' || !data.profile || typeof data.profile.startedAt !== 'number') {
-        showToast('That file is not a valid Unchain backup', 'error');
+        showToast('That file is not a valid Unchainly backup', 'error');
         return;
       }
 
@@ -361,212 +372,210 @@ export function ProfileScreen() {
 
   return (
     <Screen tabPadding>
-      <Text variant="title1" style={{ marginTop: spacing.sm }}>Profile</Text>
-
-      {/* Recovery Information */}
-      <Text variant="headline" style={{ marginTop: spacing.lg, marginBottom: spacing.md }}>
-        Recovery Information
-      </Text>
-      <Card>
-        {/* Name row - display or edit mode */}
-        <View style={{ marginBottom: spacing.md }}>
-          <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>Name</Text>
-          {editingName ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <TextInput
-                ref={nameRef}
-                value={nameValue}
-                onChangeText={setNameValue}
-                onSubmitEditing={commitName}
-                returnKeyType="done"
-                style={inputStyle}
-                placeholderTextColor={theme.color.textDim}
-              />
-              {/* Confirm */}
-              <Pressable
-                onPress={commitName}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Save name"
-                style={{
-                  width: 44, height: 44, borderRadius: radius.round,
-                  backgroundColor: theme.color.success,
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Ionicons name="checkmark" size={20} color="#fff" />
-              </Pressable>
-              {/* Cancel */}
-              <Pressable
-                onPress={cancelName}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel editing name"
-                style={{
-                  width: 44, height: 44, borderRadius: radius.round,
-                  backgroundColor: theme.color.surfaceAlt,
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Ionicons name="close" size={20} color={theme.color.textDim} />
-              </Pressable>
+      <View style={{ gap: spacing.md, marginTop: spacing.xs }}>
+        <View
+          style={{
+            backgroundColor: 'transparent',
+            borderBottomWidth: 1,
+            borderBottomColor: theme.color.hairline,
+            paddingBottom: spacing.md,
+            gap: spacing.md,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 15,
+                backgroundColor: theme.color.primarySoft,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text variant="headline" color={theme.color.primary}>{initials}</Text>
             </View>
-          ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text variant="callout" style={{ flex: 1 }} color={theme.color.text}>
-                {profile.name}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="title2" numberOfLines={1}>{profile.name}</Text>
+              <Text variant="footnote" dim numberOfLines={1} style={{ marginTop: 2 }}>
+                {typeLabel} recovery · {days} day streak
               </Text>
-              <Pressable onPress={startEditName} hitSlop={14} accessibilityRole="button" accessibilityLabel="Edit name">
-                <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
-              </Pressable>
             </View>
-          )}
-        </View>
-
-        <ReadRow label="Addiction" value={typeLabel} />
-        {profile.addictionDetail ? (
-          <ReadRow label="Specifically" value={profile.addictionDetail} />
-        ) : null}
-        <ReadRow label="Current streak" value={`${days} days`} />
-        <ReadRow label="Recovery start" value={new Date(profile.startedAt).toLocaleDateString()} />
-        <ReadRow
-          label="Average expense"
-          value={`${profile.currency}${profile.expenseAmount} / ${profile.expensePeriod}`}
-        />
-      </Card>
-
-      {/* Reason */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Personal Recovery Reason
-      </Text>
-      {editingReason ? (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
-          <TextInput
-            ref={reasonRef}
-            value={reasonValue}
-            onChangeText={setReasonValue}
-            multiline
-            placeholder="Your reason…"
-            placeholderTextColor={theme.color.textDim}
-            style={{
-              ...inputStyle,
-              minHeight: 90,
-              padding: spacing.lg,
-              textAlignVertical: 'top',
-            }}
-          />
-          {/* Confirm */}
-          <Pressable
-            onPress={commitReason}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Save reason"
-            style={{
-              width: 44, height: 44, borderRadius: radius.round,
-              backgroundColor: theme.color.success,
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="checkmark" size={20} color="#fff" />
-          </Pressable>
-          {/* Cancel */}
-          <Pressable
-            onPress={cancelReason}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel editing reason"
-            style={{
-              width: 44, height: 44, borderRadius: radius.round,
-              backgroundColor: theme.color.surfaceAlt,
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="close" size={20} color={theme.color.textDim} />
-          </Pressable>
-        </View>
-      ) : (
-        <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text variant="callout" style={{ flex: 1 }} color={profile.reason ? theme.color.text : theme.color.textDim}>
-              {profile.reason || 'Add your reason…'}
-            </Text>
-            <Pressable onPress={startEditReason} hitSlop={14} accessibilityRole="button" accessibilityLabel="Edit reason">
+            <Pressable onPress={startEditName} hitSlop={14} accessibilityRole="button" accessibilityLabel="Edit name">
               <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
             </Pressable>
           </View>
-        </Card>
-      )}
 
-      {/* Triggers */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Trigger Preferences
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        {(profile.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => {
-          const active = profile.triggers.includes(t);
-          return (
-            <Pill
-              key={t}
-              label={t}
-              active={active}
-              onPress={() =>
-                update({
-                  triggers: active
-                    ? profile.triggers.filter((x) => x !== t)
-                    : [...profile.triggers, t],
-                })
-              }
-            />
-          );
-        })}
-      </View>
+          <Text variant="footnote" dim style={{ lineHeight: 19 }}>
+            {profile.reason || 'Add your recovery reason so the app can keep it visible when it matters most.'}
+          </Text>
 
-      {/* Theme */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Appearance
-      </Text>
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        {THEMES.map((t) => (
-          <Pill
-            key={t.key}
-            label={t.label}
-            active={themePref === t.key}
-            onPress={() => setTheme(t.key)}
+          <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+            <ProfileStat label="Streak" value={`${days} days`} first />
+            <ProfileStat label="Start" value={new Date(profile.startedAt).toLocaleDateString()} />
+            <ProfileStat label="Expense" value={formatPeso(profile.expenseAmount)} />
+          </View>
+        </View>
+
+        <SectionTitle title="Recovery Details" />
+        <FlatGroup>
+          <ReadRow label="Name" value={profile.name} first />
+          <ReadRow label="Addiction" value={typeLabel} />
+          {profile.addictionDetail ? <ReadRow label="Specifically" value={profile.addictionDetail} /> : null}
+          <ReadRow label="Current streak" value={`${days} days`} />
+          <ReadRow label="Recovery start" value={new Date(profile.startedAt).toLocaleDateString()} />
+          <ReadRow
+            label="Average expense"
+            value={`${formatPeso(profile.expenseAmount)} / ${profile.expensePeriod}`}
           />
-        ))}
-      </View>
+        </FlatGroup>
 
-      {/* Data */}
-      <Text variant="headline" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Your Data
-      </Text>
-      <Card padding={0}>
-        <ActionRow icon="share-outline" label="Export local data" onPress={exportData} first />
-        <ActionRow icon="download-outline" label="Import backup" onPress={importData} />
-        <ActionRow
-          icon="trash-outline"
-          label="Reset recovery data"
-          danger
-          onPress={openResetRecoveryModal}
-        />
-        <ActionRow
-          icon="close-circle-outline"
-          label="Delete all local data"
-          danger
-          onPress={openDeleteAllModal}
-        />
-      </Card>
+        <SectionTitle title="Personal Recovery Reason" />
+        {editingReason ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+            <TextInput
+              ref={reasonRef}
+              value={reasonValue}
+              onChangeText={setReasonValue}
+              multiline
+              placeholder="Your reason…"
+              placeholderTextColor={theme.color.textDim}
+              style={{
+                ...inputStyle,
+                minHeight: 88,
+                padding: spacing.md,
+                textAlignVertical: 'top',
+                backgroundColor: theme.color.surface,
+              }}
+            />
+            <Pressable
+              onPress={commitReason}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Save reason"
+              style={{
+                width: 44, height: 44, borderRadius: radius.round,
+                backgroundColor: theme.color.success,
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="checkmark" size={20} color="#fff" />
+            </Pressable>
+            <Pressable
+              onPress={cancelReason}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel editing reason"
+              style={{
+                width: 44, height: 44, borderRadius: radius.round,
+                backgroundColor: theme.color.surfaceAlt,
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="close" size={20} color={theme.color.textDim} />
+            </Pressable>
+          </View>
+        ) : (
+          <View
+            style={{
+              borderRadius: radius.card,
+              borderWidth: 1,
+              borderColor: theme.color.hairline,
+              backgroundColor: theme.color.surface,
+              padding: spacing.md,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+              <View
+                style={{
+                  width: 4,
+                  alignSelf: 'stretch',
+                  borderRadius: 999,
+                  backgroundColor: theme.color.primarySoft,
+                }}
+              />
+              <Text variant="footnote" style={{ flex: 1, lineHeight: 20 }} color={profile.reason ? theme.color.text : theme.color.textDim}>
+                {profile.reason || 'Add your reason…'}
+              </Text>
+              <Pressable onPress={startEditReason} hitSlop={14} accessibilityRole="button" accessibilityLabel="Edit reason">
+                <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
+              </Pressable>
+            </View>
+          </View>
+        )}
 
-      {/* Privacy */}
-      <Card tone="primarySoft" style={{ marginTop: spacing.xl }}>
-        <Text variant="footnote" color={theme.color.primary}>Privacy</Text>
-        <Text variant="callout" dim style={{ marginTop: 4 }}>
-          Everything stays on this device. No account, no internet, no data ever leaves your phone.
+        <SectionTitle title="Trigger Preferences" />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {(profile.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => {
+            const active = profile.triggers.includes(t);
+            return (
+              <Pill
+                key={t}
+                label={t}
+                active={active}
+                size="compact"
+                onPress={() =>
+                  update({
+                    triggers: active
+                      ? profile.triggers.filter((x) => x !== t)
+                      : [...profile.triggers, t],
+                  })
+                }
+              />
+            );
+          })}
+        </View>
+
+        <SectionTitle title="Appearance" />
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {THEMES.map((t) => (
+            <Pill
+              key={t.key}
+              label={t.label}
+              active={themePref === t.key}
+              size="compact"
+              onPress={() => setTheme(t.key)}
+            />
+          ))}
+        </View>
+
+        <SectionTitle title="Your Data" />
+        <FlatGroup>
+          <ActionRow icon="share-outline" label="Export local data" onPress={exportData} first />
+          <ActionRow icon="download-outline" label="Import backup" onPress={importData} />
+          <ActionRow
+            icon="trash-outline"
+            label="Reset recovery data"
+            danger
+            onPress={openResetRecoveryModal}
+          />
+          <ActionRow
+            icon="close-circle-outline"
+            label="Delete all local data"
+            danger
+            onPress={openDeleteAllModal}
+          />
+        </FlatGroup>
+
+        <View
+          style={{
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: theme.color.hairline,
+            backgroundColor: theme.color.surfaceAlt,
+            padding: spacing.md,
+            marginTop: spacing.xs,
+          }}
+        >
+          <Text variant="footnote" color={theme.color.primary}>Privacy</Text>
+          <Text variant="footnote" dim style={{ marginTop: 4, lineHeight: 19 }}>
+            Everything stays on this device. No account, no internet, no data ever leaves your phone.
+          </Text>
+        </View>
+        <Text variant="caption" dim center style={{ marginTop: spacing.xs, marginBottom: spacing.lg }}>
+          Unchainly · Recovery Companion · v1.0
         </Text>
-      </Card>
-      <Text variant="caption" dim center style={{ marginTop: spacing.lg }}>
-        Unchain · Recovery Companion · v1.0
-      </Text>
+      </View>
 
       {/* ── Confirmation modal ─────────────────────────────────────────── */}
       <Modal
@@ -694,12 +703,74 @@ export function ProfileScreen() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ReadRow({ label, value }: { label: string; value: string }) {
+function ReadRow({ label, value, first }: { label: string; value: string; first?: boolean }) {
   const theme = useTheme();
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
-      <Text variant="callout" dim>{label}</Text>
-      <Text variant="callout" color={theme.color.text}>{value}</Text>
+    <View
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: 11,
+        gap: spacing.md,
+        borderTopWidth: first ? 0 : 1,
+        borderTopColor: theme.color.hairline,
+      }}
+    >
+      <Text variant="footnote" dim>{label}</Text>
+      <Text variant="footnote" color={theme.color.text} style={{ flexShrink: 1, textAlign: 'right' }}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function FlatGroup({ children }: { children: React.ReactNode }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        borderRadius: radius.card,
+        borderWidth: 1,
+        borderColor: theme.color.hairline,
+        backgroundColor: theme.color.surface,
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  const theme = useTheme();
+  return (
+    <Text variant="caption" color={theme.color.textDim} style={{ textTransform: 'uppercase', marginTop: spacing.xs }}>
+      {title}
+    </Text>
+  );
+}
+
+function ProfileStat({ label, value, first }: { label: string; value: string; first?: boolean }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        borderLeftWidth: first ? 0 : 1,
+        borderLeftColor: theme.color.hairline,
+        paddingLeft: first ? 0 : spacing.sm,
+        paddingVertical: 2,
+        gap: 2,
+      }}
+    >
+      <Text variant="callout" color={theme.color.text} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontSize: 15 }}>
+        {value}
+      </Text>
+      <Text variant="caption" dim numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -727,7 +798,8 @@ function ActionRow({
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
-        padding: spacing.lg,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
         borderTopWidth: first ? 0 : 1,
         borderTopColor: theme.color.hairline,
         opacity: pressed ? 0.6 : 1,

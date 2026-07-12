@@ -217,7 +217,7 @@ export async function syncPredictionNotifications(urges: UrgeLog[]): Promise<voi
               data: {
                 tag: notifTag(window.hour, window.dow),
                 // Deep-link target: opened when the user taps the notification
-                deepLink: 'unchain://sos',
+                deepLink: 'unchainly://sos',
                 hour: window.hour,
                 dow: window.dow,
                 score: window.score,

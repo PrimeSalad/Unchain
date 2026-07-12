@@ -211,10 +211,10 @@ export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: Slid
     <GestureDetector gesture={panGesture}>
       <View collapsable={false}>
         {/* Emoji + label — swiping here also works */}
-        <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
-          {kind === 'mood' && <Text style={{ fontSize: 52, lineHeight: 60 }}>{moodEmoji(value)}</Text>}
-          {kind === 'urge' && <Text style={{ fontSize: 52, lineHeight: 60 }}>{urgeEmoji(value)}</Text>}
-          <Text variant="title2" color={color} style={{ marginTop: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
+        <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
+          {kind === 'mood' && <Text style={{ fontSize: 42, lineHeight: 48 }}>{moodEmoji(value)}</Text>}
+          {kind === 'urge' && <Text style={{ fontSize: 42, lineHeight: 48 }}>{urgeEmoji(value)}</Text>}
+          <Text variant="headline" color={color} style={{ marginTop: spacing.xs, fontFamily: 'Nunito_700Bold' }}>
             {value} / {max}
           </Text>
           <Text variant="footnote" dim style={{ marginTop: spacing.xs }}>
