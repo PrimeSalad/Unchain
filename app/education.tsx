@@ -116,39 +116,48 @@ function ResourceCard({ res, index }: { res: Resource; index: number }) {
 
   return (
     <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 50).springify().damping(18)}>
-      <View
-        style={{
+      <Pressable
+        onPress={() => router.push({ pathname: '/education-resource', params: { id: res.id } } as never)}
+        accessibilityRole="button"
+        accessibilityLabel={`Read ${res.title} in the app`}
+        style={({ pressed }) => ({
           backgroundColor: theme.color.surface,
           borderRadius: radius.card,
-          borderWidth: 1, borderColor: theme.color.hairline,
+          borderWidth: 1,
+          borderColor: theme.color.hairline,
           padding: spacing.lg,
-          gap: spacing.md,
-        }}
+          opacity: pressed ? 0.82 : 1,
+        })}
       >
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          {/* Generated cover */}
+        <View style={{ flexDirection: 'row', gap: spacing.lg }}>
           <View
             accessibilityLabel={`Cover for ${res.title}`}
             style={{
-              width: 56, height: 78, borderRadius: 8,
+              width: 74,
+              height: 104,
+              borderRadius: 12,
               backgroundColor: res.tint,
               alignItems: 'center', justifyContent: 'center',
               overflow: 'hidden',
             }}
           >
-            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 26, backgroundColor: 'rgba(255,255,255,0.14)' }} />
-            <Text color="#FFFFFF" style={{ fontSize: 18, fontFamily: 'Nunito_900Black' }}>{initials}</Text>
-            <Ionicons name="book" size={13} color="rgba(255,255,255,0.8)" style={{ marginTop: 3 }} />
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 36, backgroundColor: 'rgba(255,255,255,0.14)' }} />
+            <Text color="#FFFFFF" style={{ fontSize: 22, fontFamily: 'Nunito_900Black' }}>{initials}</Text>
+            <Ionicons name="book" size={15} color="rgba(255,255,255,0.82)" style={{ marginTop: 4 }} />
           </View>
 
-          <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flex: 1, minWidth: 0, justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
               <View style={{ flex: 1 }}>
-                <Text variant="callout" numberOfLines={2}>{res.title}</Text>
-                <Text variant="caption" dim style={{ marginTop: 1 }}>{res.author}</Text>
+                <Text variant="caption" color={theme.color.primary}>FULL BOOK · OFFLINE</Text>
+                <Text variant="headline" numberOfLines={2} style={{ marginTop: spacing.xs, lineHeight: 23 }}>
+                  {res.title}
+                </Text>
+                <Text variant="caption" dim style={{ marginTop: spacing.xs }}>{res.author}</Text>
               </View>
               <Pressable
-                onPress={() => {
+                onPress={(e) => {
+                  e.stopPropagation();
                   Haptics.selectionAsync().catch(() => {});
                   toggleEduBookmark(res.id);
                 }}
@@ -163,33 +172,16 @@ function ResourceCard({ res, index }: { res: Resource; index: number }) {
                 />
               </Pressable>
             </View>
-            <Text variant="caption" dim numberOfLines={3} style={{ marginTop: 4, lineHeight: 17 }}>
+            <Text variant="footnote" dim numberOfLines={3} style={{ marginTop: spacing.md, lineHeight: 18 }}>
               {res.desc}
             </Text>
-            <Text variant="caption" dim style={{ marginTop: 4 }}>
-              {res.length} · Free
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md }}>
+              <Text variant="footnote" color={theme.color.primary}>Read now</Text>
+              <Ionicons name="chevron-forward" size={14} color={theme.color.primary} />
+            </View>
           </View>
         </View>
-
-        {/* Actions */}
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <Pressable
-            onPress={() => router.push({ pathname: '/education-resource', params: { id: res.id } } as never)}
-            accessibilityRole="button"
-            accessibilityLabel={`Read about ${res.title} in the app`}
-            style={({ pressed }) => ({
-              flex: 1, height: 40, borderRadius: radius.button,
-              backgroundColor: theme.color.primarySoft,
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Ionicons name="reader-outline" size={15} color={theme.color.primary} />
-            <Text variant="footnote" color={theme.color.primary}>Read</Text>
-          </Pressable>
-        </View>
-      </View>
+      </Pressable>
     </Animated.View>
   );
 }

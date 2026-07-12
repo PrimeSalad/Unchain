@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { FlatList, Platform, Pressable, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +43,8 @@ const BOOKS: Record<string, BookPayload> = {
 };
 
 type ParagraphKind = 'body' | 'heading' | 'frontMatter';
+const READER_WIDTH = 620;
+const readerFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' });
 
 function paragraphKind(text: string, index: number): ParagraphKind {
   const trimmed = text.trim();
@@ -56,6 +58,10 @@ function paragraphKind(text: string, index: number): ParagraphKind {
   if ((isUpper && isShort) || startsLikeHeading || romanHeading) return index < 8 ? 'frontMatter' : 'heading';
   if (index < 6 && isShort) return 'frontMatter';
   return 'body';
+}
+
+function displayParagraph(text: string) {
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 export default function EducationResource() {
@@ -77,7 +83,19 @@ export default function EducationResource() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.md,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.color.hairline,
+            backgroundColor: theme.color.bg,
+          }}
+        >
           <Pressable
             onPress={safeBack}
             hitSlop={12}
@@ -97,6 +115,9 @@ export default function EducationResource() {
             <Text variant="callout" numberOfLines={1}>{resource.title}</Text>
             <ProgressBar progress={progress} height={6} />
           </View>
+          <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'], minWidth: 36, textAlign: 'right' }}>
+            {Math.round(progress * 100)}%
+          </Text>
         </View>
 
         <FlatList
@@ -105,46 +126,60 @@ export default function EducationResource() {
           onScroll={onScroll}
           scrollEventThrottle={32}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.huge }}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge }}
           initialNumToRender={18}
           maxToRenderPerBatch={20}
           windowSize={9}
           removeClippedSubviews
           ListHeaderComponent={(
-            <View style={{ width: '100%', maxWidth: 680 }}>
+            <View style={{ width: '100%', maxWidth: READER_WIDTH, alignSelf: 'center' }}>
               <View
                 style={{
-                  alignSelf: 'flex-start',
-                  width: 76, height: 104, borderRadius: 12,
-                  backgroundColor: resource.tint,
-                  alignItems: 'center', justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: spacing.lg,
+                  alignItems: 'flex-end',
                   marginBottom: spacing.xl,
                 }}
               >
-                <Ionicons name="book" size={30} color="#FFFFFF" />
+                <View
+                  style={{
+                    width: 86,
+                    height: 124,
+                    borderRadius: 14,
+                    backgroundColor: resource.tint,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 38, backgroundColor: 'rgba(255,255,255,0.13)' }} />
+                  <Ionicons name="book" size={34} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0, paddingBottom: spacing.xs }}>
+                  <Text variant="caption" color={theme.color.primary}>FULL BOOK · OFFLINE</Text>
+                  <Text variant="title1" style={{ marginTop: spacing.xs, lineHeight: 36 }}>
+                    {resource.title}
+                  </Text>
+                  <Text variant="callout" dim style={{ marginTop: spacing.sm, lineHeight: 22 }}>
+                    {resource.author}
+                  </Text>
+                </View>
               </View>
 
-              <Text variant="title1" style={{ lineHeight: 37 }}>{resource.title}</Text>
-              <Text variant="callout" dim style={{ marginTop: spacing.sm, lineHeight: 23 }}>
-                {resource.author}
-              </Text>
-              <Text variant="caption" dim style={{ marginTop: spacing.xs }}>
-                Full book · Offline · {book.sourceId}
+              <Text variant="caption" dim style={{ marginBottom: spacing.md }}>
+                {book.sourceId}
               </Text>
 
               <View
                 style={{
-                  marginTop: spacing.xl,
+                  marginTop: spacing.sm,
                   marginBottom: spacing.xl,
-                  padding: spacing.lg,
-                  backgroundColor: theme.color.surface,
-                  borderRadius: radius.card,
-                  borderWidth: 1,
-                  borderColor: theme.color.hairline,
+                  paddingLeft: spacing.lg,
+                  borderLeftWidth: 3,
+                  borderLeftColor: theme.color.primary,
                 }}
               >
-                <Text variant="footnote" color={theme.color.primary}>Why it is in your shelf</Text>
-                <Text variant="callout" dim style={{ marginTop: spacing.xs, lineHeight: 22 }}>
+                <Text variant="callout" dim style={{ lineHeight: 24 }}>
                   {resource.desc}
                 </Text>
               </View>
@@ -152,60 +187,69 @@ export default function EducationResource() {
           )}
           renderItem={({ item, index }) => {
             const kind = paragraphKind(item, index);
+            const text = displayParagraph(item);
             if (kind === 'heading') {
               return (
-                <Text
-                  variant="title2"
-                  style={{
-                    width: '100%',
-                    maxWidth: 680,
-                    marginTop: spacing.xxl,
-                    marginBottom: spacing.xs,
-                    lineHeight: 30,
-                  }}
-                >
-                  {item}
-                </Text>
+                <View style={{ width: '100%', alignItems: 'center' }}>
+                  <Text
+                    variant="title2"
+                    style={{
+                      width: '100%',
+                      maxWidth: READER_WIDTH,
+                      marginTop: spacing.xxl,
+                      marginBottom: spacing.sm,
+                      lineHeight: 30,
+                    }}
+                  >
+                    {text}
+                  </Text>
+                </View>
               );
             }
 
             if (kind === 'frontMatter') {
               return (
-                <Text
-                  variant="callout"
-                  dim
-                  style={{
-                    width: '100%',
-                    maxWidth: 680,
-                    marginTop: spacing.sm,
-                    lineHeight: 23,
-                  }}
-                >
-                  {item}
-                </Text>
+                <View style={{ width: '100%', alignItems: 'center' }}>
+                  <Text
+                    variant="callout"
+                    dim
+                    style={{
+                      width: '100%',
+                      maxWidth: READER_WIDTH,
+                      marginTop: spacing.sm,
+                      lineHeight: 23,
+                    }}
+                  >
+                    {text}
+                  </Text>
+                </View>
               );
             }
 
             return (
-              <Text
-                variant="body"
-                style={{
-                  width: '100%',
-                  maxWidth: 680,
-                  fontSize: 18,
-                  lineHeight: 31,
-                  marginTop: spacing.lg,
-                }}
-              >
-                {item}
-              </Text>
+              <View style={{ width: '100%', alignItems: 'center' }}>
+                <Text
+                  variant="body"
+                  style={{
+                    width: '100%',
+                    maxWidth: READER_WIDTH,
+                    fontFamily: readerFont,
+                    fontSize: 19,
+                    lineHeight: 32,
+                    marginTop: spacing.lg,
+                  }}
+                >
+                  {text}
+                </Text>
+              </View>
             );
           }}
           ListFooterComponent={(
             <View
               style={{
                 width: '100%',
-                maxWidth: 680,
+                maxWidth: READER_WIDTH,
+                alignSelf: 'center',
                 marginTop: spacing.xxl,
                 padding: spacing.lg,
                 backgroundColor: theme.color.primarySoft,
