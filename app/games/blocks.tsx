@@ -70,7 +70,7 @@ export default function Blocks() {
   const gridBoxRef = useRef<View>(null);
   const tutorial = useGameTutorial('blocks');
   const layout = useSquareBoardSize({ reservedHeight: 378, horizontalPadding: spacing.lg * 2, max: 328 });
-  const trayCell = layout.compact ? 16 : 20;
+  const trayCell = layout.compact ? 18 : 22;
 
   // Refs so the gesture handlers always read the latest state.
   const gridRef = useRef(grid); gridRef.current = grid;
@@ -381,7 +381,7 @@ export default function Blocks() {
             // A piece with no legal placement reads as clearly "stuck".
             const stuck = p != null && !canPlaceAnywhere(grid, p.shape);
             return (
-              <View key={i} style={{ width: layout.compact ? 82 : 100, height: layout.compact ? 82 : 100, alignItems: 'center', justifyContent: 'center' }}>
+              <View key={i} style={{ width: layout.compact ? 92 : 112, height: layout.compact ? 92 : 112, alignItems: 'center', justifyContent: 'center' }}>
                 {p && !over && (
                   <GestureDetector gesture={gestures[i]}>
                     <View style={{ opacity: drag?.index === i ? 0.25 : stuck ? 0.3 : 1 }}>

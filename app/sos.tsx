@@ -228,14 +228,23 @@ export default function Sos() {
       />
       <SafeAreaView style={{ flex: 1 }}>
         {/* Close */}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <View
+          style={{
+            minHeight: 64,
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.lg,
+            paddingBottom: spacing.sm,
+          }}
+        >
           <Pressable
             onPress={safeBack}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Close"
             style={({ pressed }) => ({
-              width: 40, height: 40, borderRadius: 20,
+              width: 44, height: 44, borderRadius: 22,
               backgroundColor: GLASS, borderWidth: 1, borderColor: GLASS_BORDER,
               alignItems: 'center', justifyContent: 'center',
               opacity: pressed ? 0.7 : 1,
@@ -374,7 +383,7 @@ export default function Sos() {
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             <ToolTile icon="book" label="Journal" onPress={() => router.replace('/(tabs)/journal')} />
-            <ToolTile icon="game-controller" label="Games" onPress={() => router.push('/games' as Href)} />
+            <ToolTile icon="game-controller" label="Games" onPress={() => router.dismissTo('/games' as Href)} />
             <ToolTile icon="walk" label="Habits" onPress={() => router.push('/alternatives' as Href)} />
             <ToolTile icon="shield-checkmark" label="Protect" onPress={() => router.push('/protection' as Href)} />
             <ToolTile icon="create" label="Reflect" onPress={() => router.replace('/reflection')} />

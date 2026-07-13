@@ -131,12 +131,16 @@ export function ProfileScreen() {
   const startEditName = () => {
     setNameValue(profile.name);
     setEditingName(true);
-    setTimeout(() => nameRef.current?.focus(), 50);
+    setTimeout(() => nameRef.current?.focus(), 140);
   };
 
   const commitName = () => {
-    const trimmed = nameValue.trim();
-    if (trimmed && trimmed !== profile.name) {
+    const trimmed = nameValue.trim().replace(/\s+/g, ' ');
+    if (!trimmed) {
+      showToast('Name cannot be empty', 'error');
+      return;
+    }
+    if (trimmed !== profile.name) {
       try {
         update({ name: trimmed });
         showToast('Name updated');
@@ -396,14 +400,89 @@ export function ProfileScreen() {
               <Text variant="headline" color={theme.color.primary}>{initials}</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="title2" numberOfLines={1}>{profile.name}</Text>
-              <Text variant="footnote" dim numberOfLines={1} style={{ marginTop: 2 }}>
-                {typeLabel} recovery · {days} day streak
-              </Text>
+              {editingName ? (
+                <View style={{ gap: spacing.xs }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                    <TextInput
+                      ref={nameRef}
+                      value={nameValue}
+                      onChangeText={setNameValue}
+                      placeholder="Nickname"
+                      placeholderTextColor={theme.color.textDim}
+                      returnKeyType="done"
+                      onSubmitEditing={commitName}
+                      selectTextOnFocus
+                      maxLength={32}
+                      style={{
+                        ...inputStyle,
+                        minHeight: 44,
+                        minWidth: 0,
+                        flex: 1,
+                        paddingVertical: 8,
+                        paddingHorizontal: spacing.sm,
+                      }}
+                    />
+                    <Pressable
+                      onPress={commitName}
+                      accessibilityRole="button"
+                      accessibilityLabel="Save profile name"
+                      style={({ pressed }) => ({
+                        width: 42,
+                        height: 42,
+                        borderRadius: 21,
+                        backgroundColor: theme.color.success,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <Ionicons name="checkmark" size={19} color="#fff" />
+                    </Pressable>
+                    <Pressable
+                      onPress={cancelName}
+                      accessibilityRole="button"
+                      accessibilityLabel="Cancel editing profile name"
+                      style={({ pressed }) => ({
+                        width: 42,
+                        height: 42,
+                        borderRadius: 21,
+                        backgroundColor: theme.color.surfaceAlt,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <Ionicons name="close" size={19} color={theme.color.textDim} />
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <Text variant="title2" numberOfLines={1}>{profile.name}</Text>
+                  <Text variant="footnote" dim numberOfLines={1} style={{ marginTop: 2 }}>
+                    {typeLabel} recovery · {days} day streak
+                  </Text>
+                </>
+              )}
             </View>
-            <Pressable onPress={startEditName} hitSlop={14} accessibilityRole="button" accessibilityLabel="Edit name">
-              <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
-            </Pressable>
+            {editingName ? null : (
+              <Pressable
+                onPress={startEditName}
+                accessibilityRole="button"
+                accessibilityLabel="Edit profile name"
+                style={({ pressed }) => ({
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: theme.color.primarySoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
+              </Pressable>
+            )}
           </View>
 
           <Text variant="footnote" dim style={{ lineHeight: 19 }}>
@@ -419,7 +498,7 @@ export function ProfileScreen() {
 
         <SectionTitle title="Recovery Details" />
         <FlatGroup>
-          <ReadRow label="Name" value={profile.name} first />
+          <ReadRow label="Name" value={profile.name} first onPress={startEditName} actionLabel="Edit profile name" />
           <ReadRow label="Addiction" value={typeLabel} />
           {profile.addictionDetail ? <ReadRow label="Specifically" value={profile.addictionDetail} /> : null}
           <ReadRow label="Current streak" value={`${days} days`} />
@@ -703,24 +782,59 @@ export function ProfileScreen() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ReadRow({ label, value, first }: { label: string; value: string; first?: boolean }) {
+function ReadRow({
+  label,
+  value,
+  first,
+  onPress,
+  actionLabel,
+}: {
+  label: string;
+  value: string;
+  first?: boolean;
+  onPress?: () => void;
+  actionLabel?: string;
+}) {
   const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 11,
-        gap: spacing.md,
-        borderTopWidth: first ? 0 : 1,
-        borderTopColor: theme.color.hairline,
-      }}
-    >
+  const rowStyle = {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    gap: spacing.md,
+    borderTopWidth: first ? 0 : 1,
+    borderTopColor: theme.color.hairline,
+  };
+  const content = (
+    <>
       <Text variant="footnote" dim>{label}</Text>
-      <Text variant="footnote" color={theme.color.text} style={{ flexShrink: 1, textAlign: 'right' }}>
-        {value}
-      </Text>
+      <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.xs }}>
+        <Text variant="footnote" color={theme.color.text} numberOfLines={1} style={{ flexShrink: 1, textAlign: 'right' }}>
+          {value}
+        </Text>
+        {onPress ? <Ionicons name="pencil-outline" size={16} color={theme.color.primary} /> : null}
+      </View>
+    </>
+  );
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={actionLabel ?? label}
+        style={({ pressed }) => ({
+          ...rowStyle,
+          opacity: pressed ? 0.65 : 1,
+        })}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+  return (
+    <View style={rowStyle}>
+      {content}
     </View>
   );
 }

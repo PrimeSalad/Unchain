@@ -363,13 +363,36 @@ export function HomeScreen() {
             <View
               key={e.id}
               style={{
-                flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
-                borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.color.hairline,
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.md,
+                gap: spacing.sm,
+                borderTopWidth: i === 0 ? 0 : 1,
+                borderTopColor: theme.color.hairline,
               }}
             >
-              <Ionicons name={TIMELINE_ICON[e.type]} size={20} color={theme.color.primary} />
-              <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }}>{e.label}</Text>
-              <Text variant="caption" dim>{relTime(e.at, now)}</Text>
+              <View
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 12,
+                  backgroundColor: theme.color.primarySoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: 1,
+                }}
+              >
+                <Ionicons name={TIMELINE_ICON[e.type]} size={17} color={theme.color.primary} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="callout" numberOfLines={2} style={{ lineHeight: 20 }}>
+                  {e.label}
+                </Text>
+              </View>
+              <Text variant="caption" dim numberOfLines={1} style={{ width: 62, textAlign: 'right', marginTop: 2 }}>
+                {relTime(e.at, now)}
+              </Text>
             </View>
           ))
         )}

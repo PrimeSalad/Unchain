@@ -81,8 +81,7 @@ function useClarityLayout() {
   const boardWidth = Math.floor(Math.min(width - SIDE_MARGIN * 2, boardFromHeight, maxBoardWidth));
   // 5 tiles across, separated by 4 gaps.
   const tileSize = (boardWidth - tileGap * (WORD_LENGTH - 1)) / WORD_LENGTH;
-  // 56 % of tile size gives natural letter weight; hard-clamp for a11y.
-  const tileFontSize = Math.round(Math.max(13, Math.min(tileSize * 0.56, 28)));
+  const tileFontSize = Math.round(Math.max(12, Math.min(tileSize * 0.48, 24)));
 
   return { boardWidth, tileGap, tileSize, tileFontSize, keyHeight, keyGap, rowGap, compact, tiny };
 }
@@ -507,7 +506,11 @@ function TypeTile({ letter, fontSize }: { letter: string; fontSize: number }) {
         transform: [{ scale }],
       }}
     >
-      <Text variant="title2" color={theme.color.text} style={{ textTransform: 'uppercase', fontSize }}>
+      <Text
+        variant="title2"
+        color={theme.color.text}
+        style={{ textTransform: 'uppercase', fontSize, lineHeight: fontSize + 2, includeFontPadding: false, textAlign: 'center' }}
+      >
         {letter}
       </Text>
     </Animated.View>
@@ -574,7 +577,7 @@ function FlipTile({
       <Text
         variant="title2"
         color={shown ? '#FFFFFF' : theme.color.text}
-        style={{ textTransform: 'uppercase', fontSize }}
+        style={{ textTransform: 'uppercase', fontSize, lineHeight: fontSize + 2, includeFontPadding: false, textAlign: 'center' }}
       >
         {letter}
       </Text>
