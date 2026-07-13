@@ -175,6 +175,8 @@ export function ProgressScreen() {
         journalByDay.set(localMidnight(j.at), j.gambled);
       } else if (j.watched !== undefined) {
         journalByDay.set(localMidnight(j.at), j.watched);
+      } else if (j.binged !== undefined) {
+        journalByDay.set(localMidnight(j.at), j.binged);
       }
     });
 

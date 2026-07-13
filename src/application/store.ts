@@ -955,10 +955,12 @@ export const useStore = create<RecoveryState>()(
           // so neither addiction type ever blocks the other.
           const isGamblingEntry = data.gambled !== undefined;
           const isPornEntry = data.watched !== undefined;
+          const isSocialEntry = data.binged !== undefined;
           const alreadyToday = s.journal.some((j) => {
             if (!sameDay(j.at, Date.now())) return false;
             if (isGamblingEntry) return j.gambled !== undefined;
             if (isPornEntry) return j.watched !== undefined;
+            if (isSocialEntry) return j.binged !== undefined;
             return true; // generic entry - block any duplicate
           });
           if (alreadyToday) return s;
@@ -1086,6 +1088,60 @@ export const useStore = create<RecoveryState>()(
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
                 evt('urge', 'Logged a clean-day urge check from journal'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          // ── Social media: binged=true → relapse; binged=false → clean ─────
+          if (data.binged === true) {
+            const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
+            const prevDays = streakDays(streakStart);
+            const relapseEntry: RelapseEvent = {
+              id: uid(),
+              at: Date.now(),
+              whatHappened: data.bingeTrigger,
+              cause: data.bingeTrigger,
+              feeling: data.bingeEmotions?.join(', '),
+            };
+            return {
+              journal: journalAfter,
+              relapses: [relapseEntry, ...s.relapses],
+              longestStreak: Math.max(s.longestStreak, prevDays),
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Journal entry - social media binge logged'),
+                evt('relapse', 'Logged a relapse via journal - recovery continues'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          if (data.binged === false) {
+            const now = Date.now();
+            const cleanTriggers = data.socialTriggersEncountered;
+            const urgeEntry: UrgeLog = {
+              id: uid(),
+              at: now,
+              intensity: data.socialUrgeIntensity ?? 1,
+              trigger: cleanTriggers?.[0] ?? 'Daily journal',
+              triggers: cleanTriggers?.length ? cleanTriggers : ['Daily journal'],
+              notes: data.socialWhatHelped ?? data.text,
+              resisted: true,
+              mood: data.mood,
+            };
+            return {
+              journal: journalAfter,
+              urges: [urgeEntry, ...s.urges],
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...resistedCounterPatch(s, now),
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Wrote a journal entry - clean day'),
+                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
                 ...s.timeline,
               ],
             };
@@ -1248,6 +1304,17 @@ export function useTodayPornJournal(): import('@/domain/records').JournalEntry |
  */
 export function useTodayAnyJournal(): import('@/domain/records').JournalEntry | undefined {
   return useStore((s) => s.journal.find((j) => sameDay(j.at, Date.now())));
+}
+
+/**
+ * Today's journal entry for social-media users, or undefined if none submitted yet.
+ * Finds any entry today where `binged` is defined (social-media-specific gate).
+ * Completely separate from useTodayJournal and useTodayPornJournal.
+ */
+export function useTodaySocialJournal(): import('@/domain/records').JournalEntry | undefined {
+  return useStore((s) =>
+    s.journal.find((j) => sameDay(j.at, Date.now()) && j.binged !== undefined),
+  );
 }
 
 /**

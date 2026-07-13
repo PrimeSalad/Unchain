@@ -30,6 +30,7 @@ import {
 import type { TimelineType } from '@/domain/records';
 import { sameDay } from '@/domain/records';
 import { QuoteFeed } from '../components/QuoteCards';
+import { CheckInInsightsCard } from '../components/CheckInInsightsCard';
 import { formatLastCheckedIn } from '@/domain/pornRecovery';
 
 function greeting(): string {
@@ -80,6 +81,7 @@ export function HomeScreen() {
   const urgesResisted = useStore((s) => s.urgesResisted);
   const recordedUrges = useStore((s) => s.urges.filter((urge) => urge.resisted).length);
   const healthyHabitsCount = useStore((s) => s.healthyHabitsCount);
+  const blockedSites = useStore((s) => s.blockedSites);
 
   // Derive the current streak start from the event log - never from startedAt
   // directly - so a relapse only marks today red without wiping history.
@@ -235,6 +237,85 @@ export function HomeScreen() {
         </View>
       </View>
 
+      {/* Check-in insights - mood sparkline, urge avg, top triggers */}
+      <View style={{ marginTop: spacing.xl }}>
+        <CheckInInsightsCard />
+      </View>
+
+      {/* Stay Protected - Protect Card */}
+      <Text variant="callout" style={{ marginTop: spacing.xl, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
+        Stay Protected
+      </Text>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => {});
+          router.push('/protection' as Href);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Focus Protection - Block distracting sites"
+        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            backgroundColor: theme.color.surface,
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: theme.color.hairline,
+            padding: spacing.lg,
+          }}
+        >
+          {/* Left: icon badge */}
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: theme.color.primarySoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="shield-checkmark" size={20} color={theme.color.primary} />
+          </View>
+
+          {/* Middle: title + subtitle */}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>
+              Focus Protection
+            </Text>
+            {blockedSites.length > 0 ? (
+              <Text variant="caption" dim style={{ marginTop: 1 }}>
+                {blockedSites.length} site{blockedSites.length !== 1 ? 's' : ''} blocked
+              </Text>
+            ) : (
+              <Text variant="caption" dim style={{ marginTop: 1 }}>
+                Block distracting sites and stay on track.
+              </Text>
+            )}
+          </View>
+
+          {/* Right: pill badge + chevron */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <View
+              style={{
+                backgroundColor: theme.color.primarySoft,
+                borderRadius: 99,
+                paddingHorizontal: spacing.sm,
+                paddingVertical: 3,
+              }}
+            >
+              <Text variant="caption" color={theme.color.primary}>
+                Protect
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
+          </View>
+        </View>
+      </Pressable>
+
       {/* Daily motivation - today's quote first, saved favorites after. */}
       <Text variant="callout" style={{ marginTop: spacing.xl, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
         Daily Motivation
@@ -255,7 +336,6 @@ export function HomeScreen() {
         <QuickAction icon="book"   label="Journal"   onPress={() => router.push('/(tabs)/journal')} />
         <QuickAction icon="warning" label="SOS"      accent onPress={() => router.push('/sos')} />
         <QuickAction icon="flower" label="Pause"     onPress={() => router.push('/mindful-pause')} />
-        <QuickAction icon="shield-checkmark" label="Protect" onPress={() => router.push('/protection' as Href)} />
         <QuickAction icon="walk"   label="Habits"    onPress={() => router.push('/alternatives' as Href)} />
       </View>
 

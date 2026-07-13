@@ -73,6 +73,30 @@ export interface JournalEntry {
    * false → clean   (green calendar day, urgesResisted++)
    */
   watched?: boolean;
+
+  // ── Social-media-specific fields (only populated for social_media addiction) ──
+  /**
+   * Did the user binge social media on this day?
+   * true  → relapse (red calendar day, streak resets)
+   * false → clean   (green calendar day)
+   */
+  binged?: boolean;
+  /** Platforms used during a binge session. */
+  bingedPlatforms?: string[];
+  /** How long they scrolled in minutes (binge day). */
+  bingeDuration?: string;
+  /** What triggered the binge. */
+  bingeTrigger?: string;
+  /** How they were feeling before the binge. */
+  bingeEmotions?: string[];
+  /** What could help next time. */
+  bingeNextTimePlan?: string;
+  /** Urge intensity on a clean day (1–10). */
+  socialUrgeIntensity?: number;
+  /** Triggers noticed on a clean social-media-free day. */
+  socialTriggersEncountered?: string[];
+  /** What helped the user stay off social media. */
+  socialWhatHelped?: string;
   /** Urge intensity experienced today (1–10, clean day only). */
   urgeIntensity?: number;
   /** Triggers the user encountered today (clean day). */

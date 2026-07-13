@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  ActivityIndicator,
+  Alert,
   Animated,
   Keyboard,
   Modal,
@@ -13,7 +15,9 @@ import {
   findNodeHandle,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { Screen } from '../components/Screen';
@@ -63,6 +67,7 @@ type ToastConfig = {
   type: 'success' | 'error';
 };
 
+
 // ---------------------------------------------------------------------------
 // Main screen
 // ---------------------------------------------------------------------------
@@ -72,6 +77,7 @@ export function ProfileScreen() {
   const insets = useReliableSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const router = useRouter();
+  const navigation = useNavigation();
   const profile = useProfile();
   const update = useStore((s) => s.updateProfile);
   const themePref = useStore((s) => s.themePref);
@@ -93,6 +99,20 @@ export function ProfileScreen() {
   const reasonRef = useRef<TextInput>(null);
   const screenScrollRef = useRef<ScrollView>(null);
 
+  // Triggers draft state — keeps edits local until explicitly saved
+  const [triggersDraft, setTriggersDraft] = useState<string[]>(() => profile?.triggers ?? []);
+  const [savingTriggers, setSavingTriggers] = useState(false);
+
+  // Sync draft if profile triggers change externally (e.g. backup restore)
+  useEffect(() => {
+    if (profile) setTriggersDraft(profile.triggers);
+  }, [profile?.triggers]);
+
+  // Dirty check: compare sorted arrays by content
+  const triggersDirty = profile
+    ? [...triggersDraft].sort().join('\0') !== [...profile.triggers].sort().join('\0')
+    : false;
+
   // Modal state
   const [modal, setModal] = useState<ModalConfig | null>(null);
 
@@ -108,6 +128,32 @@ export function ProfileScreen() {
     },
     [],
   );
+
+  // Guard navigation away when there are unsaved trigger changes
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (!triggersDirty) return;
+      // Prevent the default back action
+      e.preventDefault();
+      Alert.alert(
+        'Unsaved trigger changes',
+        'You have unsaved trigger changes. Discard them and leave?',
+        [
+          {
+            text: 'Keep editing',
+            style: 'cancel',
+            onPress: () => {},
+          },
+          {
+            text: 'Discard changes',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ],
+      );
+    });
+    return unsubscribe;
+  }, [navigation, triggersDirty]);
 
   if (!profile) return null;
 
@@ -134,7 +180,7 @@ export function ProfileScreen() {
     : triggersForAddiction(profile.addictionType);
   // Keep saved legacy/custom values editable instead of silently hiding them.
   const triggerOptions = [...new Set<string>([...standardTriggerOptions, ...profile.triggers])];
-  const selectedTriggerCount = triggerOptions.filter((trigger) => profile.triggers.includes(trigger)).length;
+  const selectedTriggerCount = triggersDraft.length;
   const filledTextColor = theme.color.textInverse;
 
   // ── Toast ────────────────────────────────────────────────────────────────
@@ -243,6 +289,30 @@ export function ProfileScreen() {
     setEditingReason(false);
   };
 
+  // ── Trigger draft handlers ────────────────────────────────────────────────
+
+  const toggleTriggerDraft = (trigger: string) => {
+    setTriggersDraft((prev) =>
+      prev.includes(trigger) ? prev.filter((t) => t !== trigger) : [...prev, trigger],
+    );
+  };
+
+  const saveTriggers = async () => {
+    setSavingTriggers(true);
+    try {
+      update({ triggers: triggersDraft });
+      showToast('Triggers saved');
+    } catch {
+      showToast('Failed to save triggers', 'error');
+    } finally {
+      setSavingTriggers(false);
+    }
+  };
+
+  const discardTriggers = () => {
+    setTriggersDraft(profile.triggers);
+  };
+
   // ── Modals ────────────────────────────────────────────────────────────────
 
   const openResetRecoveryModal = () =>
@@ -275,12 +345,12 @@ export function ProfileScreen() {
       },
     });
 
+
   // ── Data export / import ──────────────────────────────────────────────────
 
   const exportData = async () => {
     try {
       const s = useStore.getState();
-      // A single self-describing backup file with every locally-stored slice.
       const backup = {
         app: BACKUP_MARKER,
         version: 2,
@@ -328,7 +398,6 @@ export function ProfileScreen() {
       const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? '';
       const fileUri = `${dir}unchainly-backup-${stamp}.json`;
       await FileSystem.writeAsStringAsync(fileUri, json);
-
       await shareCapturedContent({
         uri: fileUri,
         summary: json,
@@ -348,27 +417,19 @@ export function ProfileScreen() {
         copyToCacheDirectory: true,
       });
       if (res.canceled || !res.assets?.[0]) return;
-
       const text = await FileSystem.readAsStringAsync(res.assets[0].uri);
       const parsed = JSON.parse(text);
-      // Accept both the wrapped backup and a raw data object.
       const data =
         parsed?.app === BACKUP_MARKER || parsed?.app === LEGACY_BACKUP_MARKER || parsed?.data
           ? parsed.data
           : parsed;
-
-      // Validate before touching the store, so a bad file can't corrupt state.
       if (!data || typeof data !== 'object' || !data.profile || typeof data.profile.startedAt !== 'number') {
         showToast('That file is not a valid Unchainly backup', 'error');
         return;
       }
-
       const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
       const obj = <T extends object>(v: unknown, fallback: T): T =>
         v && typeof v === 'object' && !Array.isArray(v) ? (v as T) : fallback;
-      // Replace state wholesale (no merge) so nothing duplicates and no slice
-      // from the pre-import state leaks into the restored one. Slices missing
-      // from older (v1) backups restore to clean defaults.
       useStore.setState({
         onboarded: true,
         profile: data.profile,
@@ -422,7 +483,8 @@ export function ProfileScreen() {
     }
   };
 
-  // ── Styles ────────────────────────────────────────────────────────────────
+
+  // ── Shared input style ────────────────────────────────────────────────────
 
   const inputStyle = {
     borderRadius: radius.input,
@@ -442,6 +504,7 @@ export function ProfileScreen() {
       <Screen scrollRef={screenScrollRef} tabPadding contentStyle={{ paddingTop: spacing.md }}>
         <Text variant="title1" accessibilityRole="header">Profile</Text>
 
+        {/* ── Avatar + name row ── */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg }}>
           <View
             accessible={false}
@@ -471,6 +534,7 @@ export function ProfileScreen() {
           )}
         </View>
 
+        {/* ── Inline name editor ── */}
         {editingName && (
           <View
             style={{
@@ -527,6 +591,7 @@ export function ProfileScreen() {
           </View>
         )}
 
+        {/* ── Streak / start metrics ── */}
         <View
           style={{
             flexDirection: 'row',
@@ -541,6 +606,7 @@ export function ProfileScreen() {
           <ProfileMetric label="Recovery start" value={recoveryStart} />
         </View>
 
+        {/* ── Recovery details ── */}
         <View style={{ marginTop: spacing.xxl }}>
           <SectionTitle title="Recovery details" />
           <FlatGroup>
@@ -561,6 +627,8 @@ export function ProfileScreen() {
           </FlatGroup>
         </View>
 
+
+        {/* ── Recovery reason ── */}
         <View style={{ marginTop: spacing.xxl }}>
           <SectionTitle title="Recovery reason" />
           {editingReason ? (
@@ -630,29 +698,91 @@ export function ProfileScreen() {
           )}
         </View>
 
+        {/* ── Triggers ── */}
         <View style={{ marginTop: spacing.xxl }}>
-          <SectionTitle title="Triggers" trailing={`${selectedTriggerCount} selected`} />
+          <SectionTitle
+            title="Triggers"
+            trailing={`${selectedTriggerCount} selected${triggersDirty ? ' · unsaved' : ''}`}
+          />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             {triggerOptions.map((trigger) => {
-              const active = profile.triggers.includes(trigger);
+              const active = triggersDraft.includes(trigger);
               return (
                 <TriggerOption
                   key={trigger}
                   label={trigger}
                   active={active}
-                  onPress={() =>
-                    update({
-                      triggers: active
-                        ? profile.triggers.filter((value) => value !== trigger)
-                        : [...profile.triggers, trigger],
-                    })
-                  }
+                  onPress={() => toggleTriggerDraft(trigger)}
                 />
               );
             })}
           </View>
+
+          {/* Save / Discard row — only visible when dirty */}
+          {triggersDirty && (
+            <Reanimated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              style={{
+                flexDirection: 'row',
+                gap: spacing.sm,
+                marginTop: spacing.md,
+              }}
+            >
+              {/* Discard button */}
+              <Pressable
+                onPress={discardTriggers}
+                accessibilityRole="button"
+                accessibilityLabel="Discard trigger changes"
+                style={({ pressed }) => ({
+                  flex: 1,
+                  minHeight: 48,
+                  borderRadius: radius.button,
+                  borderWidth: 1,
+                  borderColor: theme.color.hairline,
+                  backgroundColor: pressed ? theme.color.surfaceAlt : theme.color.surface,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Text variant="callout" color={theme.color.textDim}>Discard</Text>
+              </Pressable>
+
+              {/* Save button */}
+              <Pressable
+                onPress={saveTriggers}
+                disabled={savingTriggers}
+                accessibilityRole="button"
+                accessibilityLabel="Save trigger changes"
+                style={({ pressed }) => ({
+                  flex: 2,
+                  minHeight: 48,
+                  borderRadius: radius.button,
+                  backgroundColor: theme.color.primary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: spacing.sm,
+                  opacity: pressed || savingTriggers ? 0.75 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
+              >
+                {savingTriggers ? (
+                  <ActivityIndicator size="small" color={theme.color.onPrimary} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={18} color={theme.color.onPrimary} />
+                    <Text variant="callout" color={theme.color.onPrimary}>Save triggers</Text>
+                  </>
+                )}
+              </Pressable>
+            </Reanimated.View>
+          )}
         </View>
 
+
+        {/* ── Appearance ── */}
         <View style={{ marginTop: spacing.xxl }}>
           <SectionTitle title="Appearance" />
           <View
@@ -680,6 +810,7 @@ export function ProfileScreen() {
           </View>
         </View>
 
+        {/* ── Backup ── */}
         <View style={{ marginTop: spacing.xxl }}>
           <SectionTitle title="Backup" />
           <FlatGroup>
@@ -688,6 +819,7 @@ export function ProfileScreen() {
           </FlatGroup>
         </View>
 
+        {/* ── Danger zone ── */}
         <View style={{ marginTop: spacing.xxl }}>
           <SectionTitle title="Danger zone" danger />
           <FlatGroup>
@@ -696,6 +828,7 @@ export function ProfileScreen() {
           </FlatGroup>
         </View>
 
+        {/* ── Privacy note ── */}
         <View
           accessible
           accessibilityLabel="Private by design. Everything stays on this device."
@@ -712,6 +845,7 @@ export function ProfileScreen() {
         </Text>
       </Screen>
 
+      {/* ── Confirmation modal ── */}
       <Modal
         visible={modal !== null}
         transparent
@@ -788,6 +922,7 @@ export function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* ── Toast ── */}
       {toast && modal === null && (
         <Animated.View
           pointerEvents="none"
@@ -824,6 +959,7 @@ export function ProfileScreen() {
   );
 }
 
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -855,10 +991,7 @@ function ReadRow({
         borderTopColor: theme.color.hairline,
       }}
     >
-      <View
-        accessible={false}
-        style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}
-      >
+      <View accessible={false} style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
         <Ionicons name={icon} size={19} color={theme.color.primary} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -954,7 +1087,6 @@ function IconAction({
     : tone === 'neutral'
       ? theme.color.textDim
       : theme.color.primary;
-
   return (
     <Pressable
       onPress={onPress}
@@ -974,6 +1106,7 @@ function IconAction({
     </Pressable>
   );
 }
+
 
 function TriggerOption({
   label,

@@ -113,22 +113,27 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
   const isPornClean  = entry.watched === false;
   // Whether this is a porn-type entry at all
   const isPornEntry  = entry.watched !== undefined;
+  // Social media entry detection
+  const isBinged      = entry.binged === true;
+  const isSocialClean = entry.binged === false;
 
   const accent =
-    isGamble || isWatched ? theme.color.danger :
-    isClean || isPornClean ? theme.color.success :
+    isGamble || isWatched || isBinged ? theme.color.danger :
+    isClean || isPornClean || isSocialClean ? theme.color.success :
     theme.color.primary;
 
   const statusLabel =
-    isGamble    ? 'Gambled' :
-    isClean     ? 'Clean day' :
-    isWatched   ? 'Relapse' :
-    isPornClean ? 'Clean day' :
+    isGamble      ? 'Gambled' :
+    isClean       ? 'Clean day' :
+    isWatched     ? 'Relapse' :
+    isPornClean   ? 'Clean day' :
+    isBinged      ? 'Relapse' :
+    isSocialClean ? 'Clean day' :
     'Entry';
 
   const statusIcon =
-    isGamble || isWatched   ? 'alert-circle' :
-    isClean  || isPornClean ? 'checkmark-circle' :
+    isGamble || isWatched || isBinged          ? 'alert-circle' :
+    isClean  || isPornClean || isSocialClean   ? 'checkmark-circle' :
     'document-text-outline';
 
   const dateStr = new Date(entry.at).toLocaleDateString('en-PH', {
@@ -157,7 +162,9 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
 
   const hasText = entry.text &&
     entry.text !== 'Gambling relapse recorded.' &&
-    entry.text !== 'Clean day recorded.';
+    entry.text !== 'Clean day recorded.' &&
+    entry.text !== 'Social media binge recorded.' &&
+    entry.text !== 'Relapse recorded.';
 
   // The recovery-adjusted balance: raw balance minus the wager on a losing
   // day (wins are never added). This is the figure the app tracks everywhere.
@@ -363,6 +370,34 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
               {entry.watched === true && entry.feelingNow && (
                 <DetailRow icon="happy-outline" color={theme.color.primary} label="Feeling now" value={entry.feelingNow} />
               )}
+
+              {/* ── Social media clean-day rows ── */}
+              {entry.binged === false && entry.socialUrgeIntensity != null && (
+                <DetailRow icon="pulse-outline" color={theme.color.celebrate} label="Urge" value={`${entry.socialUrgeIntensity}/10`} />
+              )}
+              {entry.binged === false && entry.socialTriggersEncountered != null && entry.socialTriggersEncountered.length > 0 && (
+                <DetailRow icon="warning-outline" color={theme.color.textDim} label="Triggers" value={entry.socialTriggersEncountered.join(', ')} />
+              )}
+              {entry.binged === false && entry.socialWhatHelped && (
+                <DetailRow icon="shield-checkmark-outline" color={theme.color.success} label="Helped" value={entry.socialWhatHelped} />
+              )}
+
+              {/* ── Social media binge rows ── */}
+              {entry.binged === true && entry.bingeDuration && (
+                <DetailRow icon="time-outline" color={theme.color.textDim} label="Duration" value={entry.bingeDuration} />
+              )}
+              {entry.binged === true && entry.bingedPlatforms != null && entry.bingedPlatforms.length > 0 && (
+                <DetailRow icon="phone-portrait-outline" color={theme.color.textDim} label="Platforms" value={entry.bingedPlatforms.join(', ')} />
+              )}
+              {entry.binged === true && entry.bingeEmotions != null && entry.bingeEmotions.length > 0 && (
+                <DetailRow icon="heart-outline" color={theme.color.danger} label="Emotions" value={entry.bingeEmotions.join(', ')} />
+              )}
+              {entry.binged === true && entry.bingeTrigger && (
+                <DetailRow icon="warning-outline" color={theme.color.danger} label="Trigger" value={entry.bingeTrigger} />
+              )}
+              {entry.binged === true && entry.bingeNextTimePlan && (
+                <DetailRow icon="bulb-outline" color={theme.color.primary} label="Next time" value={entry.bingeNextTimePlan} />
+              )}
             </View>
           )}
         </Animated.View>
@@ -546,6 +581,7 @@ export function JournalScreen() {
 
   const isGambling = profile?.addictionType === 'gambling';
   const isPorn     = profile?.addictionType === 'pornography';
+  const isSocial   = profile?.addictionType === 'social_media';
 
   const [query, setQuery]         = useState('');
   const [filter, setFilter]       = useState<Filter>('all');
@@ -565,6 +601,7 @@ export function JournalScreen() {
   // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const isPorn = profile?.addictionType === 'pornography';
+    const isSocial = profile?.addictionType === 'social_media';
     const total    = entries.length;
     // Gambling stats
     const clean    = entries.filter((e) => e.gambled === false).length;
@@ -572,11 +609,14 @@ export function JournalScreen() {
     // Porn stats
     const pornClean    = entries.filter((e) => e.watched === false).length;
     const pornRelapses = entries.filter((e) => e.watched === true).length;
+    // Social media stats
+    const socialClean    = entries.filter((e) => e.binged === false).length;
+    const socialRelapses = entries.filter((e) => e.binged === true).length;
     const withMood = entries.filter((e) => e.mood != null);
     const avgMood  = withMood.length
       ? Math.round(withMood.reduce((s, e) => s + (e.mood ?? 0), 0) / withMood.length * 10) / 10
       : null;
-    return { total, clean, relapses, pornClean, pornRelapses, avgMood };
+    return { total, clean, relapses, pornClean, pornRelapses, socialClean, socialRelapses, avgMood };
   }, [entries, profile]);
 
   // ── Filtered + sorted entries ─────────────────────────────────────────────
@@ -613,6 +653,10 @@ export function JournalScreen() {
         if (isPorn) {
           if (filter === 'clean'   && e.watched !== false) return false;
           if (filter === 'watched' && e.watched !== true)  return false;
+        }
+        if (isSocial) {
+          if (filter === 'clean'   && e.binged !== false) return false;
+          if (filter === 'gambled' && e.binged !== true)  return false;
         }
         // Search
         if (query && !e.text.toLowerCase().includes(query.toLowerCase())) return false;
@@ -667,7 +711,7 @@ export function JournalScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            router.push(isPorn ? '/porn-journal-entry' : '/journal-entry');
+            router.push(isPorn ? '/porn-journal-entry' : isSocial ? '/social-journal-entry' : '/journal-entry');
           }}
           accessibilityRole="button"
           accessibilityLabel="Write new entry"
@@ -686,18 +730,18 @@ export function JournalScreen() {
       {searching && <SearchBar query={query} onChange={setQuery} />}
 
       {/* ── Stats: three compact tiles, only when there are entries ── */}
-      {(isGambling || isPorn) && entries.length > 0 && (
+      {(isGambling || isPorn || isSocial) && entries.length > 0 && (
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
           <StatCard
             icon="checkmark-circle"
-            value={isGambling ? stats.clean : stats.pornClean}
+            value={isGambling ? stats.clean : isPorn ? stats.pornClean : stats.socialClean}
             label="Clean"
             color={theme.color.success}
             delay={0}
           />
           <StatCard
             icon="alert-circle"
-            value={isGambling ? stats.relapses : stats.pornRelapses}
+            value={isGambling ? stats.relapses : isPorn ? stats.pornRelapses : stats.socialRelapses}
             label="Relapses"
             color={theme.color.danger}
             delay={60}
