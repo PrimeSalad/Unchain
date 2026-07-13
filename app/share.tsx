@@ -26,7 +26,7 @@ import {
   saveToPhotosMessage,
   shareCapturedContent,
 } from '@/application/shareMedia';
-import { streakDays, moneySaved, formatMoney, addictionMeta, currentStreakStart } from '@/domain/gambling';
+import { DEFAULT_CURRENCY, streakDays, moneySaved, formatMoney, addictionMeta, currentStreakStart } from '@/domain/gambling';
 import { computeStats, badgeProgress } from '@/domain/achievements';
 
 const SHARE_MILESTONES = [1, 7, 30, 90, 365] as const;
@@ -56,7 +56,7 @@ export default function ShareCard() {
   const streakStart = currentStreakStart(profile.startedAt, store.relapses, store.journal);
   const days = streakDays(streakStart);
   const money = moneySaved({ ...profile, startedAt: streakStart });
-  const currency = profile.currency ?? '₱';
+  const currency = profile.currency ?? DEFAULT_CURRENCY;
   const freeLabel = addictionMeta(profile.addictionType).freeLabel;
   const stats = computeStats({
     profile,

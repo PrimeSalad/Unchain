@@ -9,12 +9,16 @@ import { Button } from '../components/Button';
 import { Pill } from '../components/Pill';
 import { Mascot } from '../components/Mascot';
 import { ProgressBar } from '../components/ProgressBar';
-import { radius, spacing } from '../theme/tokens';
+import { fonts, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import {
   ADDICTIONS,
+  DEFAULT_CURRENCY,
+  SUPPORTED_CURRENCIES,
   addictionMeta,
+  formatMoneyInput,
+  parseMoneyInput,
   TRIGGERS,
   type AddictionType,
   type ExpensePeriod,
@@ -61,6 +65,7 @@ export function OnboardingScreen() {
   const [detail, setDetail] = useState('');
   const [daysAgo, setDaysAgo] = useState(0);
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [period, setPeriod] = useState<ExpensePeriod>('weekly');
   const [triggers, setTriggers] = useState<string[]>([]);
   const [reason, setReason] = useState('');
@@ -82,6 +87,7 @@ export function OnboardingScreen() {
     setTriggers((c) => (c.includes(t) ? c.filter((x) => x !== t) : [...c, t]));
 
   const finish = () => {
+    const expenseAmount = meta && !meta.hasExpense ? 0 : Math.round(parseMoneyInput(amount));
     complete({
       name: nickname.trim() || 'Friend',
       age: age ? parseInt(age, 10) : undefined,
@@ -91,9 +97,9 @@ export function OnboardingScreen() {
       // e.g. daysAgo=6, today=July 7  →  startedAt = July 1 @ 00:00 local.
       // This makes calendar math exact - no fractional-day drift.
       startedAt: localMidnightDaysAgo(daysAgo),
-      expenseAmount: meta && !meta.hasExpense ? 0 : parseInt(amount, 10) || 0,
+      expenseAmount,
       expensePeriod: period,
-      currency: '₱',
+      currency,
       triggers,
       reason: reason.trim(),
     });
@@ -113,7 +119,7 @@ export function OnboardingScreen() {
   } as const;
 
   return (
-    <Screen edges={['top', 'bottom']} scroll={step === 'type' || step === 'specific' || step === 'triggers'}>
+    <Screen edges={['top', 'bottom']} scroll={step === 'type' || step === 'specific' || step === 'expense' || step === 'triggers'}>
       {/* Top bar: circular back button + progress + step counter */}
       {index > 0 && (
         <View style={{
@@ -298,35 +304,155 @@ export function OnboardingScreen() {
 
       {/* ── Expense ─────────────────────────────────────────────────────── */}
       {step === 'expense' && (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <Text variant="title1">How much did you spend?</Text>
-          <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
-            An estimate is fine - it powers your money-saved counter.
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <Text variant="title1">₱</Text>
-            <TextInput
-              value={amount}
-              onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
-              placeholder="0"
-              placeholderTextColor={theme.color.textDim}
-              keyboardType="number-pad"
-              style={[inputStyle, { flex: 1 }]}
-            />
+        <View style={{ gap: spacing.xl }}>
+          <View style={{ alignItems: 'center', alignSelf: 'center', width: '100%', maxWidth: 430 }}>
+            <Text variant="title1" center>How much did you spend?</Text>
+            <Text variant="body" dim center style={{ marginTop: spacing.sm, lineHeight: 24 }}>
+              Use your average spend. This powers your money-saved counter.
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg }}>
-            {PERIODS.map((p) => (
-              <Pill
-                key={p}
-                label={p[0].toUpperCase() + p.slice(1)}
-                active={period === p}
-                onPress={() => setPeriod(p)}
-              />
-            ))}
+
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 430,
+              alignSelf: 'center',
+              borderRadius: radius.card,
+              backgroundColor: theme.color.surface,
+              borderWidth: 1,
+              borderColor: theme.color.hairline,
+              padding: spacing.lg,
+              gap: spacing.lg,
+            }}
+          >
+            <View style={{ gap: spacing.sm }}>
+              <Text variant="footnote" dim center>Average spend</Text>
+              <View
+                style={{
+                  minHeight: 76,
+                  borderRadius: radius.card,
+                  backgroundColor: theme.color.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: theme.color.hairline,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: spacing.md,
+                  gap: spacing.md,
+                }}
+              >
+                <View
+                  style={{
+                    width: 54,
+                    height: 54,
+                    borderRadius: 18,
+                    backgroundColor: theme.color.primary,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                </View>
+                <TextInput
+                  value={amount}
+                  onChangeText={(t) => setAmount(formatMoneyInput(t))}
+                  placeholder="0"
+                  placeholderTextColor={theme.color.textDim}
+                  keyboardType="number-pad"
+                  accessibilityLabel="Average spend amount"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    color: theme.color.text,
+                    fontSize: 34,
+                    lineHeight: 40,
+                    fontFamily: fonts.displayHeavy,
+                    paddingVertical: spacing.sm,
+                  }}
+                />
+              </View>
+            </View>
+
+            <View
+              accessibilityRole="radiogroup"
+              accessibilityLabel="Spending period"
+              style={{
+                flexDirection: 'row',
+                padding: spacing.xs,
+                borderRadius: radius.round,
+                backgroundColor: theme.color.surfaceAlt,
+                gap: spacing.xs,
+              }}
+            >
+              {PERIODS.map((p) => {
+                const active = period === p;
+                return (
+                  <Pressable
+                    key={p}
+                    onPress={() => setPeriod(p)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
+                    accessibilityLabel={`${p} spend`}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      minHeight: 44,
+                      borderRadius: radius.round,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: active ? theme.color.primary : 'transparent',
+                      opacity: pressed ? 0.75 : 1,
+                    })}
+                  >
+                    <Text variant="footnote" color={active ? theme.color.onPrimary : theme.color.textDim}>
+                      {p[0].toUpperCase() + p.slice(1)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-          <View style={{ flex: 1 }} />
+
+          <View style={{ width: '100%', maxWidth: 430, alignSelf: 'center', gap: spacing.sm }}>
+            <Text variant="footnote" dim center>Currency</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+              {SUPPORTED_CURRENCIES.map((option) => {
+                const active = currency === option.symbol;
+                return (
+                  <Pressable
+                    key={option.code}
+                    onPress={() => setCurrency(option.symbol)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${option.label}, ${option.code}`}
+                    accessibilityState={{ selected: active }}
+                    style={({ pressed }) => ({
+                      width: '30.5%',
+                      minWidth: 86,
+                      minHeight: 52,
+                      borderRadius: radius.input,
+                      borderWidth: 1,
+                      borderColor: active ? theme.color.primary : theme.color.hairline,
+                      backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: spacing.sm,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.72 : 1,
+                    })}
+                  >
+                    <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>
+                      {option.symbol}
+                    </Text>
+                    <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>
+                      {option.code}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
           <Button label="Continue" onPress={next} disabled={!amount} full />
-        </KeyboardAvoidingView>
+        </View>
       )}
 
       {/* ── Triggers ────────────────────────────────────────────────────── */}

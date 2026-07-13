@@ -863,12 +863,13 @@ export const useStore = create<RecoveryState>()(
         if (newlyIds.length === 0 && newlyGoals.length === 0) return [];
 
         const title = (id: string) => BADGES.find((b) => b.id === id)?.title ?? id;
+        const currency = s.profile.currency;
         set({
           celebratedBadges: [...s.celebratedBadges, ...newlyIds],
           goals,
           timeline: [
             ...newlyIds.map((id) => evt('achievement', `Badge earned - ${title(id)}`)),
-            ...newlyGoals.map((g) => evt('milestone', `Goal reached - ${goalTitle(g)}`)),
+            ...newlyGoals.map((g) => evt('milestone', `Goal reached - ${goalTitle(g, currency)}`)),
             ...s.timeline,
           ],
         });

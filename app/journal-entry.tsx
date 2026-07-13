@@ -33,6 +33,7 @@ import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile, useTodayJournal } from '@/application/store';
+import { DEFAULT_CURRENCY, formatMoney, formatMoneyInput, parseMoneyInput } from '@/domain/gambling';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step types
@@ -165,25 +166,9 @@ function YesNoToggle({
 // Displays with comma formatting (e.g. 1,000) while storing raw digits only.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Re-format a typed string with thousand-separator commas as the user types.
- * Accepts the raw text coming from onChangeText (may contain commas already).
- * Returns the formatted display string, e.g. "1000" → "1,000".
- * The formatted string is also stored as state so the input value always
- * matches what is displayed — this prevents cursor-jump on Android.
- */
-function applyCommaFormat(input: string): string {
-  // Strip anything that isn't a digit or a decimal point first.
-  const stripped = input.replace(/[^0-9.]/g, '');
-  // Guard against multiple decimal points.
-  const parts = stripped.split('.');
-  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return parts.length > 1 ? `${intPart}.${parts.slice(1).join('')}` : intPart;
-}
-
 /** Strip commas before passing to parseFloat. */
 function numericValue(formatted: string): number {
-  return parseFloat(formatted.replace(/,/g, '')) || 0;
+  return parseMoneyInput(formatted);
 }
 
 function AmountInput({
@@ -204,7 +189,7 @@ function AmountInput({
       <Text variant="title1">{currency}</Text>
       <TextInput
         value={value}
-        onChangeText={(t) => onChange(applyCommaFormat(t))}
+        onChangeText={(t) => onChange(formatMoneyInput(t, true))}
         placeholder="0"
         placeholderTextColor={theme.color.textDim}
         keyboardType="decimal-pad"
@@ -352,7 +337,7 @@ export default function JournalEntry() {
   const safeBack   = useSafeBack('/(tabs)/journal');
   const profile    = useProfile();
   const addJournal = useStore((s) => s.addJournal);
-  const currency   = profile?.currency ?? '₱';
+  const currency   = profile?.currency ?? DEFAULT_CURRENCY;
   const insets     = useSafeAreaInsets();
   const isGambling = profile?.addictionType === 'gambling';
 
@@ -705,20 +690,20 @@ export default function JournalEntry() {
                 <SummaryRow icon={gambled ? 'alert-circle-outline' : 'checkmark-circle-outline'} iconColor={gambled ? theme.color.danger : theme.color.success} label="Today" value={gambled ? 'Relapse' : 'Clean day'} />
               )}
               {moneyBalance !== '' && (
-                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={`${currency}${numericValue(moneyBalance).toLocaleString()}`} />
+                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={formatMoney(numericValue(moneyBalance), currency)} />
               )}
               {gambled === true && amountWagered !== '' && (
-                <SummaryRow icon="card-outline" iconColor={theme.color.textDim} label="Wagered" value={`${currency}${numericValue(amountWagered).toLocaleString()}`} />
+                <SummaryRow icon="card-outline" iconColor={theme.color.textDim} label="Wagered" value={formatMoney(numericValue(amountWagered), currency)} />
               )}
               {gambled === true && lost != null && (
-                <SummaryRow icon={lost ? 'trending-down-outline' : 'trending-up-outline'} iconColor={lost ? theme.color.danger : theme.color.success} label="Result" value={lost ? `Lost ${currency}${numericValue(amountLost || '0').toLocaleString()}` : 'No net loss'} />
+                <SummaryRow icon={lost ? 'trending-down-outline' : 'trending-up-outline'} iconColor={lost ? theme.color.danger : theme.color.success} label="Result" value={lost ? `Lost ${formatMoney(numericValue(amountLost || '0'), currency)}` : 'No net loss'} />
               )}
               {adjustedBalance != null && (
                 <SummaryRow
                   icon="wallet-outline"
                   iconColor={theme.color.danger}
                   label="Tracked"
-                  value={`${currency}${adjustedBalance.toLocaleString()} after lost wager`}
+                  value={`${formatMoney(adjustedBalance, currency)} after lost wager`}
                 />
               )}
               {gambled === true && whyLabel && (

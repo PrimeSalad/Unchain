@@ -14,16 +14,8 @@ import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useTodayCheckIn, useProfile } from '@/application/store';
-import { TRIGGERS, addictionMeta } from '@/domain/gambling';
+import { DEFAULT_CURRENCY, TRIGGERS, addictionMeta, formatMoneyInput } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
-
-/** Re-format a typed string with thousand-separator commas as the user types. */
-function applyCommaFormat(input: string): string {
-  const stripped = input.replace(/[^0-9.]/g, '');
-  const parts = stripped.split('.');
-  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return parts.length > 1 ? `${intPart}.${parts.slice(1).join('')}` : intPart;
-}
 
 export default function CheckIn() {
   const theme = useTheme();
@@ -213,8 +205,8 @@ export default function CheckIn() {
                   {/* Comma-formatted as you type; raw numeric value extracted on save */}
                   <TextInput
                     value={amount}
-                    onChangeText={(t) => setAmount(applyCommaFormat(t))}
-                    placeholder={`${profile?.currency ?? '₱'}0`}
+                    onChangeText={(t) => setAmount(formatMoneyInput(t))}
+                    placeholder={`${profile?.currency ?? DEFAULT_CURRENCY}0`}
                     placeholderTextColor={theme.color.textDim}
                     keyboardType="number-pad"
                     underlineColorAndroid="transparent"

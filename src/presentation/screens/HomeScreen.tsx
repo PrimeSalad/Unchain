@@ -15,6 +15,7 @@ import { useNow } from '../hooks/useNow';
 import { useResponsive } from '../hooks/useResponsive';
 import { useStore, useProfile } from '@/application/store';
 import {
+  DEFAULT_CURRENCY,
   streakDays,
   currentStreakStart,
   recoveryTimer,
@@ -83,7 +84,7 @@ export function HomeScreen() {
   // gambling losses are subtracted from the entered balance, gambling wins
   // are never added. Neither fact changes the streak or calendar.
   const moneyStats = journalMoneyStats(journal);
-  const currency = profile?.currency ?? '₱';
+  const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const managedUrges = Math.max(recordedUrges, urgesResisted);
 
   // Auto-complete the daily_log mission the moment a journal entry exists

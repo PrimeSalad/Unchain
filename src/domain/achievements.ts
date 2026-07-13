@@ -7,7 +7,7 @@
  */
 
 import type { RecoveryProfile } from './gambling';
-import { streakDays, currentStreakStart, moneySaved } from './gambling';
+import { DEFAULT_CURRENCY, formatMoney, streakDays, currentStreakStart, moneySaved } from './gambling';
 import type {
   DailyCheckIn,
   JournalEntry,
@@ -139,9 +139,9 @@ export const BADGES: Badge[] = [
   { id: 'tool-10', title: 'Grounded',  desc: 'Used calming tools 10 times',  icon: 'flower',       category: 'tools', metric: (s) => ({ value: s.toolSessions, target: 10 }) },
 
   // Money
-  { id: 'save-1k',  title: '₱1,000 Kept',   desc: 'Saved your first ₱1,000',  icon: 'cash',        category: 'money', metric: (s) => ({ value: s.moneyTotal, target: 1000 }) },
-  { id: 'save-10k', title: '₱10,000 Kept',  desc: 'Saved ₱10,000',            icon: 'wallet',      category: 'money', metric: (s) => ({ value: s.moneyTotal, target: 10000 }) },
-  { id: 'save-50k', title: '₱50,000 Kept',  desc: 'Saved ₱50,000',            icon: 'diamond',     category: 'money', metric: (s) => ({ value: s.moneyTotal, target: 50000 }) },
+  { id: 'save-1k',  title: '1,000 Kept',   desc: 'Saved your first 1,000',  icon: 'cash',        category: 'money', metric: (s) => ({ value: s.moneyTotal, target: 1000 }) },
+  { id: 'save-10k', title: '10,000 Kept',  desc: 'Saved 10,000',            icon: 'wallet',      category: 'money', metric: (s) => ({ value: s.moneyTotal, target: 10000 }) },
+  { id: 'save-50k', title: '50,000 Kept',  desc: 'Saved 50,000',            icon: 'diamond',     category: 'money', metric: (s) => ({ value: s.moneyTotal, target: 50000 }) },
 ];
 
 export function badgeProgress(stats: RecoveryStats): BadgeProgress[] {
@@ -172,7 +172,7 @@ export interface Goal {
 
 export const GOAL_META: Record<GoalKind, { label: string; unit: string; icon: string }> = {
   streak:   { label: 'Days free',    unit: 'days',       icon: 'flame' },
-  money:    { label: 'Money saved',  unit: '₱',          icon: 'wallet' },
+  money:    { label: 'Money saved',  unit: 'money',      icon: 'wallet' },
   checkins: { label: 'Check-ins',    unit: 'check-ins',  icon: 'checkmark-done' },
 };
 
@@ -198,8 +198,8 @@ export function goalProgress(goal: Goal, stats: RecoveryStats): { value: number;
   return { value, pct, done: value >= goal.target };
 }
 
-export function goalTitle(goal: Goal): string {
-  if (goal.kind === 'money') return `Save ₱${goal.target.toLocaleString('en-PH')}`;
+export function goalTitle(goal: Goal, currency = DEFAULT_CURRENCY): string {
+  if (goal.kind === 'money') return `Save ${formatMoney(goal.target, currency)}`;
   if (goal.kind === 'streak') return `Reach ${goal.target} days free`;
   return `Log ${goal.target} check-ins`;
 }

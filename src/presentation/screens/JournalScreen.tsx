@@ -29,7 +29,7 @@ import { Text } from '../components/Text';
 import { elevation, spacing, radius, palette, motion } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
-import { recoveryAdjustedBalance } from '@/domain/gambling';
+import { DEFAULT_CURRENCY, recoveryAdjustedBalance } from '@/domain/gambling';
 import type { JournalEntry } from '@/domain/records';
 
 // Enable layout animation on Android
@@ -844,7 +844,7 @@ export function JournalScreen() {
           </View>
           <View style={{ gap: spacing.md }}>
             {filtered.map((e, i) => (
-              <EntryCard key={e.id} entry={e} index={i} currency={profile?.currency ?? '₱'} />
+              <EntryCard key={e.id} entry={e} index={i} currency={profile?.currency ?? DEFAULT_CURRENCY} />
             ))}
             <View style={{ height: spacing.xl }} />
           </View>

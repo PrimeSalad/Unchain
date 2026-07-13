@@ -68,6 +68,17 @@ export function addictionMeta(k: AddictionType): AddictionMeta {
 
 export type ExpensePeriod = 'daily' | 'weekly' | 'monthly';
 
+export const DEFAULT_CURRENCY = '₱';
+
+export const SUPPORTED_CURRENCIES = [
+  { symbol: '₱', code: 'PHP', label: 'Philippine Peso' },
+  { symbol: '$', code: 'USD', label: 'US Dollar' },
+  { symbol: '€', code: 'EUR', label: 'Euro' },
+  { symbol: '£', code: 'GBP', label: 'British Pound' },
+  { symbol: '¥', code: 'JPY', label: 'Japanese Yen' },
+  { symbol: '₹', code: 'INR', label: 'Indian Rupee' },
+] as const;
+
 export const TRIGGERS = [
   'Stress',
   'Boredom',
@@ -181,7 +192,19 @@ export function moneySaved(p: RecoveryProfile, now = Date.now()): MoneySaved {
   };
 }
 
-export function formatMoney(amount: number, currency = '₱'): string {
+export function formatMoneyInput(input: string, allowDecimal = false): string {
+  const stripped = input.replace(allowDecimal ? /[^0-9.]/g : /[^0-9]/g, '');
+  const parts = stripped.split('.');
+  const intPart = (parts[0] || '').replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (!allowDecimal || parts.length === 1) return intPart;
+  return `${intPart}.${parts.slice(1).join('').slice(0, 2)}`;
+}
+
+export function parseMoneyInput(input: string): number {
+  return parseFloat(input.replace(/,/g, '')) || 0;
+}
+
+export function formatMoney(amount: number, currency = DEFAULT_CURRENCY): string {
   const n = Math.round(amount);
   // Sign before the currency symbol: -₱500, never ₱-500.
   return (n < 0 ? '-' : '') + currency + Math.abs(n).toLocaleString('en-PH');

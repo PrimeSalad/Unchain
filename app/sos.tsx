@@ -12,7 +12,7 @@ import { useReliableSafeAreaInsets } from '@/presentation/hooks/useReliableSafeA
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useProfile, useStore } from '@/application/store';
-import { recoveryTimer, journalMoneyStats, formatMoney, currentStreakStart, type AddictionType } from '@/domain/gambling';
+import { DEFAULT_CURRENCY, recoveryTimer, journalMoneyStats, formatMoney, currentStreakStart, type AddictionType } from '@/domain/gambling';
 import { QUOTES } from '@/domain/quotes';
 
 const GLASS = 'rgba(255,255,255,0.07)';
@@ -218,7 +218,7 @@ export default function Sos() {
   const secondaryAnchor = profile && profile.addictionType !== 'gambling'
     ? recoveryAnchor(profile.addictionType, urgesResisted, healthyHabits)
     : null;
-  const currency = profile?.currency ?? '₱';
+  const currency = profile?.currency ?? DEFAULT_CURRENCY;
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.night }}>

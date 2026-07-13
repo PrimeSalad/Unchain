@@ -13,7 +13,16 @@ import { RecoveryInsightsSection } from '../components/RecoveryInsightsSection';
 import { elevation, spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
-import { streakDays, currentStreakStart, journalMoneyStats, formatMoney, nextMilestone } from '@/domain/gambling';
+import {
+  DEFAULT_CURRENCY,
+  streakDays,
+  currentStreakStart,
+  journalMoneyStats,
+  formatMoney,
+  formatMoneyInput,
+  parseMoneyInput,
+  nextMilestone,
+} from '@/domain/gambling';
 import { sameDay } from '@/domain/records';
 import {
   computeStats,
@@ -92,7 +101,7 @@ export function ProgressScreen() {
   // are never added - a win can never improve these figures, achievements,
   // or the streak.
   const moneyStats = journalMoneyStats(journal);
-  const currency = profile?.currency ?? '₱';
+  const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const resisted = urges.filter((u) => u.resisted).length;
 
   // Porn-specific journal stats - computed only when needed.
@@ -406,6 +415,7 @@ export function ProgressScreen() {
       <AddGoalModal
         visible={goalModal}
         existing={goals}
+        currency={currency}
         onClose={() => setGoalModal(false)}
         onAdd={(kind, target) => {
           addGoal(kind, target);
@@ -432,14 +442,15 @@ function GoalCard({
   const meta = GOAL_META[goal.kind];
   const p = stats ? goalProgress(goal, stats) : { value: 0, pct: 0, done: false };
   const fmt = (n: number) => (goal.kind === 'money' ? formatMoney(n, currency) : `${n}`);
+  const title = goalTitle(goal, currency);
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
         <View style={{ width: 34, height: 34, borderRadius: radius.round, backgroundColor: p.done ? theme.color.successSoft : theme.color.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name={(p.done ? 'checkmark' : meta.icon) as any} size={18} color={p.done ? theme.color.success : theme.color.primary} />
         </View>
-        <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }}>{goalTitle(goal)}</Text>
-        <Pressable onPress={onRemove} hitSlop={14} accessibilityRole="button" accessibilityLabel={`Remove goal: ${goalTitle(goal)}`}>
+        <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }}>{title}</Text>
+        <Pressable onPress={onRemove} hitSlop={14} accessibilityRole="button" accessibilityLabel={`Remove goal: ${title}`}>
           <Ionicons name="close" size={18} color={theme.color.textDim} />
         </Pressable>
       </View>
@@ -557,10 +568,11 @@ function BadgeTile({ badge }: { badge: ReturnType<typeof badgeProgress>[number] 
 }
 
 function AddGoalModal({
-  visible, existing, onClose, onAdd,
+  visible, existing, currency, onClose, onAdd,
 }: {
   visible: boolean;
   existing: Goal[];
+  currency: string;
   onClose: () => void;
   onAdd: (kind: GoalKind, target: number) => void;
 }) {
@@ -569,6 +581,7 @@ function AddGoalModal({
   const [custom, setCustom] = useState('');
 
   const hasGoal = (k: GoalKind, t: number) => existing.some((g) => g.kind === k && g.target === t);
+  const customTarget = Math.round(parseMoneyInput(custom));
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -596,7 +609,7 @@ function AddGoalModal({
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm }}>
             {GOAL_PRESETS.map((g) => {
               const label =
-                g.kind === 'money' ? `Save ₱${g.target.toLocaleString('en-PH')}`
+                g.kind === 'money' ? `Save ${formatMoney(g.target, currency)}`
                 : g.kind === 'streak' ? `${g.target} days`
                 : `${g.target} check-ins`;
               const taken = hasGoal(g.kind, g.target);
@@ -633,9 +646,9 @@ function AddGoalModal({
           <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
             <TextInput
               value={custom}
-              onChangeText={(t) => setCustom(t.replace(/[^0-9]/g, ''))}
+              onChangeText={(t) => setCustom(formatMoneyInput(t))}
               keyboardType="number-pad"
-              placeholder={kind === 'money' ? 'Amount in ₱' : 'Target number'}
+              placeholder={kind === 'money' ? `Amount in ${currency}` : 'Target number'}
               placeholderTextColor={theme.color.textDim}
               style={{
                 flex: 1, borderRadius: radius.input, backgroundColor: theme.color.surfaceAlt,
@@ -643,14 +656,14 @@ function AddGoalModal({
               }}
             />
             <Pressable
-              disabled={!custom || parseInt(custom, 10) <= 0}
-              onPress={() => { onAdd(kind, parseInt(custom, 10)); setCustom(''); }}
+              disabled={!custom || customTarget <= 0}
+              onPress={() => { onAdd(kind, customTarget); setCustom(''); }}
               accessibilityRole="button"
               accessibilityLabel="Add custom goal"
               style={{
                 paddingHorizontal: spacing.xl, height: 48, borderRadius: radius.button,
                 backgroundColor: theme.color.primary, alignItems: 'center', justifyContent: 'center',
-                opacity: !custom || parseInt(custom, 10) <= 0 ? 0.4 : 1,
+                opacity: !custom || customTarget <= 0 ? 0.4 : 1,
               }}
             >
               <Text variant="headline" color={theme.color.onPrimary}>Add</Text>

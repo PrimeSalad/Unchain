@@ -8,7 +8,7 @@ import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
 import { playSound, setCalmMusicPaused, startCalmMusic, stopCalmMusic } from '@/application/sound';
-import { moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
+import { DEFAULT_CURRENCY, moneySaved, formatMoney, currentStreakStart } from '@/domain/gambling';
 import { BREATHING_TIPS } from '@/domain/content';
 
 const DURATIONS = [5, 10, 15, 20, 30];
@@ -44,7 +44,7 @@ export default function MindfulPause() {
   const money = profile
     ? moneySaved({ ...profile, startedAt: currentStreakStart(profile.startedAt, relapses, journal) })
     : ({ total: 0 } as ReturnType<typeof moneySaved>);
-  const currency = profile?.currency ?? '₱';
+  const currency = profile?.currency ?? DEFAULT_CURRENCY;
 
   // Countdown - driven by the wall clock so time spent backgrounded counts.
   useEffect(() => {

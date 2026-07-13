@@ -19,7 +19,7 @@ import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile, initialGames } from '@/application/store';
 import { shareCapturedContent } from '@/application/shareMedia';
-import { streakDays, addictionMeta, TRIGGERS, currentStreakStart } from '@/domain/gambling';
+import { DEFAULT_CURRENCY, formatMoney, streakDays, addictionMeta, TRIGGERS, currentStreakStart } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
 const BACKUP_MARKER = 'unchainly-backup';
@@ -101,7 +101,8 @@ export function ProfileScreen() {
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
     .slice(0, 2) || 'U';
-  const formatPeso = (value: number) => `₱${Math.max(0, Math.round(value)).toLocaleString('en-PH')}`;
+  const currency = profile.currency ?? DEFAULT_CURRENCY;
+  const formatProfileMoney = (value: number) => formatMoney(Math.max(0, value), currency);
 
   // ── Toast ────────────────────────────────────────────────────────────────
 
@@ -492,7 +493,7 @@ export function ProfileScreen() {
           <View style={{ flexDirection: 'row', gap: spacing.xs }}>
             <ProfileStat label="Streak" value={`${days} days`} first />
             <ProfileStat label="Start" value={new Date(profile.startedAt).toLocaleDateString()} />
-            <ProfileStat label="Expense" value={formatPeso(profile.expenseAmount)} />
+            <ProfileStat label="Expense" value={formatProfileMoney(profile.expenseAmount)} />
           </View>
         </View>
 
@@ -503,9 +504,10 @@ export function ProfileScreen() {
           {profile.addictionDetail ? <ReadRow label="Specifically" value={profile.addictionDetail} /> : null}
           <ReadRow label="Current streak" value={`${days} days`} />
           <ReadRow label="Recovery start" value={new Date(profile.startedAt).toLocaleDateString()} />
+          <ReadRow label="Currency" value={currency} />
           <ReadRow
             label="Average expense"
-            value={`${formatPeso(profile.expenseAmount)} / ${profile.expensePeriod}`}
+            value={`${formatProfileMoney(profile.expenseAmount)} / ${profile.expensePeriod}`}
           />
         </FlatGroup>
 
