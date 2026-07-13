@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import { useReliableSafeAreaInsets } from '../hooks/useReliableSafeAreaInsets';
 import { Text } from './Text';
 
 interface TabBarProps {
@@ -26,7 +26,7 @@ const BAR_MAX_WIDTH = 430;
 /** Floating bar with a raised, center-docked SOS action. Home · Progress | SOS | Journal · Profile. */
 export function TabBar({ state, navigation }: TabBarProps) {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
+  const insets = useReliableSafeAreaInsets();
   const { width } = useWindowDimensions();
   const router = useRouter();
   const activeName = state.routes[state.index]?.name;

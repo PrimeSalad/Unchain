@@ -6,9 +6,10 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
+import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { useResponsive } from '../hooks/useResponsive';
+import { useReliableSafeAreaInsets } from '../hooks/useReliableSafeAreaInsets';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -56,10 +57,16 @@ export function Screen({
 }: ScreenProps) {
   const theme = useTheme();
   const { gutter, contentMax } = useResponsive();
-  const insets = useSafeAreaInsets();
+  const insets = useReliableSafeAreaInsets();
   const bg = background ?? theme.color.bg;
   const tabClearance = Math.max(132, insets.bottom + 108);
   const pageBottomPad = Math.max(32, insets.bottom + 24);
+  const containerEdges = edges.filter((edge) => edge !== 'top' && edge !== 'bottom');
+  const containerStyle: ViewStyle = {
+    flex: 1,
+    backgroundColor: bg,
+    paddingTop: edges.includes('top') ? insets.top : 0,
+  };
 
   const hPad: ViewStyle = {
     paddingHorizontal: gutter,
@@ -75,7 +82,7 @@ export function Screen({
       paddingBottom: tabPadding ? tabClearance : pageBottomPad,
     };
     return (
-      <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg }}>
+      <SafeAreaView edges={containerEdges} style={containerStyle}>
         {/* KAV inside SafeAreaView → only keyboard height, not safe-area */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -101,7 +108,7 @@ export function Screen({
   const bottomInset = tabPadding ? tabClearance : Math.max(insets.bottom, 16);
 
   return (
-    <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg }}>
+    <SafeAreaView edges={containerEdges} style={containerStyle}>
       {/* KAV inside SafeAreaView → only keyboard height, not safe-area */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

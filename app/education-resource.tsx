@@ -21,6 +21,7 @@ import { Text } from '@/presentation/components/Text';
 import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
+import { useReliableSafeAreaInsets } from '@/presentation/hooks/useReliableSafeAreaInsets';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore } from '@/application/store';
 import { resourceById } from '@/domain/education';
@@ -73,7 +74,7 @@ interface ChapterDisplay {
   title: string;
 }
 
-const READER_WIDTH = 620;
+const READER_WIDTH = 560;
 const readerFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' });
 
 interface BookRule {
@@ -456,6 +457,7 @@ function buildReaderModel(bookId: string, paragraphs?: string[]) {
 export default function EducationResource() {
   const theme = useTheme();
   const safeBack = useSafeBack();
+  const insets = useReliableSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const resource = id ? resourceById(id) : undefined;
   const book = resource ? BOOKS[resource.bookId] : undefined;
@@ -520,14 +522,14 @@ export default function EducationResource() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView edges={['left', 'right']} style={{ flex: 1 }}>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             gap: spacing.md,
             paddingHorizontal: spacing.lg,
-            paddingTop: spacing.md,
+            paddingTop: insets.top + spacing.sm,
             paddingBottom: spacing.md,
             borderBottomWidth: 1,
             borderBottomColor: theme.color.hairline,
@@ -598,7 +600,11 @@ export default function EducationResource() {
           }}
           scrollEventThrottle={32}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.lg,
+            paddingBottom: Math.max(spacing.huge, insets.bottom + spacing.huge),
+          }}
           initialNumToRender={72}
           maxToRenderPerBatch={32}
           windowSize={12}
@@ -629,7 +635,7 @@ export default function EducationResource() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0, paddingBottom: spacing.xs }}>
                   <Text variant="caption" color={theme.color.primary}>FULL BOOK · OFFLINE</Text>
-                  <Text variant="title1" style={{ marginTop: spacing.xs, lineHeight: 36 }}>
+                  <Text variant="title1" style={{ marginTop: spacing.xs, fontSize: 25, lineHeight: 31 }}>
                     {resource.title}
                   </Text>
                   <Text variant="callout" dim style={{ marginTop: spacing.sm, lineHeight: 22 }}>
@@ -736,7 +742,7 @@ export default function EducationResource() {
                     >
                       {display.marker}
                     </Text>
-                    <Text variant="title1" style={{ lineHeight: 34 }}>
+                    <Text variant="title2" style={{ lineHeight: 29 }}>
                       {display.title}
                     </Text>
                   </View>
@@ -753,7 +759,7 @@ export default function EducationResource() {
                       maxWidth: READER_WIDTH,
                       marginTop: spacing.xl,
                       marginBottom: spacing.xs,
-                      lineHeight: 24,
+                      lineHeight: 25,
                     }}
                   >
                     {text}
@@ -794,11 +800,12 @@ export default function EducationResource() {
                     width: '100%',
                     maxWidth: READER_WIDTH,
                     fontFamily: readerFont,
-                    fontSize: 18,
-                    lineHeight: 32,
+                    fontSize: 16,
+                    lineHeight: 28,
                     marginTop: item.firstInChapter ? spacing.sm : spacing.lg,
                     includeFontPadding: false,
                     textAlign: 'justify',
+                    letterSpacing: 0,
                   }}
                 >
                   {text}

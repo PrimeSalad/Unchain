@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { Mascot } from '@/presentation/components/Mascot';
 import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
+import { useReliableSafeAreaInsets } from '@/presentation/hooks/useReliableSafeAreaInsets';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useProfile, useStore } from '@/application/store';
@@ -187,6 +188,7 @@ export default function Sos() {
   const router = useRouter();
   const safeBack = useSafeBack();
   const reduce = useReducedMotion();
+  const insets = useReliableSafeAreaInsets();
   const profile = useProfile();
 
   // The same daily quote shown on Home - consistent all day, offline.
@@ -226,7 +228,7 @@ export default function Sos() {
         end={{ x: 0.4, y: 1 }}
         style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
       />
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView edges={['left', 'right']} style={{ flex: 1, paddingTop: insets.top }}>
         {/* Close */}
         <View
           style={{
@@ -255,7 +257,7 @@ export default function Sos() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: Math.max(spacing.xxxl, insets.bottom + spacing.xxxl) }}
           showsVerticalScrollIndicator={false}
         >
           {/* Hero */}
