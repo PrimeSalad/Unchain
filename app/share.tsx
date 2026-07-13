@@ -10,7 +10,8 @@ import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
-import { captureShareRef, shareCapturedContent } from '@/application/shareMedia';
+import { ShareActionButton } from '@/presentation/components/ShareActionButton';
+import { captureShareRef, saveShareRefToPhotos, saveToPhotosMessage, shareCapturedContent } from '@/application/shareMedia';
 import { streakDays, moneySaved, formatMoney, addictionMeta, currentStreakStart } from '@/domain/gambling';
 import { computeStats, badgeProgress } from '@/domain/achievements';
 
@@ -22,7 +23,8 @@ export default function ShareCard() {
   const cardRef = useRef<View>(null);
 
   const [photo, setPhoto] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'share' | 'save' | null>(null);
+  const busy = pendingAction != null;
 
   // Navigation is a side effect - never call it during render.
   useEffect(() => {
@@ -84,14 +86,25 @@ export default function ShareCard() {
   };
 
   const shareImage = async () => {
-    setBusy(true);
+    setPendingAction('share');
     try {
       const uri = await captureShareRef(cardRef);
       await shareCapturedContent({ uri: uri ?? '', summary, dialogTitle: 'Share your progress' });
     } catch {
       await Share.share({ message: summary }).catch(() => {});
     } finally {
-      setBusy(false);
+      setPendingAction(null);
+    }
+  };
+
+  const saveImage = async () => {
+    setPendingAction('save');
+    try {
+      const result = await saveShareRefToPhotos(cardRef);
+      const message = saveToPhotosMessage(result);
+      Alert.alert(message.title, message.message);
+    } finally {
+      setPendingAction(null);
     }
   };
 
@@ -187,21 +200,23 @@ export default function ShareCard() {
             <ControlButton icon={photo ? 'image' : 'image-outline'} label={photo ? 'Change photo' : 'Add photo'} onPress={pickPhoto} />
             {photo && <ControlButton icon="trash-outline" label="Remove" onPress={() => setPhoto(null)} />}
           </View>
-          <Pressable
+          <ShareActionButton
+            icon="download-outline"
+            label={pendingAction === 'save' ? 'Saving...' : 'Save to Photos'}
+            onPress={saveImage}
+            disabled={busy}
+            busy={pendingAction === 'save'}
+            accessibilityLabel="Save card to Photos"
+            kind="secondary"
+          />
+          <ShareActionButton
+            icon="share-social"
+            label={pendingAction === 'share' ? 'Preparing...' : 'Share'}
             onPress={shareImage}
             disabled={busy}
-            accessibilityRole="button"
+            busy={pendingAction === 'share'}
             accessibilityLabel="Share"
-            accessibilityState={{ disabled: busy, busy }}
-            style={({ pressed }) => ({
-              height: 54, borderRadius: radius.button, backgroundColor: theme.color.primary,
-              alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.sm,
-              opacity: busy ? 0.6 : pressed ? 0.9 : 1,
-            })}
-          >
-            <Ionicons name="share-social" size={20} color={theme.color.onPrimary} />
-            <Text variant="headline" color={theme.color.onPrimary}>{busy ? 'Preparing…' : 'Share'}</Text>
-          </Pressable>
+          />
         </View>
       </SafeAreaView>
     </View>

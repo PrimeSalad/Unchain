@@ -47,6 +47,13 @@
           "photosPermission": "Unchainly uses a photo only as the background for the progress card you choose to share. Photos never leave your device otherwise."
         }
       ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Unchainly needs photo access only when you choose to save a share card.",
+          "savePhotosPermission": "Unchainly saves only the recovery card you choose to export to Photos."
+        }
+      ],
       "expo-audio",
       "expo-notifications",
       "expo-asset",

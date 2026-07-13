@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, Share, View } from 'react-native';
+import { Alert, Image, Pressable, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/presentation/components/Text';
+import { ShareActionButton } from '@/presentation/components/ShareActionButton';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore } from '@/application/store';
-import { captureShareRef, shareCapturedContent } from '@/application/shareMedia';
+import { captureShareRef, saveShareRefToPhotos, saveToPhotosMessage, shareCapturedContent } from '@/application/shareMedia';
 import { achievementById, GAME_ACHIEVEMENTS, GAME_NAMES } from '@/domain/games/achievements';
 import { ALTERNATIVES, altAchievementById } from '@/domain/alternatives';
 
@@ -24,7 +25,8 @@ export default function ShareAchievement() {
   const altCounts = useStore((s) => s.altCounts);
   const journalCount = useStore((s) => s.journal.length);
   const cardRef = useRef<View>(null);
-  const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'share' | 'save' | null>(null);
+  const busy = pendingAction != null;
 
   const gameAch = id ? achievementById(id) : undefined;
   const altAch = !gameAch && id ? altAchievementById(id) : undefined;
@@ -102,14 +104,25 @@ export default function ShareAchievement() {
   const summary = `Achievement unlocked: ${achievement.title} - ${categoryLabel} 🏆\n${achievement.desc}\nRecovering, one calm day at a time. - Unchainly`;
 
   const shareImage = async () => {
-    setBusy(true);
+    setPendingAction('share');
     try {
       const uri = await captureShareRef(cardRef);
       await shareCapturedContent({ uri: uri ?? '', summary, dialogTitle: 'Share your achievement' });
     } catch {
       await Share.share({ message: summary }).catch(() => {});
     } finally {
-      setBusy(false);
+      setPendingAction(null);
+    }
+  };
+
+  const saveImage = async () => {
+    setPendingAction('save');
+    try {
+      const result = await saveShareRefToPhotos(cardRef);
+      const message = saveToPhotosMessage(result);
+      Alert.alert(message.title, message.message);
+    } finally {
+      setPendingAction(null);
     }
   };
 
@@ -195,22 +208,24 @@ export default function ShareAchievement() {
         </View>
 
         {/* Share */}
-        <View style={{ padding: spacing.xl }}>
-          <Pressable
+        <View style={{ padding: spacing.xl, gap: spacing.md }}>
+          <ShareActionButton
+            icon="download-outline"
+            label={pendingAction === 'save' ? 'Saving...' : 'Save to Photos'}
+            onPress={saveImage}
+            disabled={busy}
+            busy={pendingAction === 'save'}
+            accessibilityLabel="Save card to Photos"
+            kind="secondary"
+          />
+          <ShareActionButton
+            icon="share-social"
+            label={pendingAction === 'share' ? 'Preparing...' : 'Share'}
             onPress={shareImage}
             disabled={busy}
-            accessibilityRole="button"
+            busy={pendingAction === 'share'}
             accessibilityLabel="Share"
-            accessibilityState={{ disabled: busy, busy }}
-            style={({ pressed }) => ({
-              height: 54, borderRadius: radius.button, backgroundColor: theme.color.primary,
-              alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.sm,
-              opacity: busy ? 0.6 : pressed ? 0.9 : 1,
-            })}
-          >
-            <Ionicons name="share-social" size={20} color={theme.color.onPrimary} />
-            <Text variant="headline" color={theme.color.onPrimary}>{busy ? 'Preparing…' : 'Share'}</Text>
-          </Pressable>
+          />
         </View>
       </SafeAreaView>
     </View>
