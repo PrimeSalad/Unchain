@@ -1,48 +1,53 @@
 /**
- * Focus Protection - a permanent, consent-first website blocklist.
+ * Focus Protection - a private, user-built website focus list.
  *
- * Blocking model: a website on the list is protected the moment it is added
- * and stays protected indefinitely. There are no timers, no sessions, no
- * expiry, and no pause switch - the ONLY way a site stops being protected is
- * the user deleting it, behind a destructive confirmation. The user builds
- * the whole list themselves. No browsing data is read or collected, and the
- * list never leaves the device.
+ * The list is stored locally and is the source of truth for any native
+ * enforcement layer. This screen deliberately avoids claiming that the
+ * current JavaScript build can block Safari system-wide.
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, TextInput, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Screen } from '@/presentation/components/Screen';
-import { Text } from '@/presentation/components/Text';
-import { Button } from '@/presentation/components/Button';
-import { Card } from '@/presentation/components/Card';
-import { ActionSheet } from '@/presentation/components/ActionSheet';
-import { elevation, radius, spacing } from '@/presentation/theme/tokens';
-import { useTheme } from '@/presentation/theme/ThemeProvider';
-import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useProfile, useTodayAnyJournal } from '@/application/store';
-import { currentStreakStart, streakDays } from '@/domain/gambling';
-import { ALTERNATIVES } from '@/domain/alternatives';
-import { sameDay } from '@/domain/records';
-import { siteLabel, type BlockedSite } from '@/domain/protection';
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AccessibilityInfo,
+  Keyboard,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { Screen } from "@/presentation/components/Screen";
+import { Text } from "@/presentation/components/Text";
+import { Button } from "@/presentation/components/Button";
+import { ActionSheet } from "@/presentation/components/ActionSheet";
+import { Mascot } from "@/presentation/components/Mascot";
+import { elevation, radius, spacing } from "@/presentation/theme/tokens";
+import { useTheme } from "@/presentation/theme/ThemeProvider";
+import { useReducedMotion } from "@/presentation/hooks/useReducedMotion";
+import { useReliableSafeAreaInsets } from "@/presentation/hooks/useReliableSafeAreaInsets";
+import { useSafeBack } from "@/presentation/hooks/useSafeBack";
+import { useStore } from "@/application/store";
+import {
+  normalizeDomain,
+  siteLabel,
+  type BlockedSite,
+} from "@/domain/protection";
 
-export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
+export { AppErrorBoundary as ErrorBoundary } from "@/presentation/components/AppErrorBoundary";
 
-type SortMode = 'az' | 'recent';
+type SortMode = "az" | "recent";
 
 function fmtDate(ts: number): string {
-  return new Date(ts).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Cross-platform confirmation dialog
-//
-// React Native's Alert.alert is a no-op on web - this custom Modal works on
-// iOS, Android, AND web. It blocks interaction behind a dark scrim and shows
-// a centred card with Cancel + Remove buttons.
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -51,692 +56,1136 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
 }
 
-function ConfirmDialog({ visible, siteName, onCancel, onConfirm }: ConfirmDialogProps) {
+function ConfirmDialog({
+  visible,
+  siteName,
+  onCancel,
+  onConfirm,
+}: ConfirmDialogProps) {
   const theme = useTheme();
+  const reduceMotion = useReducedMotion();
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType={reduceMotion ? "none" : "fade"}
       statusBarTranslucent
       onRequestClose={onCancel}
     >
-      {/* Scrim */}
-      <Pressable
-        onPress={onCancel}
+      <View
+        onAccessibilityEscape={onCancel}
         style={{
           flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.55)',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingHorizontal: spacing.xl,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: spacing.xl,
         }}
       >
-        {/* Dialog card - stopPropagation so taps inside don't hit the scrim */}
-        <Animated.View
-          entering={FadeIn.duration(150)}
+        <Pressable
+          onPress={onCancel}
+          accessible={false}
+          importantForAccessibility="no"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "rgba(0,0,0,0.55)" },
+          ]}
+        />
+        <View
+          accessibilityViewIsModal
           style={{
-            width: '100%',
-            maxWidth: 340,
-            backgroundColor: theme.color.surface,
+            width: "100%",
+            maxWidth: 360,
+            maxHeight: "84%",
+            overflow: "hidden",
             borderRadius: radius.card,
-            overflow: 'hidden',
+            backgroundColor: theme.color.surface,
             ...elevation.e2,
           }}
         >
-          {/* Stop scrim from firing when user taps inside the card */}
-          <Pressable onPress={() => {}}>
-            <View style={{ padding: spacing.lg, gap: spacing.sm }}>
-              {/* Icon */}
-              <View style={{ alignItems: 'center', marginBottom: spacing.sm }}>
-                <View
-                  style={{
-                    width: 46, height: 46, borderRadius: 23,
-                    backgroundColor: theme.color.danger + '18',
-                    alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <Ionicons name="trash-outline" size={22} color={theme.color.danger} />
-                </View>
-              </View>
-
-              {/* Title */}
-              <Text
-                variant="headline"
-                center
-                style={{ fontFamily: 'Nunito_800ExtraBold' }}
-              >
-                Remove Protection?
-              </Text>
-
-              {/* Message */}
-              <Text variant="footnote" dim center style={{ lineHeight: 19 }}>
-                Are you sure you want to remove{' '}
-                <Text variant="footnote" style={{ fontFamily: 'Nunito_700Bold', color: theme.color.text }}>
-                  {siteName}
-                </Text>
-                {' '}from your blocklist?
-              </Text>
+          <ScrollView
+            style={{ flexShrink: 1 }}
+            contentContainerStyle={{
+              padding: spacing.xl,
+              paddingBottom: spacing.lg,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: radius.input,
+                backgroundColor: theme.color.accentSoft,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={21}
+                color={theme.color.danger}
+              />
             </View>
-
-            {/* Divider */}
-            <View style={{ height: 1, backgroundColor: theme.color.hairline }} />
-
-            {/* Buttons */}
-            <View style={{ flexDirection: 'row' }}>
-              {/* Cancel */}
-              <Pressable
-                onPress={onCancel}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel"
-                style={({ pressed }) => ({
-                  flex: 1,
-                  paddingVertical: spacing.lg,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.6 : 1,
-                  borderRightWidth: 1,
-                  borderRightColor: theme.color.hairline,
-                })}
-              >
-                <Text variant="callout" color={theme.color.primary}>Cancel</Text>
-              </Pressable>
-
-              {/* Remove */}
-              <Pressable
-                onPress={onConfirm}
-                accessibilityRole="button"
-                accessibilityLabel="Remove from blocklist"
-                style={({ pressed }) => ({
-                  flex: 1,
-                  paddingVertical: spacing.lg,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.6 : 1,
-                })}
-              >
-                <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold', color: theme.color.danger }}>
-                  Remove
-                </Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Animated.View>
-      </Pressable>
+            <Text variant="title2" accessibilityRole="header">
+              Remove website?
+            </Text>
+            <Text
+              variant="body"
+              dim
+              style={{ marginTop: spacing.sm, lineHeight: 24 }}
+            >
+              Remove {siteName} from your focus list? This only deletes the
+              saved entry from this device.
+            </Text>
+          </ScrollView>
+          <View
+            style={{
+              gap: spacing.sm,
+              paddingHorizontal: spacing.xl,
+              paddingBottom: spacing.xl,
+            }}
+          >
+            <Pressable
+              onPress={onCancel}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              style={({ pressed }) => ({
+                minHeight: 48,
+                borderRadius: radius.input,
+                backgroundColor: theme.color.surfaceAlt,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.72 : 1,
+              })}
+            >
+              <Text variant="headline">Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={onConfirm}
+              accessibilityRole="button"
+              accessibilityLabel="Remove from focus list"
+              style={({ pressed }) => ({
+                minHeight: 48,
+                borderRadius: radius.input,
+                backgroundColor: theme.color.danger,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.78 : 1,
+              })}
+            >
+              <Text variant="headline" color={theme.color.textInverse}>
+                Remove
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
     </Modal>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared domain/nickname fields
-// ─────────────────────────────────────────────────────────────────────────────
+interface DomainFieldsProps {
+  domain: string;
+  nickname: string;
+  error: string | null;
+  domainRef?: RefObject<TextInput | null>;
+  nicknameRef?: RefObject<TextInput | null>;
+  onDomain: (value: string) => void;
+  onNickname: (value: string) => void;
+  onDomainSubmit?: () => void;
+  onNicknameSubmit?: () => void;
+}
 
 function DomainFields({
   domain,
   nickname,
   error,
-  autoFocus = true,
+  domainRef,
+  nicknameRef,
   onDomain,
   onNickname,
-}: {
-  domain: string;
-  nickname: string;
-  error: string | null;
-  autoFocus?: boolean;
-  onDomain: (v: string) => void;
-  onNickname: (v: string) => void;
-}) {
+  onDomainSubmit,
+  onNicknameSubmit,
+}: DomainFieldsProps) {
   const theme = useTheme();
-  const inputStyle = {
-    borderRadius: radius.input,
-    backgroundColor: theme.color.surfaceAlt,
-    borderWidth: 1,
-    borderColor: error ? theme.color.danger : theme.color.hairline,
-    padding: spacing.md,
-    color: theme.color.text,
-    fontSize: 16,
-    fontFamily: 'Nunito_600SemiBold',
-  } as const;
 
   return (
-    <View style={{ gap: spacing.sm }}>
-      <Text variant="footnote" dim>Website URL</Text>
-      <TextInput
-        value={domain}
-        onChangeText={onDomain}
-        placeholder="e.g. casino.com"
-        placeholderTextColor={theme.color.textDim}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-        autoFocus={autoFocus}
-        underlineColorAndroid="transparent"
-        selectionColor={theme.color.primary}
-        accessibilityLabel="Website URL"
-        style={inputStyle}
-      />
+    <View>
+      <View
+        style={{
+          overflow: "hidden",
+          borderRadius: radius.input,
+          borderWidth: 1,
+          borderColor: error ? theme.color.danger : theme.color.hairline,
+          backgroundColor: theme.color.surface,
+        }}
+      >
+        <View
+          style={{
+            paddingHorizontal: spacing.md,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.xs,
+          }}
+        >
+          <Text variant="caption" dim>
+            Website address
+          </Text>
+          <View
+            style={{
+              minHeight: 44,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.sm,
+            }}
+          >
+            <Ionicons
+              name="globe-outline"
+              size={19}
+              color={error ? theme.color.danger : theme.color.primary}
+            />
+            <TextInput
+              ref={domainRef}
+              value={domain}
+              onChangeText={onDomain}
+              onSubmitEditing={onDomainSubmit}
+              placeholder="example.com"
+              placeholderTextColor={theme.color.textDim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              maxLength={512}
+              underlineColorAndroid="transparent"
+              selectionColor={theme.color.primary}
+              accessibilityLabel="Website address"
+              accessibilityHint="Enter a domain such as example.com"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                paddingVertical: spacing.sm,
+                color: theme.color.text,
+                fontSize: 16,
+                fontFamily: "Nunito_600SemiBold",
+              }}
+            />
+          </View>
+        </View>
+        <View style={{ height: 1, backgroundColor: theme.color.hairline }} />
+        <View
+          style={{
+            paddingHorizontal: spacing.md,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.xs,
+          }}
+        >
+          <Text variant="caption" dim>
+            Label (optional)
+          </Text>
+          <View
+            style={{
+              minHeight: 44,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.sm,
+            }}
+          >
+            <Ionicons
+              name="pricetag-outline"
+              size={19}
+              color={theme.color.primary}
+            />
+            <TextInput
+              ref={nicknameRef}
+              value={nickname}
+              onChangeText={onNickname}
+              onSubmitEditing={onNicknameSubmit}
+              placeholder="Online casino"
+              placeholderTextColor={theme.color.textDim}
+              autoCapitalize="sentences"
+              returnKeyType="done"
+              maxLength={48}
+              underlineColorAndroid="transparent"
+              selectionColor={theme.color.primary}
+              accessibilityLabel="Website label, optional"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                paddingVertical: spacing.sm,
+                color: theme.color.text,
+                fontSize: 16,
+                fontFamily: "Nunito_600SemiBold",
+              }}
+            />
+          </View>
+        </View>
+      </View>
       {error ? (
-        <Text variant="footnote" color={theme.color.danger}>{error}</Text>
+        <Text
+          variant="footnote"
+          color={theme.color.danger}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={{ marginTop: spacing.sm }}
+        >
+          {error}
+        </Text>
       ) : null}
-      <Text variant="footnote" dim style={{ marginTop: spacing.sm }}>Nickname (optional)</Text>
-      <TextInput
-        value={nickname}
-        onChangeText={onNickname}
-        placeholder="e.g. Online Casino"
-        placeholderTextColor={theme.color.textDim}
-        underlineColorAndroid="transparent"
-        selectionColor={theme.color.primary}
-        accessibilityLabel="Nickname, optional"
-        style={[inputStyle, { borderColor: theme.color.hairline }]}
-      />
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Add sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-function AddSiteSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const addBlockedSite = useStore((s) => s.addBlockedSite);
-  const [domain, setDomain] = useState('');
-  const [nickname, setNickname] = useState('');
+function AddSiteForm({
+  onCancel,
+  onAdded,
+}: {
+  onCancel: () => void;
+  onAdded: (domain: string) => void;
+}) {
+  const theme = useTheme();
+  const addBlockedSite = useStore((state) => state.addBlockedSite);
+  const [domain, setDomain] = useState("");
+  const [nickname, setNickname] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const domainRef = useRef<TextInput>(null);
+  const nicknameRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    if (visible) {
-      setDomain('');
-      setNickname('');
-      setError(null);
-    }
-  }, [visible]);
+    const timer = setTimeout(() => domainRef.current?.focus(), 180);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const fail = (message: string) => {
+    setError(message);
+    AccessibilityInfo.announceForAccessibility(message);
+    domainRef.current?.focus();
+  };
 
   const save = () => {
-    const result = addBlockedSite(domain, nickname);
-    if (result === 'invalid') {
-      setError('That does not look like a website address. Try something like casino.com.');
+    const normalized = normalizeDomain(domain);
+    if (!normalized) {
+      fail(
+        "Enter a website such as example.com. Email addresses are not accepted.",
+      );
       return;
     }
-    if (result === 'duplicate') {
-      setError('This website is already protected.');
+    const result = addBlockedSite(normalized, nickname);
+    if (result === "duplicate") {
+      fail(
+        "That website, or a matching subdomain, is already in your focus list.",
+      );
       return;
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    onClose();
+    if (result !== "added") {
+      fail("That website could not be added. Check the address and try again.");
+      return;
+    }
+    Keyboard.dismiss();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => {},
+    );
+    onAdded(normalized);
+  };
+
+  const cancel = () => {
+    Keyboard.dismiss();
+    onCancel();
   };
 
   return (
-    <ActionSheet visible={visible} onClose={onClose}>
-      <Text variant="headline" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.xs }}>
-        Add Website
-      </Text>
-      <Text variant="footnote" dim style={{ marginBottom: spacing.lg, lineHeight: 19 }}>
-        Protection starts the moment you add it and stays on until you remove it. The list never leaves this device.
-      </Text>
+    <View
+      style={{
+        marginTop: spacing.lg,
+        padding: spacing.md,
+        borderRadius: radius.input,
+        borderWidth: 1,
+        borderColor: theme.color.hairline,
+        backgroundColor: theme.color.surfaceAlt,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          marginBottom: spacing.md,
+        }}
+      >
+        <Text variant="headline" accessibilityRole="header" style={{ flex: 1 }}>
+          Add a website
+        </Text>
+        <Pressable
+          onPress={cancel}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel adding website"
+          style={({ pressed }) => ({
+            width: 44,
+            height: 44,
+            borderRadius: radius.input,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: pressed ? 0.65 : 1,
+          })}
+        >
+          <Ionicons name="close" size={22} color={theme.color.textDim} />
+        </Pressable>
+      </View>
       <DomainFields
         domain={domain}
         nickname={nickname}
         error={error}
-        onDomain={(v) => { setDomain(v); setError(null); }}
+        domainRef={domainRef}
+        nicknameRef={nicknameRef}
+        onDomain={(value) => {
+          setDomain(value);
+          if (error) setError(null);
+        }}
         onNickname={setNickname}
+        onDomainSubmit={() => nicknameRef.current?.focus()}
+        onNicknameSubmit={save}
       />
-      <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
-        <Button label="Add & Protect" onPress={save} disabled={!domain.trim()} full />
-        <Button label="Cancel" kind="secondary" onPress={onClose} full />
+      <View style={{ marginTop: spacing.md }}>
+        <Button
+          label="Add to focus list"
+          onPress={save}
+          disabled={!domain.trim()}
+          full
+        />
       </View>
-    </ActionSheet>
+    </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Edit sheet - subscribes to the live store entry by id (never a stale copy),
-// so every change is reflected instantly and deletion closes cleanly.
-// The "Remove from Blocklist" button has been intentionally removed here -
-// the only deletion path is the trash icon on each row in the list.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function EditSiteSheet({ siteId, onClose }: { siteId: string | null; onClose: () => void }) {
-  const updateBlockedSite = useStore((s) => s.updateBlockedSite);
-  const site = useStore((s) => (siteId ? s.blockedSites.find((b) => b.id === siteId) : undefined));
-
-  const [domain, setDomain] = useState('');
-  const [nickname, setNickname] = useState('');
+function EditSiteSheet({
+  siteId,
+  onClose,
+}: {
+  siteId: string | null;
+  onClose: () => void;
+}) {
+  const theme = useTheme();
+  const updateBlockedSite = useStore((state) => state.updateBlockedSite);
+  const site = useStore((state) =>
+    siteId
+      ? state.blockedSites.find((entry) => entry.id === siteId)
+      : undefined,
+  );
+  const [domain, setDomain] = useState("");
+  const [nickname, setNickname] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-
-  // Track whether the sheet should be open independently of the store lookup.
-  // This prevents the race where removing a site makes `site` undefined before
-  // the sheet closes, causing the Modal to unmount unexpectedly.
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
+    "idle",
+  );
   const [open, setOpen] = useState(false);
+  const domainRef = useRef<TextInput>(null);
+  const nicknameRef = useRef<TextInput>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (siteId != null) setOpen(true);
   }, [siteId]);
 
   useEffect(() => {
-    if (siteId && site) {
-      setDomain(site.domain);
-      setNickname(site.nickname ?? '');
-      setError(null);
-      setSaveStatus('idle');
-    }
-    // Re-seed only when a different site is opened.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!siteId) return;
+    const selected = useStore
+      .getState()
+      .blockedSites.find((entry) => entry.id === siteId);
+    if (!selected) return;
+    setDomain(selected.domain);
+    setNickname(selected.nickname ?? "");
+    setError(null);
+    setSaveStatus("idle");
   }, [siteId]);
 
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
+
   const handleClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    Keyboard.dismiss();
     setOpen(false);
     onClose();
   };
 
   const save = () => {
-    if (!site) return;
-    setSaveStatus('saving');
+    if (!site || saveStatus !== "idle") return;
+    setSaveStatus("saving");
     const result = updateBlockedSite(site.id, { domain, nickname });
-    if (result === 'invalid') {
-      setError('That does not look like a website address.');
-      setSaveStatus('idle');
+    if (result === "invalid") {
+      setError("Enter a website such as example.com.");
+      setSaveStatus("idle");
+      domainRef.current?.focus();
       return;
     }
-    if (result === 'duplicate') {
-      setError('Another entry already uses this domain.');
-      setSaveStatus('idle');
+    if (result === "duplicate") {
+      setError("A matching website is already in your focus list.");
+      setSaveStatus("idle");
+      domainRef.current?.focus();
       return;
     }
-    setSaveStatus('saved');
+    Keyboard.dismiss();
+    setSaveStatus("saved");
     Haptics.selectionAsync().catch(() => {});
-    // Brief pause so the user sees "Saved" before the sheet closes.
-    setTimeout(handleClose, 600);
+    closeTimer.current = setTimeout(handleClose, 500);
   };
 
-  const theme = useTheme();
   const saveLabel =
-    saveStatus === 'saving' ? 'Saving…' :
-    saveStatus === 'saved'  ? '✓ Saved' :
-    'Save Changes';
+    saveStatus === "saving"
+      ? "Saving..."
+      : saveStatus === "saved"
+        ? "Saved"
+        : "Save changes";
 
   return (
     <ActionSheet visible={open} onClose={handleClose}>
-      <Text variant="headline" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.md }}>
-        Edit Website
+      <Text
+        variant="headline"
+        accessibilityRole="header"
+        style={{ marginBottom: spacing.md }}
+      >
+        Edit website
       </Text>
       <DomainFields
         domain={domain}
         nickname={nickname}
         error={error}
-        autoFocus={false}
-        onDomain={(v) => { setDomain(v); setError(null); }}
+        domainRef={domainRef}
+        nicknameRef={nicknameRef}
+        onDomain={(value) => {
+          setDomain(value);
+          if (error) setError(null);
+        }}
         onNickname={setNickname}
+        onDomainSubmit={() => nicknameRef.current?.focus()}
+        onNicknameSubmit={save}
       />
       <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
         <Button
           label={saveLabel}
           onPress={save}
-          disabled={!domain.trim() || saveStatus !== 'idle'}
+          disabled={!domain.trim() || saveStatus !== "idle"}
           full
         />
         <Button label="Close" kind="secondary" onPress={handleClose} full />
       </View>
-      {saveStatus === 'saved' && (
-        <View style={{ alignItems: 'center', marginTop: spacing.sm }}>
-          <Text variant="caption" color={theme.color.success}>Changes saved successfully.</Text>
-        </View>
-      )}
+      {saveStatus === "saved" ? (
+        <Text
+          variant="caption"
+          color={theme.color.success}
+          accessibilityLiveRegion="polite"
+          center
+          style={{ marginTop: spacing.sm }}
+        >
+          Changes saved.
+        </Text>
+      ) : null}
     </ActionSheet>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Site row - always Protected; tap card to edit, tap trash to remove directly.
-//
-// Web / nested-button fix: the trash icon must NOT be a Pressable nested
-// inside another Pressable - that produces the "button cannot contain a
-// nested button" warning on React Native Web.  Instead both interactive
-// zones are SIBLINGS inside the Animated.View:
-//   [ Pressable:card-content ]  [ Pressable:trash ]
-// The card Pressable occupies flex:1 so it fills all remaining space and
-// the layout looks identical to the old nested approach.
-// ─────────────────────────────────────────────────────────────────────────────
-
 function SiteRow({
   site,
-  index,
+  first,
   onEdit,
   onRemove,
 }: {
   site: BlockedSite;
-  index: number;
+  first: boolean;
   onEdit: () => void;
   onRemove: (id: string, label: string) => void;
 }) {
   const theme = useTheme();
-  const cardStyle = {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: spacing.md,
-    backgroundColor: theme.color.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: theme.color.hairline,
-    padding: spacing.md,
-  };
+  const label = siteLabel(site);
+  const detail = site.nickname
+    ? `${site.domain} · Added ${fmtDate(site.addedAt)}`
+    : `Added ${fmtDate(site.addedAt)}`;
 
   return (
-    <Animated.View
-      entering={FadeInDown.delay(Math.min(index, 8) * 40).springify().damping(18)}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
+    <View
+      style={{
+        minHeight: 72,
+        flexDirection: "row",
+        alignItems: "center",
+        borderTopWidth: first ? 0 : 1,
+        borderTopColor: theme.color.hairline,
+      }}
     >
-      {/* Card - tapping opens the edit sheet */}
       <Pressable
-        onPress={() => { Haptics.selectionAsync().catch(() => {}); onEdit(); }}
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => {});
+          onEdit();
+        }}
         accessibilityRole="button"
-        accessibilityLabel={`${siteLabel(site)}, protected. Tap to edit`}
-        style={({ pressed }) => [cardStyle, { flex: 1, opacity: pressed ? 0.85 : 1 }]}
-      >
-        <View
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: theme.color.success + '18',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="shield-checkmark" size={18} color={theme.color.success} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }} numberOfLines={1}>{siteLabel(site)}</Text>
-          {site.nickname ? (
-            <Text variant="caption" dim numberOfLines={1}>{site.domain}</Text>
-          ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 }}>
-            <Ionicons name="checkmark-circle" size={12} color={theme.color.success} />
-            <Text variant="caption" color={theme.color.success}>Protected</Text>
-            <Text variant="caption" dim>· Added {fmtDate(site.addedAt)}</Text>
-          </View>
-        </View>
-      </Pressable>
-
-      {/* Trash - sibling of the card Pressable, never nested inside it */}
-      <Pressable
-        onPress={() => onRemove(site.id, siteLabel(site))}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel={`Remove ${siteLabel(site)} from blocklist`}
+        accessibilityLabel={`${label}, ${site.domain}, added ${fmtDate(site.addedAt)}`}
+        accessibilityHint="Edits this website"
         style={({ pressed }) => ({
-          width: 36, height: 36, borderRadius: 18,
-          backgroundColor: theme.color.accentSoft,
-          alignItems: 'center', justifyContent: 'center',
-          opacity: pressed ? 0.6 : 1,
+          flex: 1,
+          minWidth: 0,
+          minHeight: 72,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.md,
+          paddingLeft: spacing.md,
+          paddingVertical: spacing.sm,
+          backgroundColor: pressed ? theme.color.surfaceAlt : "transparent",
         })}
       >
-        <Ionicons name="trash-outline" size={17} color={theme.color.accentText} />
+        <View
+          accessible={false}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: radius.chip,
+            backgroundColor: theme.color.primarySoft,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons
+            name="globe-outline"
+            size={18}
+            color={theme.color.primary}
+          />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="callout" numberOfLines={1}>
+            {label}
+          </Text>
+          <Text
+            variant="caption"
+            dim
+            numberOfLines={1}
+            style={{ marginTop: 2 }}
+          >
+            {detail}
+          </Text>
+        </View>
+        <Ionicons
+          name="chevron-forward"
+          size={17}
+          color={theme.color.textDim}
+        />
       </Pressable>
-    </Animated.View>
+      <Pressable
+        onPress={() => onRemove(site.id, label)}
+        accessibilityRole="button"
+        accessibilityLabel={`Remove ${label} from focus list`}
+        style={({ pressed }) => ({
+          width: 44,
+          height: 44,
+          marginHorizontal: spacing.sm,
+          borderRadius: radius.input,
+          backgroundColor: pressed ? theme.color.accentSoft : "transparent",
+          alignItems: "center",
+          justifyContent: "center",
+        })}
+      >
+        <Ionicons name="trash-outline" size={19} color={theme.color.danger} />
+      </Pressable>
+    </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen
-// ─────────────────────────────────────────────────────────────────────────────
+function AddWebsiteButton({ onPress }: { onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Add website"
+      style={({ pressed }) => ({
+        minHeight: 50,
+        marginTop: spacing.lg,
+        borderRadius: radius.button,
+        backgroundColor: theme.color.primary,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: spacing.sm,
+        opacity: pressed ? 0.78 : 1,
+        transform: [{ scale: pressed ? 0.99 : 1 }],
+      })}
+    >
+      <Ionicons
+        name="add-circle-outline"
+        size={21}
+        color={theme.color.onPrimary}
+      />
+      <Text variant="headline" color={theme.color.onPrimary}>
+        Add website
+      </Text>
+    </Pressable>
+  );
+}
 
 export default function Protection() {
   const theme = useTheme();
+  const insets = useReliableSafeAreaInsets();
   const safeBack = useSafeBack();
-  const profile = useProfile();
-  const blockedSites = useStore((s) => s.blockedSites);
-  const removeBlockedSite = useStore((s) => s.removeBlockedSite);
-  const relapses = useStore((s) => s.relapses);
-  const journal = useStore((s) => s.journal);
-  const completions = useStore((s) => s.alternatives);
-  // Any addiction type's entry counts toward "activities today".
-  const todayJournal = useTodayAnyJournal();
-
+  const { width } = useWindowDimensions();
+  const blockedSites = useStore((state) => state.blockedSites);
+  const removeBlockedSite = useStore((state) => state.removeBlockedSite);
+  const screenScrollRef = useRef<ScrollView>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<SortMode>('az');
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortMode>("recent");
+  const [toast, setToast] = useState<string | null>(null);
+  const [confirmPending, setConfirmPending] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
 
-  // ── Deletion confirmation dialog ───────────────────────────────────────────
-  // We use a custom Modal instead of Alert.alert because Alert is a no-op on
-  // React Native Web - the Modal works identically on iOS, Android, and web.
-  const [confirmPending, setConfirmPending] = useState<{ id: string; label: string } | null>(null);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
+
+  const showToast = (message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(message);
+    AccessibilityInfo.announceForAccessibility(message);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  };
+
+  const clearToast = () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+    setToast(null);
+  };
+
+  const openAdd = () => {
+    clearToast();
+    setAddOpen(true);
+    setTimeout(
+      () => screenScrollRef.current?.scrollTo({ y: 150, animated: true }),
+      80,
+    );
+  };
+
+  const visibleSites = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const filtered = normalizedQuery
+      ? blockedSites.filter(
+          (site) =>
+            site.domain.toLowerCase().includes(normalizedQuery) ||
+            (site.nickname ?? "").toLowerCase().includes(normalizedQuery),
+        )
+      : blockedSites;
+    return [...filtered].sort((a, b) =>
+      sort === "az"
+        ? siteLabel(a).localeCompare(siteLabel(b))
+        : b.addedAt - a.addedAt,
+    );
+  }, [blockedSites, query, sort]);
+
+  const handleAdded = (domain: string) => {
+    setAddOpen(false);
+    setQuery("");
+    setSort("recent");
+    showToast(`${domain} added to your focus list`);
+  };
 
   const handleRemove = (id: string, label: string) => {
+    clearToast();
+    Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setConfirmPending({ id, label });
   };
 
   const handleConfirmDelete = () => {
     if (!confirmPending) return;
-    const { id } = confirmPending;
+    const { id, label } = confirmPending;
     setConfirmPending(null);
     removeBlockedSite(id);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-  };
-
-  const handleCancelDelete = () => {
-    setConfirmPending(null);
-  };
-
-  const streak = profile ? streakDays(currentStreakStart(profile.startedAt, relapses, journal)) : 0;
-  const activitiesToday = ALTERNATIVES.filter((a) =>
-    a.id === 'journal'
-      ? todayJournal != null
-      : completions[a.id] != null && sameDay(completions[a.id]!, Date.now()),
-  ).length;
-
-  const visibleSites = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = q
-      ? blockedSites.filter(
-          (s) => s.domain.toLowerCase().includes(q) || (s.nickname ?? '').toLowerCase().includes(q),
-        )
-      : blockedSites;
-    return [...filtered].sort((a, b) =>
-      sort === 'az' ? siteLabel(a).localeCompare(siteLabel(b)) : b.addedAt - a.addedAt,
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => {},
     );
-  }, [blockedSites, query, sort]);
+    showToast(`${label} removed from your focus list`);
+  };
 
+  const openEdit = (id: string) => {
+    clearToast();
+    setEditingId(id);
+  };
+
+  const mascotSize = Math.min(132, Math.max(100, width * 0.335));
   const hasSites = blockedSites.length > 0;
+  const showSearch = blockedSites.length >= 5 || query.length > 0;
 
   return (
-    <Screen edges={['top', 'bottom']}>
-      {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="headline">Focus Protection</Text>
-          <Text variant="footnote" dim style={{ marginTop: 2 }}>
-            Permanent by design - protection only ends when you remove a website.
+    <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+      <Screen
+        scrollRef={screenScrollRef}
+        edges={["top", "bottom"]}
+        contentStyle={{ paddingTop: spacing.md }}
+      >
+        <View
+          style={{
+            minHeight: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.md,
+          }}
+        >
+          <Text variant="title1" accessibilityRole="header" style={{ flex: 1 }}>
+            Focus Protection
           </Text>
-        </View>
-        <Pressable
-          onPress={safeBack}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          style={({ pressed }) => ({
-            width: 40, height: 40, borderRadius: radius.round,
-            backgroundColor: theme.color.surfaceAlt,
-            alignItems: 'center', justifyContent: 'center',
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <Ionicons name="close" size={22} color={theme.color.primary} />
-        </Pressable>
-      </View>
-
-      {/* Dashboard */}
-      <Card tone={hasSites ? 'successSoft' : 'surface'} style={{ marginTop: spacing.md, gap: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <View
-            style={{
-              width: 40, height: 40, borderRadius: 20,
-              backgroundColor: (hasSites ? theme.color.success : theme.color.primary) + '20',
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Ionicons
-              name={hasSites ? 'shield-checkmark' : 'shield-outline'}
-              size={21}
-              color={hasSites ? theme.color.success : theme.color.primary}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>
-              {hasSites ? 'Protection Always On' : 'No websites protected yet'}
-            </Text>
-            <Text variant="footnote" dim style={{ marginTop: 1 }}>
-              {hasSites
-                ? `${blockedSites.length} website${blockedSites.length === 1 ? '' : 's'} protected - no timers, no expiry`
-                : 'Add websites below to start protecting yourself'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <DashStat value={`${blockedSites.length}`} label="Websites" />
-          <DashStat value={`${streak}`} label="Day streak" />
-          <DashStat value={`${activitiesToday}/${ALTERNATIVES.length}`} label="Activities today" />
-        </View>
-      </Card>
-
-      {/* Blocklist */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.sm }}>
-        <Text variant="callout" style={{ flex: 1, fontFamily: 'Nunito_700Bold' }}>
-          My Blocklist · {blockedSites.length}
-        </Text>
-        <Pressable
-          onPress={() => setAddOpen(true)}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Add website"
-          style={({ pressed }) => ({
-            flexDirection: 'row', alignItems: 'center', gap: 4,
-            paddingHorizontal: spacing.md, height: 40, borderRadius: radius.round,
-            backgroundColor: theme.color.primarySoft, opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <Ionicons name="add-circle" size={18} color={theme.color.primary} />
-          <Text variant="footnote" color={theme.color.primary}>Add</Text>
-        </Pressable>
-      </View>
-
-      {hasSites && (
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
-          {/* Search */}
-          <View
-            style={{
-              flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-              backgroundColor: theme.color.surface, borderRadius: radius.input,
-              borderWidth: 1, borderColor: theme.color.hairline, paddingHorizontal: spacing.md,
-            }}
-          >
-            <Ionicons name="search" size={15} color={theme.color.textDim} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search blocklist…"
-              placeholderTextColor={theme.color.textDim}
-              autoCapitalize="none"
-              autoCorrect={false}
-              underlineColorAndroid="transparent"
-              selectionColor={theme.color.primary}
-              accessibilityLabel="Search blocklist"
-              style={{ flex: 1, paddingVertical: spacing.md, color: theme.color.text, fontSize: 15, fontFamily: 'Nunito_600SemiBold' }}
-            />
-            {query.length > 0 && (
-              <Pressable onPress={() => setQuery('')} hitSlop={12} accessibilityRole="button" accessibilityLabel="Clear search">
-                <Ionicons name="close-circle" size={16} color={theme.color.textDim} />
-              </Pressable>
-            )}
-          </View>
-          {/* Sort */}
           <Pressable
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              setSort((s) => (s === 'az' ? 'recent' : 'az'));
-            }}
+            onPress={safeBack}
             accessibilityRole="button"
-            accessibilityLabel={sort === 'az' ? 'Sorted alphabetically. Switch to most recent' : 'Sorted by most recent. Switch to alphabetical'}
+            accessibilityLabel="Close Focus Protection"
             style={({ pressed }) => ({
-              width: 44, borderRadius: radius.input,
-              backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
-              alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1,
+              width: 44,
+              height: 44,
+              borderRadius: radius.input,
+              backgroundColor: theme.color.surfaceAlt,
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: pressed ? 0.7 : 1,
             })}
           >
-            <Ionicons name={sort === 'az' ? 'text' : 'time-outline'} size={18} color={theme.color.primary} />
+            <Ionicons name="close" size={22} color={theme.color.primary} />
           </Pressable>
         </View>
-      )}
 
-      {!hasSites ? (
-        <Card tone="primarySoft" style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.sm }}>
-          <Ionicons name="shield-outline" size={26} color={theme.color.primary} />
-          <Text variant="callout" center>Your blocklist is empty</Text>
-          <Text variant="footnote" dim center style={{ paddingHorizontal: spacing.sm, lineHeight: 19 }}>
-            Add the websites you want out of your life. Once added, they stay protected until you remove them yourself.
-          </Text>
-          <Button label="Add your first website" onPress={() => setAddOpen(true)} style={{ marginTop: spacing.sm }} />
-        </Card>
-      ) : visibleSites.length === 0 ? (
-        <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
-          <Text variant="callout" dim>No websites match your search.</Text>
-        </Card>
-      ) : (
-        <View style={{ gap: spacing.sm }}>
-          {visibleSites.map((s, i) => (
-            <SiteRow
-              key={s.id}
-              site={s}
-              index={i}
-              onEdit={() => setEditingId(s.id)}
-              onRemove={handleRemove}
-            />
-          ))}
+        <View
+          style={{
+            minHeight: 136,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.sm,
+            marginTop: spacing.md,
+            paddingVertical: spacing.md,
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: theme.color.hairline,
+          }}
+        >
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.xs,
+              }}
+            >
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={17}
+                color={theme.color.primary}
+              />
+              <Text
+                variant="caption"
+                color={theme.color.primary}
+                style={{ textTransform: "uppercase" }}
+              >
+                Your focus list
+              </Text>
+            </View>
+            <Text variant="title2" style={{ marginTop: spacing.sm }}>
+              {hasSites
+                ? `${blockedSites.length} website${blockedSites.length === 1 ? "" : "s"} saved`
+                : "Create a private focus list"}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.xs,
+                marginTop: spacing.sm,
+              }}
+            >
+              <Ionicons
+                name="lock-closed-outline"
+                size={14}
+                color={theme.color.textDim}
+              />
+              <Text variant="footnote" dim>
+                Saved only on this device
+              </Text>
+            </View>
+          </View>
+          <Mascot
+            state="protect"
+            size={mascotSize}
+            motion="gentle"
+            decorative
+          />
         </View>
-      )}
 
-      {/* Privacy */}
-      <Card tone="primarySoft" style={{ marginTop: spacing.lg, marginBottom: spacing.xl }}>
-        <Text variant="footnote" color={theme.color.primary}>Private by design</Text>
-        <Text variant="footnote" dim style={{ marginTop: 4, lineHeight: 19 }}>
-          Your blocklist never leaves this device. Unchainly does not read your browsing history, collect analytics about
-          blocked websites, or upload anything anywhere.
-        </Text>
-      </Card>
+        {addOpen ? (
+          <AddSiteForm
+            onCancel={() => setAddOpen(false)}
+            onAdded={handleAdded}
+          />
+        ) : (
+          <AddWebsiteButton onPress={openAdd} />
+        )}
 
-      {/* Sheets */}
-      <AddSiteSheet visible={addOpen} onClose={() => setAddOpen(false)} />
+        <View style={{ marginTop: spacing.xxl }}>
+          <View
+            style={{
+              minHeight: 44,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.sm,
+            }}
+          >
+            <Text
+              variant="headline"
+              accessibilityRole="header"
+              style={{ flex: 1 }}
+            >
+              Websites
+            </Text>
+            <Text variant="footnote" dim>
+              {blockedSites.length}
+            </Text>
+            {blockedSites.length > 1 ? (
+              <Pressable
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setSort((current) => (current === "az" ? "recent" : "az"));
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  sort === "az"
+                    ? "Sorted A to Z. Switch to recent"
+                    : "Sorted by recent. Switch to A to Z"
+                }
+                style={({ pressed }) => ({
+                  minWidth: 88,
+                  minHeight: 44,
+                  paddingHorizontal: spacing.sm,
+                  borderRadius: radius.input,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: spacing.xs,
+                  backgroundColor: pressed
+                    ? theme.color.surfaceAlt
+                    : "transparent",
+                })}
+              >
+                <Ionicons
+                  name="swap-vertical-outline"
+                  size={17}
+                  color={theme.color.primary}
+                />
+                <Text variant="footnote" color={theme.color.primary}>
+                  {sort === "az" ? "A-Z" : "Recent"}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {showSearch ? (
+            <View
+              style={{
+                minHeight: 48,
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: spacing.md,
+                paddingLeft: spacing.md,
+                borderRadius: radius.input,
+                borderWidth: 1,
+                borderColor: theme.color.hairline,
+                backgroundColor: theme.color.surface,
+              }}
+            >
+              <Ionicons
+                name="search-outline"
+                size={18}
+                color={theme.color.textDim}
+              />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search websites"
+                placeholderTextColor={theme.color.textDim}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                underlineColorAndroid="transparent"
+                selectionColor={theme.color.primary}
+                accessibilityLabel="Search websites"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: 48,
+                  paddingHorizontal: spacing.sm,
+                  color: theme.color.text,
+                  fontSize: 16,
+                  fontFamily: "Nunito_600SemiBold",
+                }}
+              />
+              {query ? (
+                <Pressable
+                  onPress={() => setQuery("")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={19}
+                    color={theme.color.textDim}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
+          {!hasSites ? (
+            <View
+              accessible
+              accessibilityLabel="No websites added"
+              style={{
+                minHeight: 76,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.md,
+                paddingHorizontal: spacing.md,
+                borderTopWidth: 1,
+                borderBottomWidth: 1,
+                borderColor: theme.color.hairline,
+              }}
+            >
+              <Ionicons
+                name="globe-outline"
+                size={22}
+                color={theme.color.textDim}
+              />
+              <Text variant="callout" dim>
+                No websites added.
+              </Text>
+            </View>
+          ) : visibleSites.length === 0 ? (
+            <View
+              style={{
+                minHeight: 76,
+                alignItems: "center",
+                justifyContent: "center",
+                borderTopWidth: 1,
+                borderBottomWidth: 1,
+                borderColor: theme.color.hairline,
+              }}
+            >
+              <Text variant="callout" dim>
+                No websites match your search.
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={{
+                overflow: "hidden",
+                borderRadius: radius.input,
+                borderWidth: 1,
+                borderColor: theme.color.hairline,
+                backgroundColor: theme.color.surface,
+              }}
+            >
+              {visibleSites.map((site, index) => (
+                <SiteRow
+                  key={site.id}
+                  site={site}
+                  first={index === 0}
+                  onEdit={() => openEdit(site.id)}
+                  onRemove={handleRemove}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View
+          accessible
+          accessibilityLabel="Private by design. Only domains you add are stored. Browsing history is never read."
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: spacing.sm,
+            marginTop: spacing.xxl,
+          }}
+        >
+          <Ionicons
+            name="lock-closed-outline"
+            size={18}
+            color={theme.color.primary}
+          />
+          <View style={{ flex: 1 }}>
+            <Text variant="footnote">Private by design</Text>
+            <Text
+              variant="caption"
+              dim
+              style={{ marginTop: 2, lineHeight: 18 }}
+            >
+              Only domains you add are stored. Your browsing history is never
+              read.
+            </Text>
+          </View>
+        </View>
+      </Screen>
+
+      {toast && !addOpen && editingId === null && confirmPending === null ? (
+        <View
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
+          style={{
+            position: "absolute",
+            left: spacing.lg,
+            right: spacing.lg,
+            bottom: Math.max(insets.bottom + spacing.lg, spacing.xl),
+            minHeight: 52,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.sm,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.md,
+            borderRadius: radius.input,
+            backgroundColor: theme.color.success,
+            ...elevation.e2,
+          }}
+        >
+          <Ionicons
+            name="checkmark-circle"
+            size={20}
+            color={theme.color.textInverse}
+          />
+          <Text
+            variant="callout"
+            color={theme.color.textInverse}
+            style={{ flex: 1 }}
+          >
+            {toast}
+          </Text>
+        </View>
+      ) : null}
+
       <EditSiteSheet siteId={editingId} onClose={() => setEditingId(null)} />
-
-      {/* Deletion confirmation - cross-platform Modal (Alert.alert is a no-op on web) */}
       <ConfirmDialog
         visible={confirmPending !== null}
-        siteName={confirmPending?.label ?? ''}
-        onCancel={handleCancelDelete}
+        siteName={confirmPending?.label ?? ""}
+        onCancel={() => setConfirmPending(null)}
         onConfirm={handleConfirmDelete}
       />
-    </Screen>
-  );
-}
-
-function DashStat({ value, label }: { value: string; label: string }) {
-  const theme = useTheme();
-  return (
-    <View
-      accessibilityLabel={`${value} ${label}`}
-      style={{
-        flex: 1,
-        backgroundColor: theme.color.surfaceAlt + '80',
-        borderRadius: radius.input,
-        paddingVertical: spacing.sm,
-        alignItems: 'center',
-      }}
-    >
-      <Text variant="callout" style={{ fontVariant: ['tabular-nums'], fontFamily: 'Nunito_700Bold' }}>{value}</Text>
-      <Text variant="caption" dim style={{ marginTop: 1 }}>{label}</Text>
     </View>
   );
 }

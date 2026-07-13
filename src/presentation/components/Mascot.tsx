@@ -27,7 +27,7 @@ import { palette } from '../theme/tokens';
  * and never shames or drives re-engagement.
  */
 
-export type MascotState = 'happy' | 'celebrate' | 'comfort' | 'braced';
+export type MascotState = 'happy' | 'celebrate' | 'comfort' | 'braced' | 'protect';
 export type MascotMotion = 'gentle' | 'hero' | 'celebrate';
 
 const SOURCES: Record<MascotState, ImageSourcePropType> = {
@@ -35,6 +35,7 @@ const SOURCES: Record<MascotState, ImageSourcePropType> = {
   celebrate: require('../../../assets/images/mascot-celebrate.png'),
   comfort: require('../../../assets/images/mascot-comfort.png'),
   braced: require('../../../assets/images/mascot-braced.png'),
+  protect: require('../../../assets/images/mascot-protect.png'),
 };
 
 const MOTION: Record<
@@ -79,6 +80,7 @@ const STATE_POSE: Record<MascotState, { rotateX: number; rotateY: number; rotate
   celebrate: { rotateX: -0.8, rotateY: 1.2, rotateZ: -1.1 },
   comfort: { rotateX: 1.2, rotateY: -0.8, rotateZ: 1.1 },
   braced: { rotateX: -1, rotateY: 0.6, rotateZ: -0.7 },
+  protect: { rotateX: 0.4, rotateY: -0.5, rotateZ: 0.3 },
 };
 
 interface MascotProps {

@@ -2,11 +2,10 @@
 
 ## Where things stand
 
-The app-level blocklist is complete and permanent: websites are added
-explicitly by the user, protected the moment they're added, persisted
-offline, de-duplicated and normalized (`stake.com` == `https://www.Stake.com/x`),
-and only removable through a destructive confirmation. There are no timers,
-no sessions, and no early-exit.
+The app-level focus list is complete: websites are added explicitly by the
+user, persisted offline, de-duplicated and normalized (`stake.com` ==
+`https://www.Stake.com/x`), and only removable through a destructive
+confirmation. It is the source of truth for a future native enforcement layer.
 
 **What JavaScript alone cannot do:** iOS sandboxing means no React Native /
 Expo code can block Safari or other apps from opening a website. Real,
@@ -54,9 +53,8 @@ domain). No special entitlement needed, but:
 
 ## App Review notes (Guideline 2.3.1, 2.5.1, 5.1.1)
 
-- Never claim blocking the app can't perform - current UI copy says sites
-  are "protected", which is accurate for the commitment model and becomes
-  literally true once Option A ships.
+- Never claim blocking the app can't perform. The current UI calls this a
+  private focus list and does not present system-wide browser blocking as active.
 - Only public APIs above; both options are fully App Store legal.
 - Keep the consent flow: explain the Screen Time permission before
   requesting it, and never add domains the user didn't choose.

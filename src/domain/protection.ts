@@ -46,6 +46,9 @@ export function extractHostname(input: string): string | null {
     /* malformed escape - keep the raw string */
   }
   s = s.trim().toLowerCase();
+  // A bare email address is not a website. Keep explicit URL userinfo such as
+  // "https://user@example.com" and the legacy "user:pass@example.com" form.
+  if (/^[^/@:]+@[^/@]+$/.test(s) || s.startsWith('mailto:')) return null;
   s = s.replace(/^[a-z][a-z0-9+.-]*:\/\//, ''); // scheme
   s = s.replace(/^\/\//, ''); // protocol-relative
   s = s.split('/')[0].split('\\')[0].split('?')[0].split('#')[0]; // path/query/hash
@@ -78,6 +81,11 @@ export function normalizeDomain(input: string): string | null {
  */
 export function isHostnameBlocked(hostname: string, blockedDomain: string): boolean {
   return hostname === blockedDomain || hostname.endsWith('.' + blockedDomain);
+}
+
+/** True when either normalized domain already covers the other. */
+export function domainsOverlap(a: string, b: string): boolean {
+  return isHostnameBlocked(a, b) || isHostnameBlocked(b, a);
 }
 
 /**

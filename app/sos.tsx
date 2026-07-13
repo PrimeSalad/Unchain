@@ -324,11 +324,11 @@ export default function Sos() {
           {protectedCount > 0 && (
             <GlassTile
               style={{ marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}
-              accessibilityLabel={`Focus Protection on, ${protectedCount} websites permanently protected`}
+              accessibilityLabel={`Focus list, ${protectedCount} websites saved`}
             >
               <Ionicons name="shield-checkmark" size={18} color="#77B58A" />
               <Text variant="callout" color={palette.fog} style={{ flex: 1 }}>
-                {protectedCount} website{protectedCount === 1 ? '' : 's'} protected - always on
+                {protectedCount} website{protectedCount === 1 ? '' : 's'} in your focus list
               </Text>
             </GlassTile>
           )}

@@ -13,6 +13,7 @@ const {
   extractHostname,
   normalizeDomain,
   isHostnameBlocked,
+  domainsOverlap,
   isUrlBlocked,
   activeBlockedDomains,
   siteLabel,
@@ -57,6 +58,8 @@ test('extractHostname: malformed input returns null, never throws', () => {
   assert.equal(extractHostname('bad-.com'), null);
   assert.equal(extractHostname('%E0%A4%A'), null, 'broken percent-encoding');
   assert.equal(extractHostname('a'.repeat(300) + '.com'), null, 'over-long host');
+  assert.equal(extractHostname('me@example.com'), null, 'bare email address');
+  assert.equal(extractHostname('mailto:me@example.com'), null, 'mailto link');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,6 +110,13 @@ test('isHostnameBlocked: near-miss domains are NOT blocked', () => {
   assert.equal(isHostnameBlocked('youtube.com.evil.com', 'youtube.com'), false);
   assert.equal(isHostnameBlocked('youtube.org', 'youtube.com'), false);
   assert.equal(isHostnameBlocked('yout.ube.com', 'youtube.com'), false);
+});
+
+test('domainsOverlap: parent and subdomain entries are treated as duplicates', () => {
+  assert.equal(domainsOverlap('youtube.com', 'youtube.com'), true);
+  assert.equal(domainsOverlap('m.youtube.com', 'youtube.com'), true);
+  assert.equal(domainsOverlap('youtube.com', 'm.youtube.com'), true);
+  assert.equal(domainsOverlap('notyoutube.com', 'youtube.com'), false);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

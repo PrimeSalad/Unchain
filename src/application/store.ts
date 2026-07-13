@@ -46,7 +46,7 @@ import {
 import type { FavoriteQuote } from '@/domain/quotes';
 import { QUOTES, QUOTE_HISTORY_SIZE, localDayKey, pickDailyQuoteIndex } from '@/domain/quotes';
 import type { BlockedSite } from '@/domain/protection';
-import { normalizeDomain } from '@/domain/protection';
+import { domainsOverlap, normalizeDomain } from '@/domain/protection';
 import type { DailyMissionState, MissionId } from '@/domain/missions';
 import { missionById, missionDayKey } from '@/domain/missions';
 import { challengeDayNumber, dailyChallengeTarget } from '@/domain/games/inhibition';
@@ -480,7 +480,7 @@ export const useStore = create<RecoveryState>()(
       addBlockedSite: (domainInput, nickname) => {
         const domain = normalizeDomain(domainInput);
         if (!domain) return 'invalid';
-        if (get().blockedSites.some((s) => s.domain === domain)) return 'duplicate';
+        if (get().blockedSites.some((s) => domainsOverlap(domain, s.domain))) return 'duplicate';
         const site: BlockedSite = {
           id: uid(),
           domain,
@@ -499,7 +499,11 @@ export const useStore = create<RecoveryState>()(
         if (patch.domain != null) {
           const normalized = normalizeDomain(patch.domain);
           if (!normalized) return 'invalid';
-          if (get().blockedSites.some((s) => s.id !== id && s.domain === normalized)) {
+          const currentDomain = get().blockedSites.find((site) => site.id === id)?.domain;
+          if (
+            normalized !== currentDomain &&
+            get().blockedSites.some((site) => site.id !== id && domainsOverlap(normalized, site.domain))
+          ) {
             return 'duplicate';
           }
           domain = normalized;
