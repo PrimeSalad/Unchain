@@ -9,14 +9,40 @@ type ShareOptions = {
   mimeType?: string;
 };
 
+type SvgDataUrlRef = {
+  toDataURL?: (callback: (base64: string) => void, options?: object) => void;
+};
+
 export type SaveToPhotosResult =
   | { ok: true }
   | { ok: false; reason: 'capture-unavailable' | 'permission-denied' | 'unavailable' | 'failed' };
 
+function cleanBase64Png(base64: string) {
+  return base64.replace(/^data:image\/png;base64,/, '');
+}
+
+export async function writePngBase64ToCache(base64: string, fileName = 'unchainly-share'): Promise<string | null> {
+  const cleaned = cleanBase64Png(base64);
+  if (!cleaned) return null;
+
+  try {
+    const FileSystem = await import('expo-file-system/legacy');
+    const root = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+    if (!root) return null;
+
+    const uri = `${root}${fileName}-${Date.now()}.png`;
+    await FileSystem.writeAsStringAsync(uri, cleaned, { encoding: FileSystem.EncodingType.Base64 });
+    return uri;
+  } catch {
+    return null;
+  }
+}
+
 export async function captureShareRef(ref: RefObject<View | null>): Promise<string | null> {
   try {
     const { captureRef } = await import('react-native-view-shot');
-    return await captureRef(ref, { format: 'png', quality: 1 });
+    const base64 = await captureRef(ref, { format: 'png', quality: 1, result: 'base64' });
+    return await writePngBase64ToCache(base64);
   } catch {
     return null;
   }
@@ -43,6 +69,38 @@ export async function saveShareRefToPhotos(ref: RefObject<View | null>): Promise
   const uri = await captureShareRef(ref);
   if (!uri) return { ok: false, reason: 'capture-unavailable' };
 
+  return saveImageFileToPhotos(uri);
+}
+
+export async function savePngBase64ToPhotos(base64: string): Promise<SaveToPhotosResult> {
+  const uri = await writePngBase64ToCache(base64);
+  if (!uri) return { ok: false, reason: 'capture-unavailable' };
+  return saveImageFileToPhotos(uri);
+}
+
+export function saveSvgRefToPhotos(ref: RefObject<SvgDataUrlRef | null>): Promise<SaveToPhotosResult> {
+  return new Promise((resolve) => {
+    const svg = ref.current;
+    if (!svg || typeof svg.toDataURL !== 'function') {
+      resolve({ ok: false, reason: 'capture-unavailable' });
+      return;
+    }
+
+    try {
+      svg.toDataURL(async (base64: string) => {
+        if (!base64) {
+          resolve({ ok: false, reason: 'capture-unavailable' });
+          return;
+        }
+        resolve(await savePngBase64ToPhotos(base64));
+      }, { width: 1080, height: 1350 });
+    } catch {
+      resolve({ ok: false, reason: 'failed' });
+    }
+  });
+}
+
+export async function saveImageFileToPhotos(uri: string): Promise<SaveToPhotosResult> {
   try {
     const MediaLibrary = await import('expo-media-library');
     if (

@@ -6,11 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/presentation/components/Text';
 import { ShareActionButton } from '@/presentation/components/ShareActionButton';
+import { ShareFallbackSvg } from '@/presentation/components/ShareFallbackSvg';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore } from '@/application/store';
-import { captureShareRef, saveShareRefToPhotos, saveToPhotosMessage, shareCapturedContent } from '@/application/shareMedia';
+import { captureShareRef, saveShareRefToPhotos, saveSvgRefToPhotos, saveToPhotosMessage, shareCapturedContent } from '@/application/shareMedia';
 import { achievementById, GAME_ACHIEVEMENTS, GAME_NAMES } from '@/domain/games/achievements';
 import { ALTERNATIVES, altAchievementById } from '@/domain/alternatives';
 
@@ -25,6 +26,7 @@ export default function ShareAchievement() {
   const altCounts = useStore((s) => s.altCounts);
   const journalCount = useStore((s) => s.journal.length);
   const cardRef = useRef<View>(null);
+  const svgRef = useRef<any>(null);
   const [pendingAction, setPendingAction] = useState<'share' | 'save' | null>(null);
   const busy = pendingAction != null;
 
@@ -118,7 +120,10 @@ export default function ShareAchievement() {
   const saveImage = async () => {
     setPendingAction('save');
     try {
-      const result = await saveShareRefToPhotos(cardRef);
+      let result = await saveShareRefToPhotos(cardRef);
+      if (!result.ok && (result.reason === 'capture-unavailable' || result.reason === 'failed')) {
+        result = await saveSvgRefToPhotos(svgRef);
+      }
       const message = saveToPhotosMessage(result);
       Alert.alert(message.title, message.message);
     } finally {
@@ -128,6 +133,16 @@ export default function ShareAchievement() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+      <ShareFallbackSvg
+        svgRef={svgRef}
+        gradient={[palette.grapeDeep, palette.grape, palette.coralDeep]}
+        pill={categoryLabel}
+        eyebrow="Achievement unlocked"
+        title={achievement.title}
+        subtitle={achievement.desc}
+        stats={stats}
+        footer={`${date} · Unchainly`}
+      />
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>

@@ -1,8 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Alert, Image, ImageBackground, Platform, Pressable, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, {
+  Circle,
+  Defs,
+  Line,
+  LinearGradient as SvgLinearGradient,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { Text } from '@/presentation/components/Text';
 import { Roadmap } from '@/presentation/components/Roadmap';
@@ -11,7 +20,13 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
 import { ShareActionButton } from '@/presentation/components/ShareActionButton';
-import { captureShareRef, saveShareRefToPhotos, saveToPhotosMessage, shareCapturedContent } from '@/application/shareMedia';
+import {
+  captureShareRef,
+  saveShareRefToPhotos,
+  saveSvgRefToPhotos,
+  saveToPhotosMessage,
+  shareCapturedContent,
+} from '@/application/shareMedia';
 import { streakDays, moneySaved, formatMoney, addictionMeta, currentStreakStart } from '@/domain/gambling';
 import { computeStats, badgeProgress } from '@/domain/achievements';
 
@@ -21,6 +36,7 @@ export default function ShareCard() {
   const profile = useProfile();
   const store = useStore();
   const cardRef = useRef<View>(null);
+  const svgRef = useRef<any>(null);
 
   const [photo, setPhoto] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'share' | 'save' | null>(null);
@@ -51,10 +67,12 @@ export default function ShareCard() {
     longestStreak: store.longestStreak,
   });
   const earned = badgeProgress(stats).filter((b) => b.earned).length;
+  const savedValue = formatMoney(money.total, currency);
+  const shareDate = new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const summary =
     `${days} days ${freeLabel.toLowerCase()} 💜\n` +
-    `${formatMoney(money.total, currency)} saved · ${stats.urgesResisted} urges resisted · ${earned} badges\n` +
+    `${savedValue} saved · ${stats.urgesResisted} urges resisted · ${earned} badges\n` +
     `My recovery, one day at a time. - Unchainly`;
 
   const pickPhoto = async () => {
@@ -100,13 +118,19 @@ export default function ShareCard() {
   const saveImage = async () => {
     setPendingAction('save');
     try {
-      const result = await saveShareRefToPhotos(cardRef);
+      let result = await saveShareRefToPhotos(cardRef);
+      if (!result.ok && (result.reason === 'capture-unavailable' || result.reason === 'failed')) {
+        result = await saveFallbackSvg();
+      }
       const message = saveToPhotosMessage(result);
       Alert.alert(message.title, message.message);
     } finally {
       setPendingAction(null);
     }
   };
+
+  const saveFallbackSvg = () =>
+    saveSvgRefToPhotos(svgRef);
 
   const CardInner = (
     <View style={{ flex: 1, padding: spacing.xl, justifyContent: 'space-between' }}>
@@ -120,7 +144,7 @@ export default function ShareCard() {
         <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchainly</Text>
         <View style={{ flex: 1 }} />
         <Text variant="caption" color="rgba(255,255,255,0.75)">
-          {new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+          {shareDate}
         </Text>
       </View>
 
@@ -147,7 +171,7 @@ export default function ShareCard() {
 
       {/* Stats */}
       <View style={{ flexDirection: 'row', marginTop: spacing.md }}>
-        <ShareStat label="Saved" value={formatMoney(money.total, currency)} />
+        <ShareStat label="Saved" value={savedValue} />
         <ShareStat label="Urges resisted" value={`${stats.urgesResisted}`} />
         <ShareStat label="Badges" value={`${earned}`} />
       </View>
@@ -156,6 +180,15 @@ export default function ShareCard() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+      <ProgressFallbackSvg
+        svgRef={svgRef}
+        days={days}
+        freeLabel={freeLabel}
+        saved={savedValue}
+        urges={`${stats.urgesResisted}`}
+        badges={`${earned}`}
+        date={shareDate}
+      />
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
@@ -238,6 +271,109 @@ function ShareStat({ label, value }: { label: string; value: string }) {
         {value}
       </Text>
       <Text variant="caption" color="rgba(255,255,255,0.75)">{label}</Text>
+    </View>
+  );
+}
+
+function ProgressFallbackSvg({
+  svgRef,
+  days,
+  freeLabel,
+  saved,
+  urges,
+  badges,
+  date,
+}: {
+  svgRef: any;
+  days: number;
+  freeLabel: string;
+  saved: string;
+  urges: string;
+  badges: string;
+  date: string;
+}) {
+  const milestones = [1, 7, 30, 90, 365];
+  const startX = 150;
+  const endX = 930;
+  const y = 890;
+  const span = endX - startX;
+
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: -1400, top: 0, width: 1080, height: 1350 }}>
+      <Svg ref={svgRef} width={1080} height={1350} viewBox="0 0 1080 1350">
+        <Defs>
+          <SvgLinearGradient id="shareBg" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={palette.grapeDeep} />
+            <Stop offset="0.48" stopColor={palette.grape} />
+            <Stop offset="1" stopColor={palette.coralDeep} />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.16" />
+            <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+          </SvgLinearGradient>
+        </Defs>
+
+        <Rect x="0" y="0" width="1080" height="1350" fill="url(#shareBg)" />
+        <Circle cx="950" cy="120" r="220" fill="url(#shine)" />
+        <Circle cx="120" cy="1240" r="260" fill="#FFFFFF" opacity="0.08" />
+
+        <Rect x="72" y="72" width="54" height="54" rx="15" fill="#FFFFFF" opacity="0.18" />
+        <SvgText x="150" y="112" fill="#FFFFFF" fontSize="36" fontWeight="800">
+          Unchainly
+        </SvgText>
+        <SvgText x="1008" y="108" fill="#FFFFFF" opacity="0.76" fontSize="27" textAnchor="end">
+          {date}
+        </SvgText>
+
+        <SvgText x="540" y="430" fill="#FFFFFF" fontSize="190" fontWeight="900" textAnchor="middle">
+          {String(days)}
+        </SvgText>
+        <SvgText x="540" y="502" fill="#FFFFFF" fontSize="43" fontWeight="800" textAnchor="middle">
+          Day{days === 1 ? '' : 's'} {freeLabel}
+        </SvgText>
+
+        <Line x1={startX} y1={y} x2={endX} y2={y} stroke="#FFFFFF" strokeOpacity="0.26" strokeWidth="14" strokeLinecap="round" />
+        {milestones.map((milestone, index) => {
+          const x = startX + (span * index) / (milestones.length - 1);
+          const reached = days >= milestone;
+          return (
+            <Fragment key={milestone}>
+              <Circle cx={x} cy={y} r={reached ? 24 : 18} fill={reached ? '#FFFFFF' : 'rgba(255,255,255,0.22)'} />
+              <SvgText
+                x={x}
+                y={y + 66}
+                fill="#FFFFFF"
+                opacity={reached ? 1 : 0.68}
+                fontSize="24"
+                fontWeight={reached ? '800' : '600'}
+                textAnchor="middle"
+              >
+                {milestone}d
+              </SvgText>
+            </Fragment>
+          );
+        })}
+
+        <Rect x="72" y="1035" width="936" height="152" rx="34" fill="#FFFFFF" opacity="0.13" />
+        <SvgText x="144" y="1112" fill="#FFFFFF" fontSize="38" fontWeight="800">
+          {saved}
+        </SvgText>
+        <SvgText x="144" y="1158" fill="#FFFFFF" opacity="0.75" fontSize="24">
+          Saved
+        </SvgText>
+        <SvgText x="540" y="1112" fill="#FFFFFF" fontSize="38" fontWeight="800" textAnchor="middle">
+          {urges}
+        </SvgText>
+        <SvgText x="540" y="1158" fill="#FFFFFF" opacity="0.75" fontSize="24" textAnchor="middle">
+          Urges resisted
+        </SvgText>
+        <SvgText x="936" y="1112" fill="#FFFFFF" fontSize="38" fontWeight="800" textAnchor="end">
+          {badges}
+        </SvgText>
+        <SvgText x="936" y="1158" fill="#FFFFFF" opacity="0.75" fontSize="24" textAnchor="end">
+          Badges
+        </SvgText>
+      </Svg>
     </View>
   );
 }

@@ -6,11 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/presentation/components/Text';
 import { ShareActionButton } from '@/presentation/components/ShareActionButton';
+import { ShareFallbackSvg } from '@/presentation/components/ShareFallbackSvg';
 import { palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
-import { captureShareRef, saveShareRefToPhotos, saveToPhotosMessage, shareCapturedContent } from '@/application/shareMedia';
+import { captureShareRef, saveShareRefToPhotos, saveSvgRefToPhotos, saveToPhotosMessage, shareCapturedContent } from '@/application/shareMedia';
 import { currentStreakStart, streakDays } from '@/domain/gambling';
 import { ALTERNATIVES, WATER_GOAL_GLASSES, alternativeById, type AlternativeId } from '@/domain/alternatives';
 import { formatDistance, formatPace } from '@/domain/walk';
@@ -90,6 +91,7 @@ export default function ShareActivity() {
   const journal = useStore((s) => s.journal);
   const journalCount = journal.length;
   const cardRef = useRef<View>(null);
+  const svgRef = useRef<any>(null);
   const [pendingAction, setPendingAction] = useState<'share' | 'save' | null>(null);
   const busy = pendingAction != null;
 
@@ -170,6 +172,14 @@ export default function ShareActivity() {
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const fallbackHeroValue =
+    timed ? fmtClock(seconds) :
+    id === 'water' && sessionGlasses > 0 ? `${sessionGlasses}` :
+    'Done';
+  const fallbackHeroLabel =
+    id === 'water' && sessionGlasses > 0
+      ? `glass${sessionGlasses === 1 ? '' : 'es'} today`
+      : HERO_LABEL[id];
 
   const walkDetail =
     id === 'walk'
@@ -198,7 +208,10 @@ export default function ShareActivity() {
   const saveImage = async () => {
     setPendingAction('save');
     try {
-      const result = await saveShareRefToPhotos(cardRef);
+      let result = await saveShareRefToPhotos(cardRef);
+      if (!result.ok && (result.reason === 'capture-unavailable' || result.reason === 'failed')) {
+        result = await saveSvgRefToPhotos(svgRef);
+      }
       const message = saveToPhotosMessage(result);
       Alert.alert(message.title, message.message);
     } finally {
@@ -208,6 +221,18 @@ export default function ShareActivity() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+      <ShareFallbackSvg
+        svgRef={svgRef}
+        gradient={gradient}
+        pill="Healthy Habits"
+        eyebrow={HERO_LABEL[id]}
+        title={HERO_LABEL[id]}
+        subtitle={TAGLINE[id]}
+        heroValue={fallbackHeroValue}
+        heroLabel={fallbackHeroLabel}
+        stats={stats}
+        footer={`Day ${streak} of recovery · ${dateStr}`}
+      />
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
