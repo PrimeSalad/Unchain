@@ -497,7 +497,7 @@ function TopTriggersCard({ urges }: { urges: Array<{ trigger?: string; triggers?
     const moodCounts: Record<number, number> = {};
 
     urges.forEach((u) => {
-      const triggers = u.triggers?.length ? u.triggers : u.trigger ? [u.trigger] : [];
+      const triggers = Array.isArray(u.triggers) && u.triggers.length ? u.triggers : u.trigger ? [u.trigger] : [];
       triggers.forEach((trigger) => { counts[trigger] = (counts[trigger] ?? 0) + 1; });
       if (u.mood != null) moodCounts[u.mood] = (moodCounts[u.mood] ?? 0) + 1;
     });

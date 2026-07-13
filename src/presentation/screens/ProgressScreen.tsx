@@ -107,10 +107,13 @@ export function ProgressScreen() {
     // Triggers logged on clean days - find the most common one.
     const triggerCounts: Record<string, number> = {};
     pornEntries
-      .filter((j) => j.watched === false && j.triggersEncountered)
-      .forEach((j) => j.triggersEncountered!.forEach((t) => {
-        triggerCounts[t] = (triggerCounts[t] ?? 0) + 1;
-      }));
+      .filter((j) => j.watched === false)
+      .forEach((j) => {
+        const triggers = Array.isArray(j.triggersEncountered) ? j.triggersEncountered : [];
+        triggers.forEach((t) => {
+          triggerCounts[t] = (triggerCounts[t] ?? 0) + 1;
+        });
+      });
     const topTrigger = Object.entries(triggerCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     return { cleanDays, relapseDays, avgUrge, topTrigger };
   }, [journal]);
@@ -679,4 +682,3 @@ function Legend({ color, label }: { color: string; label: string }) {
     </View>
   );
 }
-

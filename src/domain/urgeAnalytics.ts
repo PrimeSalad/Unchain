@@ -82,7 +82,8 @@ const MIN_URGES_FOR_PREDICTION = 10;
 const PREDICTION_RISK_THRESHOLD = 0.35;
 
 function urgeTriggers(urge: UrgeLog): string[] {
-  return urge.triggers?.length ? urge.triggers : urge.trigger ? [urge.trigger] : [];
+  if (Array.isArray(urge.triggers) && urge.triggers.length > 0) return urge.triggers;
+  return urge.trigger ? [urge.trigger] : [];
 }
 
 function sufficientPredictionHistory(urges: UrgeLog[]): boolean {

@@ -144,6 +144,8 @@ function ResourceCard({ res, index }: { res: Resource; index: number }) {
   const router = useRouter();
   const toggleEduBookmark = useStore((s) => s.toggleEduBookmark);
   const bookmarked = useStore((s) => s.eduBookmarks.includes(res.id));
+  const pct = useStore((s) => s.eduProgress[res.id]?.pct ?? 0);
+  const done = pct >= 0.97;
   const initials = res.title.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
 
   return (
@@ -157,7 +159,7 @@ function ResourceCard({ res, index }: { res: Resource; index: number }) {
         <Pressable
           onPress={() => router.push({ pathname: '/education-resource', params: { id: res.id } } as never)}
           accessibilityRole="button"
-          accessibilityLabel={`Read ${res.title} in the app`}
+          accessibilityLabel={`Read ${res.title} in the app${done ? ', finished' : pct > 0 ? `, ${Math.round(pct * 100)}% read` : ''}`}
           style={({ pressed }) => ({
             backgroundColor: theme.color.surface,
             borderRadius: radius.card,
@@ -195,8 +197,21 @@ function ResourceCard({ res, index }: { res: Resource; index: number }) {
               <Text variant="footnote" dim numberOfLines={3} style={{ marginTop: spacing.md, lineHeight: 18 }}>
                 {res.desc}
               </Text>
+              <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text variant="caption" dim style={{ flex: 1 }}>
+                    {done ? 'Finished' : pct > 0 ? `${Math.round(pct * 100)}% read` : res.length}
+                  </Text>
+                  {pct > 0 ? (
+                    <Text variant="caption" color={theme.color.primary}>
+                      Continue
+                    </Text>
+                  ) : null}
+                </View>
+                <ProgressBar progress={pct} height={4} color={done ? theme.color.success : undefined} />
+              </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md }}>
-                <Text variant="footnote" color={theme.color.primary}>Read now</Text>
+                <Text variant="footnote" color={theme.color.primary}>{pct > 0 && !done ? 'Continue reading' : 'Read now'}</Text>
                 <Ionicons name="chevron-forward" size={14} color={theme.color.primary} />
               </View>
             </View>
