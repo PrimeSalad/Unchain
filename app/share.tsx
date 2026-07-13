@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { Alert, Image, ImageBackground, Platform, Pressable, Share, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Image, ImageBackground, Platform, Pressable, Share, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
@@ -14,8 +14,7 @@ import Svg, {
 } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { Text } from '@/presentation/components/Text';
-import { Roadmap } from '@/presentation/components/Roadmap';
-import { palette, radius, spacing } from '@/presentation/theme/tokens';
+import { fonts, palette, radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
@@ -30,11 +29,15 @@ import {
 import { streakDays, moneySaved, formatMoney, addictionMeta, currentStreakStart } from '@/domain/gambling';
 import { computeStats, badgeProgress } from '@/domain/achievements';
 
+const SHARE_MILESTONES = [1, 7, 30, 90, 365] as const;
+
 export default function ShareCard() {
   const safeBack = useSafeBack();
   const theme = useTheme();
   const profile = useProfile();
   const store = useStore();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const cardRef = useRef<View>(null);
   const svgRef = useRef<any>(null);
 
@@ -69,6 +72,25 @@ export default function ShareCard() {
   const earned = badgeProgress(stats).filter((b) => b.earned).length;
   const savedValue = formatMoney(money.total, currency);
   const shareDate = new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+  const compact = width <= 390 || height <= 844;
+  const cardHorizontalPadding = compact ? spacing.lg : spacing.xl;
+  const cardPadding = compact ? spacing.lg : spacing.xl;
+  const controlsGap = compact ? spacing.sm : spacing.md;
+  const controlVerticalPadding = compact ? spacing.md : spacing.xl;
+  const availableCardWidth = Math.max(260, width - cardHorizontalPadding * 2);
+  const cardMaxWidth = Math.min(availableCardWidth, compact ? 334 : 370);
+  const cardMaxHeight = Math.max(360, height - (compact ? 312 : 340));
+  const cardWidth = Math.min(cardMaxWidth, Math.max(260, cardMaxHeight * 0.8));
+  const dayDigits = String(days).length;
+  const dayFontSize =
+    dayDigits >= 5 ? (compact ? 66 : 78) :
+    dayDigits >= 4 ? (compact ? 76 : 90) :
+    dayDigits >= 3 ? (compact ? 92 : 108) :
+    compact ? 112 : 132;
+  const dayLineHeight = dayFontSize + (compact ? 10 : 12);
+  const titleFontSize = compact ? 20 : 24;
+  const titleLineHeight = compact ? 25 : 30;
+  const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 44 : 0);
 
   const summary =
     `${days} days ${freeLabel.toLowerCase()} 💜\n` +
@@ -133,48 +155,115 @@ export default function ShareCard() {
     saveSvgRefToPhotos(svgRef);
 
   const CardInner = (
-    <View style={{ flex: 1, padding: spacing.xl, justifyContent: 'space-between' }}>
+    <View style={{ flex: 1, padding: cardPadding, justifyContent: 'space-between', gap: compact ? spacing.xs : spacing.sm }}>
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Image
           source={require('../assets/images/icon.png')}
-          style={{ width: 32, height: 32, borderRadius: 9 }}
+          style={{ width: compact ? 28 : 32, height: compact ? 28 : 32, borderRadius: compact ? 8 : 9 }}
           resizeMode="cover"
         />
-        <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchainly</Text>
+        <Text
+          variant="headline"
+          color={palette.white}
+          numberOfLines={1}
+          style={{ marginLeft: spacing.sm, flexShrink: 1, fontSize: compact ? 16 : 17, lineHeight: compact ? 21 : 22 }}
+        >
+          Unchainly
+        </Text>
         <View style={{ flex: 1 }} />
-        <Text variant="caption" color="rgba(255,255,255,0.75)">
+        <Text
+          variant="caption"
+          color="rgba(255,255,255,0.75)"
+          numberOfLines={1}
+          style={{ maxWidth: compact ? 96 : 124, textAlign: 'right' }}
+        >
           {shareDate}
         </Text>
       </View>
 
       {/* Hero */}
-      <View style={{ alignItems: 'center', marginVertical: spacing.lg }}>
-        <Text color={palette.white} style={{ fontSize: 96, lineHeight: 100, fontVariant: ['tabular-nums'], includeFontPadding: false } as any}>
+      <View
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: spacing.xs,
+          paddingVertical: compact ? 0 : spacing.xs,
+          marginTop: compact ? 0 : spacing.xs,
+        }}
+      >
+        <Text
+          variant="caption"
+          color="rgba(255,255,255,0.72)"
+          center
+          numberOfLines={1}
+          style={{ textTransform: 'uppercase', fontSize: compact ? 10 : 11, lineHeight: compact ? 14 : 15 }}
+        >
+          Current streak
+        </Text>
+        <Text
+          color={palette.white}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.55}
+          style={{
+            width: '100%',
+            marginTop: compact ? spacing.md : spacing.lg,
+            textAlign: 'center',
+            fontSize: dayFontSize,
+            lineHeight: dayLineHeight,
+            fontVariant: ['tabular-nums'],
+            includeFontPadding: false,
+          } as any}
+        >
           {days}
         </Text>
-        <Text variant="title2" color={palette.white} style={{ marginTop: spacing.xs }}>
+        <Text
+          color={palette.white}
+          center
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.78}
+          style={{
+            marginTop: compact ? spacing.sm : spacing.md,
+            paddingHorizontal: spacing.sm,
+            fontSize: titleFontSize,
+            lineHeight: titleLineHeight,
+            fontFamily: fonts.rounded,
+          }}
+        >
           Day{days === 1 ? '' : 's'} {freeLabel}
         </Text>
       </View>
 
-      {/* Roadmap */}
-      <Roadmap
-        days={days}
-        reachedColor={palette.white}
-        nodeColor="rgba(255,255,255,0.18)"
-        trackColor="rgba(255,255,255,0.25)"
-        textColor={palette.white}
-        dimColor="rgba(255,255,255,0.7)"
-        accentColor={palette.honey}
-      />
+      <ShareMilestoneStrip days={days} compact={compact} />
 
       {/* Stats */}
-      <View style={{ flexDirection: 'row', marginTop: spacing.md }}>
-        <ShareStat label="Saved" value={savedValue} />
-        <ShareStat label="Urges resisted" value={`${stats.urgesResisted}`} />
-        <ShareStat label="Badges" value={`${earned}`} />
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'stretch',
+          paddingVertical: compact ? 6 : spacing.sm,
+          paddingHorizontal: compact ? spacing.sm : spacing.md,
+          marginTop: compact ? spacing.xs : 0,
+        }}
+      >
+        <ShareStat label="Saved" value={savedValue} compact={compact} />
+        <ShareDivider />
+        <ShareStat label="Urges resisted" value={`${stats.urgesResisted}`} compact={compact} />
+        <ShareDivider />
+        <ShareStat label="Badges" value={`${earned}`} compact={compact} />
       </View>
+
+      <Text
+        variant="caption"
+        color="rgba(255,255,255,0.66)"
+        center
+        numberOfLines={1}
+        style={{ fontSize: compact ? 9 : 10, lineHeight: compact ? 12 : 13 }}
+      >
+        One day at a time
+      </Text>
     </View>
   );
 
@@ -189,21 +278,42 @@ export default function ShareCard() {
         badges={`${earned}`}
         date={shareDate}
       />
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
         {/* Top bar */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: spacing.lg,
+            paddingTop: topInset + spacing.xs,
+            paddingBottom: spacing.xs,
+          }}
+        >
           <Text variant="title2" style={{ flex: 1 }}>Share your progress</Text>
-          <Pressable onPress={safeBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable
+            onPress={safeBack}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={({ pressed }) => ({
+              width: 44,
+              height: 44,
+              borderRadius: radius.round,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
             <Ionicons name="close" size={26} color={theme.color.textDim} />
           </Pressable>
         </View>
 
-        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xl }}>
+        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: cardHorizontalPadding }}>
           {/* The capture target - a 4:5 shareable card */}
           <View
             ref={cardRef}
             collapsable={false}
-            style={{ aspectRatio: 4 / 5, borderRadius: radius.sheet, overflow: 'hidden', ...cardShadow }}
+            style={{ width: cardWidth, aspectRatio: 4 / 5, alignSelf: 'center', borderRadius: radius.sheet, overflow: 'hidden', ...cardShadow }}
           >
             {photo ? (
               <ImageBackground source={{ uri: photo }} style={{ flex: 1 }} resizeMode="cover">
@@ -228,8 +338,15 @@ export default function ShareCard() {
         </View>
 
         {/* Controls */}
-        <View style={{ padding: spacing.xl, gap: spacing.md }}>
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+        <View
+          style={{
+            paddingHorizontal: compact ? spacing.lg : spacing.xl,
+            paddingTop: spacing.sm,
+            paddingBottom: controlVerticalPadding,
+            gap: controlsGap,
+          }}
+        >
+          <View style={{ flexDirection: 'row', gap: controlsGap }}>
             <ControlButton icon={photo ? 'image' : 'image-outline'} label={photo ? 'Change photo' : 'Add photo'} onPress={pickPhoto} />
             {photo && <ControlButton icon="trash-outline" label="Remove" onPress={() => setPhoto(null)} />}
           </View>
@@ -241,6 +358,7 @@ export default function ShareCard() {
             busy={pendingAction === 'save'}
             accessibilityLabel="Save card to Photos"
             kind="secondary"
+            style={{ minHeight: compact ? 50 : 54 }}
           />
           <ShareActionButton
             icon="share-social"
@@ -249,6 +367,7 @@ export default function ShareCard() {
             disabled={busy}
             busy={pendingAction === 'share'}
             accessibilityLabel="Share"
+            style={{ minHeight: compact ? 50 : 54 }}
           />
         </View>
       </SafeAreaView>
@@ -264,13 +383,119 @@ const cardShadow = {
   elevation: 12,
 } as const;
 
-function ShareStat({ label, value }: { label: string; value: string }) {
+function ShareMilestoneStrip({ days, compact }: { days: number; compact?: boolean }) {
+  const finalMilestone = SHARE_MILESTONES[SHARE_MILESTONES.length - 1];
+  const progress = Math.max(0.03, Math.min(1, days / finalMilestone));
+
   return (
-    <View style={{ flex: 1 }}>
-      <Text variant="title2" color={palette.white} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+    <View
+      style={{
+        paddingHorizontal: compact ? spacing.xs : spacing.sm,
+        paddingVertical: compact ? 0 : spacing.xs,
+      }}
+    >
+      <View style={{ height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
+        <View style={{ width: `${progress * 100}%`, height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.9)' }} />
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: spacing.sm }}>
+        {SHARE_MILESTONES.map((milestone) => {
+          const reached = days >= milestone;
+          return (
+            <View key={milestone} style={{ alignItems: 'center', width: compact ? 42 : 48 }}>
+              <View
+                style={{
+                  width: compact ? 22 : 24,
+                  height: compact ? 22 : 24,
+                  borderRadius: radius.round,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: reached ? palette.white : 'rgba(255,255,255,0.16)',
+                  borderWidth: reached ? 0 : 1,
+                  borderColor: 'rgba(255,255,255,0.24)',
+                }}
+              >
+                {reached ? (
+                  <Ionicons name="checkmark" size={compact ? 14 : 15} color={palette.grapeDeep} />
+                ) : (
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.58)' }} />
+                )}
+              </View>
+              <Text
+                variant="caption"
+                color={reached ? palette.white : 'rgba(255,255,255,0.68)'}
+                center
+                numberOfLines={1}
+                style={{
+                  marginTop: 4,
+                  fontSize: compact ? 10 : 11,
+                  lineHeight: compact ? 13 : 14,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {milestone}d
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function ShareDivider() {
+  return <View style={{ width: 1, marginVertical: 4, backgroundColor: 'rgba(255,255,255,0.16)' }} />;
+}
+
+function ShareStat({
+  label,
+  value,
+  compact,
+}: {
+  label: string;
+  value: string;
+  compact?: boolean;
+}) {
+  const valueSize = compact ? 23 : 26;
+  const labelSize = compact ? 10 : 11;
+  const labelLineHeight = labelSize + 3;
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: compact ? 52 : 58,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xs,
+      }}
+    >
+      <Text
+        color={palette.white}
+        center
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.48}
+        style={{
+          fontVariant: ['tabular-nums'],
+          fontSize: valueSize,
+          lineHeight: valueSize + 5,
+          fontFamily: fonts.displayBold,
+        }}
+      >
         {value}
       </Text>
-      <Text variant="caption" color="rgba(255,255,255,0.75)">{label}</Text>
+      <Text
+        variant="caption"
+        color="rgba(255,255,255,0.75)"
+        center
+        numberOfLines={2}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        style={{ marginTop: 2, minHeight: labelLineHeight * 2, fontSize: labelSize, lineHeight: labelLineHeight }}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -292,11 +517,20 @@ function ProgressFallbackSvg({
   badges: string;
   date: string;
 }) {
-  const milestones = [1, 7, 30, 90, 365];
+  const milestones = SHARE_MILESTONES;
   const startX = 150;
   const endX = 930;
   const y = 890;
   const span = endX - startX;
+  const dayFontSize =
+    String(days).length >= 5 ? 150 :
+    String(days).length >= 4 ? 176 :
+    String(days).length >= 3 ? 210 :
+    240;
+  const freeLabelFontSize = freeLabel.length > 18 ? 38 : 46;
+  const savedFontSize = saved.length > 12 ? 28 : saved.length > 9 ? 32 : 38;
+  const statFontSize = 38;
+  const statLabelFontSize = 22;
 
   return (
     <View pointerEvents="none" style={{ position: 'absolute', left: -1400, top: 0, width: 1080, height: 1350 }}>
@@ -325,10 +559,10 @@ function ProgressFallbackSvg({
           {date}
         </SvgText>
 
-        <SvgText x="540" y="430" fill="#FFFFFF" fontSize="190" fontWeight="900" textAnchor="middle">
+        <SvgText x="540" y="455" fill="#FFFFFF" fontSize={dayFontSize} fontWeight="900" textAnchor="middle">
           {String(days)}
         </SvgText>
-        <SvgText x="540" y="502" fill="#FFFFFF" fontSize="43" fontWeight="800" textAnchor="middle">
+        <SvgText x="540" y="540" fill="#FFFFFF" fontSize={freeLabelFontSize} fontWeight="800" textAnchor="middle">
           Day{days === 1 ? '' : 's'} {freeLabel}
         </SvgText>
 
@@ -354,24 +588,28 @@ function ProgressFallbackSvg({
           );
         })}
 
-        <Rect x="72" y="1035" width="936" height="152" rx="34" fill="#FFFFFF" opacity="0.13" />
-        <SvgText x="144" y="1112" fill="#FFFFFF" fontSize="38" fontWeight="800">
+        <SvgText x="228" y="1114" fill="#FFFFFF" fontSize={savedFontSize} fontWeight="900" textAnchor="middle">
           {saved}
         </SvgText>
-        <SvgText x="144" y="1158" fill="#FFFFFF" opacity="0.75" fontSize="24">
+        <SvgText x="228" y="1152" fill="#FFFFFF" opacity="0.75" fontSize={statLabelFontSize} textAnchor="middle">
           Saved
         </SvgText>
-        <SvgText x="540" y="1112" fill="#FFFFFF" fontSize="38" fontWeight="800" textAnchor="middle">
+        <Line x1="384" y1="1072" x2="384" y2="1160" stroke="#FFFFFF" strokeOpacity="0.16" strokeWidth="3" />
+        <SvgText x="540" y="1114" fill="#FFFFFF" fontSize={statFontSize} fontWeight="900" textAnchor="middle">
           {urges}
         </SvgText>
-        <SvgText x="540" y="1158" fill="#FFFFFF" opacity="0.75" fontSize="24" textAnchor="middle">
+        <SvgText x="540" y="1152" fill="#FFFFFF" opacity="0.75" fontSize={statLabelFontSize} textAnchor="middle">
           Urges resisted
         </SvgText>
-        <SvgText x="936" y="1112" fill="#FFFFFF" fontSize="38" fontWeight="800" textAnchor="end">
+        <Line x1="696" y1="1072" x2="696" y2="1160" stroke="#FFFFFF" strokeOpacity="0.16" strokeWidth="3" />
+        <SvgText x="852" y="1114" fill="#FFFFFF" fontSize={statFontSize} fontWeight="900" textAnchor="middle">
           {badges}
         </SvgText>
-        <SvgText x="936" y="1158" fill="#FFFFFF" opacity="0.75" fontSize="24" textAnchor="end">
+        <SvgText x="852" y="1152" fill="#FFFFFF" opacity="0.75" fontSize={statLabelFontSize} textAnchor="middle">
           Badges
+        </SvgText>
+        <SvgText x="540" y="1252" fill="#FFFFFF" opacity="0.7" fontSize="24" fontWeight="700" textAnchor="middle">
+          One day at a time
         </SvgText>
       </Svg>
     </View>

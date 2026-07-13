@@ -153,9 +153,18 @@ export default function RootLayout() {
             <Stack.Screen name="journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="porn-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="reflection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="share" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="share-achievement" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="share-activity" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen
+              name="share"
+              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false, fullScreenGestureEnabled: false }}
+            />
+            <Stack.Screen
+              name="share-achievement"
+              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false, fullScreenGestureEnabled: false }}
+            />
+            <Stack.Screen
+              name="share-activity"
+              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false, fullScreenGestureEnabled: false }}
+            />
             <Stack.Screen
               name="games"
               options={{
