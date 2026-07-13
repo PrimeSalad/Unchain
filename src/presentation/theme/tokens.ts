@@ -1,12 +1,12 @@
 /**
- * Wool & Chain - Unchainly design tokens.
+ * Wool & Chain - Unchained design tokens.
  *
  * Every colour here was sampled from the mascot art in /assets and every
  * contrast pairing was verified against WCAG 2.2 (see docs/plan.md §4.1).
  * Components must import from here - never hardcode a hex value.
  *
  * The system aims for Duolingo-grade craft (tactile chunky controls, rounded
- * friendly forms, delightful motion) held inside Unchainly's calmer, lower-arousal
+ * friendly forms, delightful motion) held inside Unchained's calmer, lower-arousal
  * recovery palette.
  */
 

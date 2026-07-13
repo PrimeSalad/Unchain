@@ -132,7 +132,7 @@ export function saveToPhotosMessage(result: SaveToPhotosResult): { title: string
     case 'permission-denied':
       return {
         title: 'Photo access needed',
-        message: 'Allow Unchainly to add photos in Settings, then try saving again.',
+        message: 'Allow Unchained to add photos in Settings, then try saving again.',
       };
     case 'capture-unavailable':
       return {

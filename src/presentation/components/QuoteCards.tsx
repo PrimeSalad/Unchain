@@ -169,7 +169,7 @@ export function QuoteFeed() {
     const text = isToday ? item.quote.text : item.fav.text;
     const author = isToday ? item.quote.author : item.fav.author;
     const chip = isToday
-      ? 'Unchainly says'
+      ? 'Unchained says'
       : `Saved ${new Date(item.fav.savedAt).toLocaleDateString()}`;
     const hearted = isToday ? item.favorited : true;
 

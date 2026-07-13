@@ -75,7 +75,7 @@ function PulseHero({ reduce }: { reduce: boolean }) {
           state="braced"
           size={118}
           still
-          accessibilityLabel="Unchainly is here with you through this urge"
+          accessibilityLabel="Unchained is here with you through this urge"
         />
       </View>
     </View>

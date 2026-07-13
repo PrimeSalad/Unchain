@@ -191,7 +191,7 @@ export default function ShareActivity() {
   const summary =
     `${HERO_LABEL[id]}${timed ? ` - ${fmtClock(seconds)}` : ''}${walkDetail ? ` · ${walkDetail}` : ''} ✅\n` +
     `${TAGLINE[id]}\n` +
-    `Day ${streak} of recovery, one calm choice at a time. - Unchainly`;
+    `Day ${streak} of recovery, one calm choice at a time. - Unchained`;
 
   const shareImage = async () => {
     setPendingAction('share');
@@ -262,7 +262,7 @@ export default function ShareActivity() {
                   style={{ width: 32, height: 32, borderRadius: 9 }}
                   resizeMode="cover"
                 />
-                <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchainly</Text>
+                <Text variant="headline" color={palette.white} style={{ marginLeft: spacing.sm, letterSpacing: 0.5 }}>Unchained</Text>
                 <View style={{ flex: 1 }} />
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: 4 }}>
                   <Text variant="caption" color={palette.white}>Healthy Habits</Text>

@@ -161,7 +161,7 @@ export function OnboardingScreen() {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Mascot state="happy" size={180} motion="hero" interactive />
           <Text variant="display" center style={{ marginTop: spacing.lg, fontSize: 34, lineHeight: 40 }}>
-            Welcome to Unchainly
+            Welcome to Unchained
           </Text>
           <Text variant="body" dim center style={{ marginTop: spacing.md, paddingHorizontal: spacing.md }}>
             Your private companion for breaking free - one day at a time. Everything stays on your device. No account, no internet, no judgment.
@@ -175,7 +175,7 @@ export function OnboardingScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <Text variant="title1">What's your nickname?</Text>
           <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
-            Add a nickname Unchainly can use in check-ins. This never leaves your device.
+            Add a nickname Unchained can use in check-ins. This never leaves your device.
           </Text>
           <Text variant="footnote" dim style={{ marginBottom: spacing.sm }}>Nickname</Text>
           <TextInput

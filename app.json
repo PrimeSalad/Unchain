@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Unchainly",
+    "name": "Unchained",
     "slug": "unchainly",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -44,14 +44,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Unchainly uses a photo only as the background for the progress card you choose to share. Photos never leave your device otherwise."
+          "photosPermission": "Unchained uses a photo only as the background for the progress card you choose to share. Photos never leave your device otherwise."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Unchainly needs photo access only when you choose to save a share card.",
-          "savePhotosPermission": "Unchainly saves only the recovery card you choose to export to Photos."
+          "photosPermission": "Unchained needs photo access only when you choose to save a share card.",
+          "savePhotosPermission": "Unchained saves only the recovery card you choose to export to Photos."
         }
       ],
       "expo-audio",
@@ -60,14 +60,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Unchainly uses your location only while a walk session is running, to measure how far you walked. Your location never leaves this device.",
+          "locationWhenInUsePermission": "Unchained uses your location only while a walk session is running, to measure how far you walked. Your location never leaves this device.",
           "isAndroidBackgroundLocationEnabled": false
         }
       ],
       [
         "expo-sensors",
         {
-          "motionPermission": "Unchainly uses motion data only to count your steps during walk sessions. Step data never leaves this device."
+          "motionPermission": "Unchained uses motion data only to count your steps during walk sessions. Step data never leaves this device."
         }
       ]
     ],

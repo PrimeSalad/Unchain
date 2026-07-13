@@ -1,4 +1,4 @@
-# Unchainly
+# Unchained
 
 A shame-free recovery companion. React Native (Expo · SDK 57) + Clean Architecture.
 Design system and product spec: [`docs/plan.md`](docs/plan.md).
@@ -17,7 +17,7 @@ Use **Expo Go** (or a dev client) on a phone: run `npm start` and scan the QR.
 ## What's built (MVP slice)
 
 - **Onboarding** - value-first welcome → choose your chain → goal (quit/reduce/break) → hold-to-commit ritual.
-- **Today** - Unchainly the mascot, Recovery Strength ring, clean-days, money-saved (₱), healing timeline, check-in.
+- **Today** - Unchained the mascot, Recovery Strength ring, clean-days, money-saved (₱), healing timeline, check-in.
 - **SOS** - full-screen, always-dark crisis flow: 4-2-6 haptic breathing orb, urge wave, escalation ladder, designed exits (no red).
 - **Relapse** - compassion-first, shame-free re-entry that never resets progress to zero.
 - **Journey / Journal / You** - stage track, milestone chain wall, craving log, privacy-first settings.
