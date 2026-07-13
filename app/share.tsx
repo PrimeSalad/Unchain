@@ -95,7 +95,7 @@ export default function ShareCard() {
   const summary =
     `${days} days ${freeLabel.toLowerCase()} 💜\n` +
     `${savedValue} saved · ${stats.urgesResisted} urges resisted · ${earned} badges\n` +
-    `My recovery, one day at a time. - Unchained`;
+    `My recovery, one day at a time. - Unchainly`;
 
   const pickPhoto = async () => {
     try {
@@ -169,7 +169,7 @@ export default function ShareCard() {
           numberOfLines={1}
           style={{ marginLeft: spacing.sm, flexShrink: 1, fontSize: compact ? 16 : 17, lineHeight: compact ? 21 : 22 }}
         >
-          Unchained
+          Unchainly
         </Text>
         <View style={{ flex: 1 }} />
         <Text
@@ -553,7 +553,7 @@ function ProgressFallbackSvg({
 
         <Rect x="72" y="72" width="54" height="54" rx="15" fill="#FFFFFF" opacity="0.18" />
         <SvgText x="150" y="112" fill="#FFFFFF" fontSize="36" fontWeight="800">
-          Unchained
+          Unchainly
         </SvgText>
         <SvgText x="1008" y="108" fill="#FFFFFF" opacity="0.76" fontSize="27" textAnchor="end">
           {date}

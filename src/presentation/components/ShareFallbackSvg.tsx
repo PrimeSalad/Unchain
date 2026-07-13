@@ -78,7 +78,7 @@ export function ShareFallbackSvg({
 
         <Rect x="72" y="72" width="54" height="54" rx="15" fill="#FFFFFF" opacity="0.18" />
         <SvgText x="150" y="112" fill="#FFFFFF" fontSize="36" fontWeight="800">
-          Unchained
+          Unchainly
         </SvgText>
         <Rect x="740" y="76" width="268" height="48" rx="24" fill="#FFFFFF" opacity="0.16" />
         <SvgText x="874" y="108" fill="#FFFFFF" fontSize="23" fontWeight="700" textAnchor="middle">

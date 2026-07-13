@@ -21,9 +21,9 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 import { palette } from '../theme/tokens';
 
 /**
- * Unchained - the sheep. State-driven, with calm dimensional motion that gives
+ * Unchainly - the sheep. State-driven, with calm dimensional motion that gives
  * the flat artwork depth without a 3D renderer. Honors Reduce Motion. Ethics
- * (docs/plan.md section 3.4): Unchained mirrors the user's state with compassion
+ * (docs/plan.md section 3.4): Unchainly mirrors the user's state with compassion
  * and never shames or drives re-engagement.
  */
 
@@ -216,7 +216,7 @@ export function Mascot({
     }
   }, []);
 
-  const label = accessibilityLabel ?? 'Unchained, your recovery companion';
+  const label = accessibilityLabel ?? 'Unchainly, your recovery companion';
   const visual = (
     <>
       <Animated.View
@@ -256,8 +256,8 @@ export function Mascot({
         onPressOut={handlePressOut}
         onPress={handlePress}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? 'Play with Unchained'}
-        accessibilityHint="Gives Unchained a little bounce"
+        accessibilityLabel={accessibilityLabel ?? 'Play with Unchainly'}
+        accessibilityHint="Gives Unchainly a little bounce"
         style={frameStyle}
       >
         {visual}

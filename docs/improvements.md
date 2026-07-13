@@ -1,7 +1,7 @@
-# Unchained - Improvements (v0 build → research-faithful)
+# Unchainly - Improvements (v0 build → research-faithful)
 
 This is a fix list for the current Expo scaffold, checked against
-`Unchained_Product_Research_and_Design_Documentation-1.docx`. Each item names the
+`Unchainly_Product_Research_and_Design_Documentation-1.docx`. Each item names the
 **actual file** that's wrong, **what the research actually says**, and the **fix**.
 Ordered by impact.
 
@@ -137,4 +137,4 @@ The research brand voice (§17) is specific: *"Plain, human, second-person, pres
 
 ---
 
-*Grounded in `Unchained_Product_Research_and_Design_Documentation-1.docx` §§1.5, 5.5, 5.10, 7.3, 8.2, 10.2, 12, 14, 17 and the current code in `src/`.*
+*Grounded in `Unchainly_Product_Research_and_Design_Documentation-1.docx` §§1.5, 5.5, 5.10, 7.3, 8.2, 10.2, 12, 14, 17 and the current code in `src/`.*

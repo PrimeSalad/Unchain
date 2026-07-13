@@ -20,7 +20,7 @@ import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 
 /**
  * Peak-end celebration (docs/plan.md §12, §16). Full-screen, ≤2.5s, skippable,
- * once. Unchained celebrates; a chain-link "forges"; one line of forward-arming.
+ * once. Unchainly celebrates; a chain-link "forges"; one line of forward-arming.
  * Calm afterwards - never a badge storm.
  */
 export default function Celebrate() {

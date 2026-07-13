@@ -401,7 +401,7 @@ export function ProfileScreen() {
       await shareCapturedContent({
         uri: fileUri,
         summary: json,
-        dialogTitle: 'Save your Unchained backup',
+        dialogTitle: 'Save your Unchainly backup',
         mimeType: 'application/json',
       });
       showToast('Backup file ready');
@@ -424,7 +424,7 @@ export function ProfileScreen() {
           ? parsed.data
           : parsed;
       if (!data || typeof data !== 'object' || !data.profile || typeof data.profile.startedAt !== 'number') {
-        showToast('That file is not a valid Unchained backup', 'error');
+        showToast('That file is not a valid Unchainly backup', 'error');
         return;
       }
       const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
@@ -841,7 +841,7 @@ export function ProfileScreen() {
           </View>
         </View>
         <Text variant="caption" dim center style={{ marginTop: spacing.xl, marginBottom: spacing.lg }}>
-          Unchained · v1.0
+          Unchainly · v1.0
         </Text>
       </Screen>
 
