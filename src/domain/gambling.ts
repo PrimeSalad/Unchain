@@ -66,6 +66,16 @@ export function addictionMeta(k: AddictionType): AddictionMeta {
   return ADDICTIONS.find((a) => a.key === k) ?? ADDICTIONS[0];
 }
 
+/** Addiction-specific streak wording for the Home recovery summary. */
+export function recoveryFreeLabel(k: AddictionType, addictionDetail?: string): string {
+  if (k === 'social_media') return 'Social Media-Free';
+  if (k === 'other') {
+    const customLabel = addictionDetail?.trim();
+    return customLabel ? `${customLabel}-Free` : 'Habit-Free';
+  }
+  return addictionMeta(k).freeLabel;
+}
+
 export type ExpensePeriod = 'daily' | 'weekly' | 'monthly';
 
 export const DEFAULT_CURRENCY = '₱';

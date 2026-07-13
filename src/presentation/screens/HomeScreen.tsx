@@ -25,7 +25,7 @@ import {
   journalMoneyStats,
   formatMoney,
   milestoneCrossed,
-  addictionMeta,
+  recoveryFreeLabel,
 } from '@/domain/gambling';
 import type { TimelineType } from '@/domain/records';
 import { sameDay } from '@/domain/records';
@@ -95,6 +95,11 @@ export function HomeScreen() {
   const moneyStats = journalMoneyStats(journal);
   const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const managedUrges = Math.max(recordedUrges, urgesResisted);
+  // Derived from the hydrated profile on every render, so a profile update is
+  // reflected immediately without caching stale addiction copy.
+  const freeLabel = profile
+    ? recoveryFreeLabel(profile.addictionType, profile.addictionDetail)
+    : '';
 
   // Auto-complete the daily_log mission the moment a journal entry exists
   // for today. Derived directly from the store (not from the ticking `now`)
@@ -122,10 +127,10 @@ export function HomeScreen() {
       pushTimeline('milestone', `Reached Day ${crossed}`);
       router.push({
         pathname: '/celebrate',
-        params: { title: `Day ${crossed} ${addictionMeta(profile.addictionType).freeLabel}!`, arm: 'Keep going - one day at a time.' },
+        params: { title: `Day ${crossed} ${freeLabel}!`, arm: 'Keep going - one day at a time.' },
       });
     }
-  }, [days, profile, timeline, pushTimeline, router]);
+  }, [days, freeLabel, profile, timeline, pushTimeline, router]);
 
   if (!profile) return null;
 
@@ -145,7 +150,7 @@ export function HomeScreen() {
         days={days}
         timer={timer}
         target={target}
-        freeLabel={addictionMeta(profile.addictionType).freeLabel}
+        freeLabel={freeLabel}
         mascotActive={mascotActive}
         onCheckIn={() => router.push('/checkin')}
         onShare={() => router.push('/share' as Href)}

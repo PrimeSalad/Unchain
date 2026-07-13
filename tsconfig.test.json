@@ -9,5 +9,5 @@
     "strict": true,
     "esModuleInterop": true
   },
-  "files": ["src/domain/protection.ts"]
+  "files": ["src/domain/protection.ts", "src/domain/gambling.ts"]
 }
