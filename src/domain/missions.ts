@@ -56,8 +56,8 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: 'play_game',
-    title: 'Play 1 Recreational Game',
-    subtitle: 'Healthy entertainment, no stakes',
+    title: 'Play one no-stakes game',
+    subtitle: 'A quick offline reset when urges spike',
     icon: 'game-controller',
     xp: 10,
     tint: 'celebrate',

@@ -71,7 +71,7 @@ export default function GamesHub() {
 
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.sm }} showsVerticalScrollIndicator={false}>
           <Text variant="footnote" dim style={{ marginBottom: spacing.xs }}>
-            A calm distraction when a craving hits. All offline.
+            Pick a quick no-stakes reset when an urge hits. Everything works offline.
           </Text>
           {defs.map((g, i) => (
             <EnterFade key={g.route} index={i}>

@@ -311,7 +311,7 @@ export function HomeScreen() {
           <View style={{ flex: 1 }}>
             <Text variant="callout">Play a game</Text>
             <Text variant="caption" dim style={{ marginTop: 1 }}>
-              Checkers, Clarity, Sudoku & Block Puzzle - all offline
+              No-stakes games to keep your hands busy: Clarity, Blocks, Sudoku, Checkers, and Go / No-Go.
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />

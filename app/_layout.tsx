@@ -137,7 +137,10 @@ export default function RootLayout() {
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="loading" options={{ animation: 'fade' }} />
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="sos" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+            <Stack.Screen
+              name="sos"
+              options={{ presentation: 'card', animation: 'fade', gestureEnabled: false, fullScreenGestureEnabled: false }}
+            />
             <Stack.Screen
               name="mindful-pause"
               options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }}
@@ -155,7 +158,13 @@ export default function RootLayout() {
             <Stack.Screen name="share-activity" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen
               name="games"
-              options={{ presentation: 'card', animation: 'slide_from_right', gestureEnabled: false, fullScreenGestureEnabled: false }}
+              options={{
+                presentation: 'card',
+                animation: 'slide_from_right',
+                animationTypeForReplace: 'push',
+                gestureEnabled: false,
+                fullScreenGestureEnabled: false,
+              }}
             />
           </Stack>
         </ThemeProvider>

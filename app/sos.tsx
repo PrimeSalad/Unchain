@@ -385,7 +385,7 @@ export default function Sos() {
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             <ToolTile icon="book" label="Journal" onPress={() => router.replace('/(tabs)/journal')} />
-            <ToolTile icon="game-controller" label="Games" onPress={() => router.dismissTo('/games' as Href)} />
+            <ToolTile icon="game-controller" label="Games" onPress={() => router.replace('/games' as Href)} />
             <ToolTile icon="walk" label="Habits" onPress={() => router.push('/alternatives' as Href)} />
             <ToolTile icon="shield-checkmark" label="Protect" onPress={() => router.push('/protection' as Href)} />
             <ToolTile icon="create" label="Reflect" onPress={() => router.replace('/reflection')} />
