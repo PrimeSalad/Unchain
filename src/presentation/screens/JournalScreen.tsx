@@ -122,10 +122,13 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
   // Alcohol entry detection
   const isDrank       = entry.drank === true;
   const isAlcoholClean = entry.drank === false;
+  // Drugs entry detection
+  const isUsed        = entry.used === true;
+  const isDrugClean   = entry.used === false;
 
   const accent =
-    isGamble || isWatched || isBinged || isSmoked || isDrank ? theme.color.danger :
-    isClean || isPornClean || isSocialClean || isSmokeClean || isAlcoholClean ? theme.color.success :
+    isGamble || isWatched || isBinged || isSmoked || isDrank || isUsed ? theme.color.danger :
+    isClean || isPornClean || isSocialClean || isSmokeClean || isAlcoholClean || isDrugClean ? theme.color.success :
     theme.color.primary;
 
   const statusLabel =
@@ -139,11 +142,13 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
     isSmokeClean  ? 'Clean day' :
     isDrank       ? 'Relapse' :
     isAlcoholClean ? 'Clean day' :
+    isUsed        ? 'Relapse' :
+    isDrugClean   ? 'Clean day' :
     'Entry';
 
   const statusIcon =
-    isGamble || isWatched || isBinged || isSmoked || isDrank        ? 'alert-circle' :
-    isClean  || isPornClean || isSocialClean || isSmokeClean || isAlcoholClean ? 'checkmark-circle' :
+    isGamble || isWatched || isBinged || isSmoked || isDrank || isUsed  ? 'alert-circle' :
+    isClean  || isPornClean || isSocialClean || isSmokeClean || isAlcoholClean || isDrugClean ? 'checkmark-circle' :
     'document-text-outline';
 
   const dateStr = new Date(entry.at).toLocaleDateString('en-PH', {
@@ -176,7 +181,8 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
     entry.text !== 'Social media binge recorded.' &&
     entry.text !== 'Relapse recorded.' &&
     entry.text !== 'Smoking relapse recorded.' &&
-    entry.text !== 'Alcohol relapse recorded.';
+    entry.text !== 'Alcohol relapse recorded.' &&
+    entry.text !== 'Last use before recovery.';
 
   // The recovery-adjusted balance: raw balance minus the wager on a losing
   // day (wins are never added). This is the figure the app tracks everywhere.
@@ -460,6 +466,31 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
               {entry.drank === true && entry.drankNextTimePlan && (
                 <DetailRow icon="bulb-outline" color={theme.color.primary} label="Next time" value={entry.drankNextTimePlan} />
               )}
+
+              {/* ── Drugs clean-day rows ── */}
+              {entry.used === false && entry.drugUrgeIntensity != null && (
+                <DetailRow icon="pulse-outline" color={theme.color.celebrate} label="Urge" value={`${entry.drugUrgeIntensity}/10`} />
+              )}
+              {entry.used === false && entry.drugWhatHelped && (
+                <DetailRow icon="shield-checkmark-outline" color={theme.color.success} label="Helped" value={entry.drugWhatHelped} />
+              )}
+
+              {/* ── Drugs relapse rows ── */}
+              {entry.used === true && entry.drugType && (
+                <DetailRow icon="medical-outline" color={theme.color.textDim} label="Substance" value={entry.drugType} />
+              )}
+              {entry.used === true && entry.drugAmount && (
+                <DetailRow icon="repeat-outline" color={theme.color.textDim} label="Frequency" value={entry.drugAmount} />
+              )}
+              {entry.used === true && entry.drugEmotions != null && entry.drugEmotions.length > 0 && (
+                <DetailRow icon="heart-outline" color={theme.color.danger} label="Emotions" value={entry.drugEmotions.join(', ')} />
+              )}
+              {entry.used === true && entry.drugTrigger && (
+                <DetailRow icon="warning-outline" color={theme.color.danger} label="Trigger" value={entry.drugTrigger} />
+              )}
+              {entry.used === true && entry.drugNextTimePlan && (
+                <DetailRow icon="bulb-outline" color={theme.color.primary} label="Next time" value={entry.drugNextTimePlan} />
+              )}
             </View>
           )}
         </Animated.View>
@@ -646,6 +677,7 @@ export function JournalScreen() {
   const isSocial   = profile?.addictionType === 'social_media';
   const isSmoke    = profile?.addictionType === 'smoking';
   const isAlcohol  = profile?.addictionType === 'alcohol';
+  const isDrugs    = profile?.addictionType === 'drugs';
 
   const [query, setQuery]         = useState('');
   const [filter, setFilter]       = useState<Filter>('all');
@@ -682,11 +714,14 @@ export function JournalScreen() {
     // Alcohol stats
     const alcoholClean    = entries.filter((e) => e.drank === false).length;
     const alcoholRelapses = entries.filter((e) => e.drank === true).length;
+    // Drugs stats
+    const drugClean    = entries.filter((e) => e.used === false).length;
+    const drugRelapses = entries.filter((e) => e.used === true).length;
     const withMood = entries.filter((e) => e.mood != null);
     const avgMood  = withMood.length
       ? Math.round(withMood.reduce((s, e) => s + (e.mood ?? 0), 0) / withMood.length * 10) / 10
       : null;
-    return { total, clean, relapses, pornClean, pornRelapses, socialClean, socialRelapses, smokeClean, smokeRelapses, alcoholClean, alcoholRelapses, avgMood };
+    return { total, clean, relapses, pornClean, pornRelapses, socialClean, socialRelapses, smokeClean, smokeRelapses, alcoholClean, alcoholRelapses, drugClean, drugRelapses, avgMood };
   }, [entries, profile]);
 
   // ── Filtered + sorted entries ─────────────────────────────────────────────
@@ -736,18 +771,26 @@ export function JournalScreen() {
           if (filter === 'clean'   && e.drank !== false) return false;
           if (filter === 'gambled' && e.drank !== true)  return false;
         }
+        if (isDrugs) {
+          if (filter === 'clean'   && e.used !== false) return false;
+          if (filter === 'gambled' && e.used !== true)  return false;
+        }
         // Search
         if (query && !e.text.toLowerCase().includes(query.toLowerCase())) return false;
         return true;
       })
       // Newest first
       .sort((a, b) => b.at - a.at);
-  }, [entries, query, filter, dateRange, isGambling, isPorn]);
+  }, [entries, query, filter, dateRange, isGambling, isPorn, isSocial, isSmoke, isAlcohol, isDrugs]);
 
   // Status filter options per addiction type
   const statusFilters: { key: Filter; label: string }[] =
     isGambling ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
     : isPorn   ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'watched', label: 'Relapses' }]
+    : isDrugs  ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
+    : isSocial ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
+    : isSmoke  ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
+    : isAlcohol ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
     : [];
 
   // Date ranges
@@ -789,7 +832,7 @@ export function JournalScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            router.push(isPorn ? '/porn-journal-entry' : isSocial ? '/social-journal-entry' : isSmoke ? '/smoke-journal-entry' : isAlcohol ? '/alcohol-journal-entry' : '/journal-entry');
+            router.push(isPorn ? '/porn-journal-entry' : isSocial ? '/social-journal-entry' : isSmoke ? '/smoke-journal-entry' : isAlcohol ? '/alcohol-journal-entry' : isDrugs ? '/drug-journal-entry' : '/journal-entry');
           }}
           accessibilityRole="button"
           accessibilityLabel="Write new entry"
@@ -808,18 +851,18 @@ export function JournalScreen() {
       {searching && <SearchBar query={query} onChange={setQuery} />}
 
       {/* ── Stats: three compact tiles, only when there are entries ── */}
-      {(isGambling || isPorn || isSocial || isSmoke || isAlcohol) && entries.length > 0 && (
+      {(isGambling || isPorn || isSocial || isSmoke || isAlcohol || isDrugs) && entries.length > 0 && (
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
           <StatCard
             icon="checkmark-circle"
-            value={isGambling ? stats.clean : isPorn ? stats.pornClean : isSocial ? stats.socialClean : isSmoke ? stats.smokeClean : stats.alcoholClean}
+            value={isGambling ? stats.clean : isPorn ? stats.pornClean : isSocial ? stats.socialClean : isSmoke ? stats.smokeClean : isAlcohol ? stats.alcoholClean : stats.drugClean}
             label="Clean"
             color={theme.color.success}
             delay={0}
           />
           <StatCard
             icon="alert-circle"
-            value={isGambling ? stats.relapses : isPorn ? stats.pornRelapses : isSocial ? stats.socialRelapses : isSmoke ? stats.smokeRelapses : stats.alcoholRelapses}
+            value={isGambling ? stats.relapses : isPorn ? stats.pornRelapses : isSocial ? stats.socialRelapses : isSmoke ? stats.smokeRelapses : isAlcohol ? stats.alcoholRelapses : stats.drugRelapses}
             label="Relapses"
             color={theme.color.danger}
             delay={60}

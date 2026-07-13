@@ -30,6 +30,7 @@ import {
   useTodaySocialJournal,
   useTodaySmokeJournal,
   useTodayAlcoholJournal,
+  useTodayDrugJournal,
 } from '@/application/store';
 import { addictionMeta } from '@/domain/gambling';
 
@@ -39,6 +40,7 @@ function journalRoute(addictionType: string): string {
   if (addictionType === 'social_media') return '/social-journal-entry';
   if (addictionType === 'smoking') return '/smoke-journal-entry';
   if (addictionType === 'alcohol') return '/alcohol-journal-entry';
+  if (addictionType === 'drugs') return '/drug-journal-entry';
   return '/journal-entry';
 }
 
@@ -49,10 +51,12 @@ function useTodayEntry(addictionType: string | undefined) {
   const social   = useTodaySocialJournal();
   const smoke    = useTodaySmokeJournal();
   const alcohol  = useTodayAlcoholJournal();
+  const drugs    = useTodayDrugJournal();
   if (addictionType === 'pornography') return porn;
   if (addictionType === 'social_media') return social;
   if (addictionType === 'smoking') return smoke;
   if (addictionType === 'alcohol') return alcohol;
+  if (addictionType === 'drugs') return drugs;
   return gambling;
 }
 

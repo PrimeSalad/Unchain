@@ -159,6 +159,28 @@ export interface JournalEntry {
   alcoholUrgeIntensity?: number;
   /** What helped the user stay alcohol-free on a clean day. */
   alcoholWhatHelped?: string;
+
+  // ── Drugs / substances-specific fields (only populated for drugs addiction) ──
+  /**
+   * Did the user use substances on this day?
+   * true  → relapse (red calendar day, streak resets)
+   * false → clean   (green calendar day)
+   */
+  used?: boolean;
+  /** What substance was used (relapse day). */
+  drugType?: string;
+  /** How much was used (relapse day). */
+  drugAmount?: string;
+  /** What triggered the relapse (relapse day). */
+  drugTrigger?: string;
+  /** Emotions felt before using (relapse day). */
+  drugEmotions?: string[];
+  /** What could help next time (relapse day). */
+  drugNextTimePlan?: string;
+  /** Urge intensity on a clean day (1–10). */
+  drugUrgeIntensity?: number;
+  /** What helped the user stay clean on a clean day. */
+  drugWhatHelped?: string;
 }
 
 /** Emergency Reflection - captured during a crisis (SOS). Stored separately

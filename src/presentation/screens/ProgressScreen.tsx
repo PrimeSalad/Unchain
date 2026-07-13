@@ -168,7 +168,7 @@ export function ProgressScreen() {
     const todayMid = todayLocalMidnight();
 
     // Index journal entries by local-midnight timestamp for O(1) lookup.
-    // Supports both gambling (gambled field) and porn recovery (watched field).
+    // Supports all addiction types.
     const journalByDay = new Map<number, boolean>(); // midnight → isRelapse
     journal.forEach((j) => {
       if (j.gambled !== undefined) {
@@ -181,6 +181,8 @@ export function ProgressScreen() {
         journalByDay.set(localMidnight(j.at), j.smoked);
       } else if (j.drank !== undefined) {
         journalByDay.set(localMidnight(j.at), j.drank);
+      } else if (j.used !== undefined) {
+        journalByDay.set(localMidnight(j.at), j.used);
       }
     });
 

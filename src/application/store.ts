@@ -804,6 +804,9 @@ export const useStore = create<RecoveryState>()(
 
         const isPorn = profile.addictionType === 'pornography';
         const isAlcohol = profile.addictionType === 'alcohol';
+        const isDrugs = profile.addictionType === 'drugs';
+        const isSmoke = profile.addictionType === 'smoking';
+        const isSocial = profile.addictionType === 'social_media';
 
         const initialRelapses: RelapseEvent[] = isToday
           ? []
@@ -818,6 +821,12 @@ export const useStore = create<RecoveryState>()(
               ? { id: uid(), at: seedAt, watched: true,  text: 'Last use before recovery.' }
               : isAlcohol
               ? { id: uid(), at: seedAt, drank: true,    text: 'Last use before recovery.' }
+              : isDrugs
+              ? { id: uid(), at: seedAt, used: true,     text: 'Last use before recovery.' }
+              : isSmoke
+              ? { id: uid(), at: seedAt, smoked: true,   text: 'Last use before recovery.' }
+              : isSocial
+              ? { id: uid(), at: seedAt, binged: true,   text: 'Last use before recovery.' }
               : { id: uid(), at: seedAt, gambled: true,  text: 'Last use before recovery.' },
           );
 
@@ -832,6 +841,12 @@ export const useStore = create<RecoveryState>()(
                 ? { id: uid(), at: dayMid + 12 * 3_600_000, watched: false, text: 'Clean day.' }
                 : isAlcohol
                 ? { id: uid(), at: dayMid + 12 * 3_600_000, drank: false,   text: 'Clean day.' }
+                : isDrugs
+                ? { id: uid(), at: dayMid + 12 * 3_600_000, used: false,    text: 'Clean day.' }
+                : isSmoke
+                ? { id: uid(), at: dayMid + 12 * 3_600_000, smoked: false,  text: 'Clean day.' }
+                : isSocial
+                ? { id: uid(), at: dayMid + 12 * 3_600_000, binged: false,  text: 'Clean day.' }
                 : { id: uid(), at: dayMid + 12 * 3_600_000, gambled: false, text: 'Clean day.' },
             );
             dayMid += MS_PER_DAY;
@@ -963,6 +978,7 @@ export const useStore = create<RecoveryState>()(
           const isSocialEntry = data.binged !== undefined;
           const isSmokeEntry = data.smoked !== undefined;
           const isAlcoholEntry = data.drank !== undefined;
+          const isDrugEntry = data.used !== undefined;
           const alreadyToday = s.journal.some((j) => {
             if (!sameDay(j.at, Date.now())) return false;
             if (isGamblingEntry) return j.gambled !== undefined;
@@ -970,6 +986,7 @@ export const useStore = create<RecoveryState>()(
             if (isSocialEntry) return j.binged !== undefined;
             if (isSmokeEntry) return j.smoked !== undefined;
             if (isAlcoholEntry) return j.drank !== undefined;
+            if (isDrugEntry) return j.used !== undefined;
             return true; // generic entry - block any duplicate
           });
           if (alreadyToday) return s;
@@ -1263,6 +1280,59 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
+          // ── Drugs / substances: used=true → relapse; used=false → clean ────
+          if (data.used === true) {
+            const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
+            const prevDays = streakDays(streakStart);
+            const relapseEntry: RelapseEvent = {
+              id: uid(),
+              at: Date.now(),
+              whatHappened: data.drugTrigger,
+              cause: data.drugTrigger,
+              feeling: data.drugEmotions?.join(', '),
+            };
+            return {
+              journal: journalAfter,
+              relapses: [relapseEntry, ...s.relapses],
+              longestStreak: Math.max(s.longestStreak, prevDays),
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Journal entry - substance use relapse logged'),
+                evt('relapse', 'Logged a relapse via journal - recovery continues'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          if (data.used === false) {
+            const now = Date.now();
+            const urgeEntry: UrgeLog = {
+              id: uid(),
+              at: now,
+              intensity: data.drugUrgeIntensity ?? 1,
+              trigger: data.drugWhatHelped ?? 'Daily journal',
+              triggers: data.drugWhatHelped ? [data.drugWhatHelped] : ['Daily journal'],
+              notes: data.drugWhatHelped ?? data.text,
+              resisted: true,
+              mood: data.mood,
+            };
+            return {
+              journal: journalAfter,
+              urges: [urgeEntry, ...s.urges],
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...resistedCounterPatch(s, now),
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Wrote a journal entry - clean day'),
+                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
+                ...s.timeline,
+              ],
+            };
+          }
+
           return {
             journal: journalAfter,
             points: s.points + 5 + altUnlocked.length * 5,
@@ -1450,6 +1520,16 @@ export function useTodaySmokeJournal(): import('@/domain/records').JournalEntry 
 export function useTodayAlcoholJournal(): import('@/domain/records').JournalEntry | undefined {
   return useStore((s) =>
     s.journal.find((j) => sameDay(j.at, Date.now()) && j.drank !== undefined),
+  );
+}
+
+/**
+ * Today's journal entry for drugs/substances users, or undefined if none submitted yet.
+ * Finds any entry today where `used` is defined (drugs-specific gate).
+ */
+export function useTodayDrugJournal(): import('@/domain/records').JournalEntry | undefined {
+  return useStore((s) =>
+    s.journal.find((j) => sameDay(j.at, Date.now()) && j.used !== undefined),
   );
 }
 
