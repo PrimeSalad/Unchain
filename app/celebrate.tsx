@@ -8,7 +8,6 @@ import Animated, {
   useSharedValue,
   withDelay,
   withSequence,
-  withSpring,
   withTiming,
   Easing,
   FadeIn,
@@ -33,7 +32,6 @@ export default function Celebrate() {
   const arm = params.arm ?? 'This is the beginning. One day at a time - no shame.';
 
   const burst = useSharedValue(0);
-  const mascotScale = useSharedValue(reduce ? 1 : 0.4);
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -41,19 +39,16 @@ export default function Celebrate() {
       burst.value = 1;
       return;
     }
-    mascotScale.value = withSpring(1, { damping: 10, stiffness: 120 });
     burst.value = withSequence(
       withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) }),
       withDelay(400, withTiming(0.85, { duration: 400 })),
     );
-  }, [burst, mascotScale, reduce]);
+  }, [burst, reduce]);
 
   const ringStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.6 + burst.value * 1.4 }],
     opacity: 0.5 * (1 - burst.value * 0.7),
   }));
-  const mascotStyle = useAnimatedStyle(() => ({ transform: [{ scale: mascotScale.value }] }));
-
   const done = () => router.replace('/(tabs)/home');
 
   return (
@@ -73,9 +68,7 @@ export default function Celebrate() {
               ringStyle,
             ]}
           />
-          <Animated.View style={mascotStyle}>
-            <Mascot state="celebrate" size={190} still />
-          </Animated.View>
+          <Mascot state="celebrate" size={190} motion="celebrate" still={reduce} />
         </View>
 
         <Animated.View entering={FadeIn.delay(200)} style={{ alignItems: 'center', marginTop: spacing.xl }}>

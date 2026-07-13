@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
-import { RecoveryRing } from '../components/RecoveryRing';
 import { StatTile } from '../components/StatTile';
 import { Mascot } from '../components/Mascot';
 import { DailyMissions } from '../components/DailyMissions';
+import { ProgressBar } from '../components/ProgressBar';
 import { spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useNow } from '../hooks/useNow';
 import { useResponsive } from '../hooks/useResponsive';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useStore, useProfile } from '@/application/store';
 import {
   DEFAULT_CURRENCY,
@@ -58,8 +60,15 @@ export function HomeScreen() {
   const router = useRouter();
   const now = useNow();
   const profile = useProfile();
-  const { ringSize } = useResponsive();
   const [showAllActivity, setShowAllActivity] = useState(false);
+  const [mascotActive, setMascotActive] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      setMascotActive(true);
+      return () => setMascotActive(false);
+    }, []),
+  );
 
   const timeline = useStore((s) => s.timeline);
   const journal = useStore((s) => s.journal);
@@ -123,29 +132,27 @@ export function HomeScreen() {
   return (
     <Screen tabPadding>
       {/* Greeting */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="caption" dim style={{ textTransform: 'uppercase' }}>
-            {new Date(now).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </Text>
-          <Text variant="headline" numberOfLines={2} style={{ marginTop: 2, fontSize: 19, lineHeight: 24 }}>
-            {greeting()}, {profile.name}
-          </Text>
-        </View>
-        <Mascot state={days > 0 ? 'happy' : 'braced'} size={58} />
+      <View style={{ marginTop: spacing.sm }}>
+        <Text variant="caption" dim style={{ textTransform: 'uppercase' }}>
+          {new Date(now).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </Text>
+        <Text variant="headline" numberOfLines={2} style={{ marginTop: 2, fontSize: 20, lineHeight: 26 }}>
+          {greeting()}, {profile.name}
+        </Text>
       </View>
 
-      {/* Recovery Dashboard - flat, sits directly on the page */}
-      <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
-        <RecoveryRing current={days} target={target} size={ringSize} caption={`of ${target} days`} />
-        <Text variant="title2" style={{ marginTop: spacing.md }}>
-          {days} Day{days === 1 ? '' : 's'} {addictionMeta(profile.addictionType).freeLabel}
-        </Text>
-        <Text variant="callout" dim style={{ marginTop: 2, fontVariant: ['tabular-nums'] }}>
-          {timer.days}d {timer.hours}h {timer.minutes}m clean · Goal: {target} days
-        </Text>
+      <RecoveryHero
+        days={days}
+        timer={timer}
+        target={target}
+        freeLabel={addictionMeta(profile.addictionType).freeLabel}
+        mascotActive={mascotActive}
+        onCheckIn={() => router.push('/checkin')}
+        onShare={() => router.push('/share' as Href)}
+      />
 
-        <View style={{ alignSelf: 'stretch', marginTop: spacing.xl, gap: spacing.md }}>
+      <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
+        <View style={{ alignSelf: 'stretch', gap: spacing.md }}>
           {profile.addictionType === 'pornography' ? (
             <>
               {/* Compact values + context in the label - same visual rhythm
@@ -222,43 +229,6 @@ export function HomeScreen() {
           )}
         </View>
       </View>
-
-      {/* Share progress - sits above the motivation feed. */}
-      <Pressable
-        onPress={() => router.push('/share' as Href)}
-        accessibilityRole="button"
-        accessibilityLabel="Share your progress"
-        style={({ pressed }) => ({
-          marginTop: spacing.xl,
-          opacity: pressed ? 0.7 : 1,
-          transform: [{ scale: pressed ? 0.99 : 1 }],
-        })}
-      >
-        <View
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-            backgroundColor: theme.color.surface,
-            borderRadius: radius.card,
-            borderWidth: 1, borderColor: theme.color.hairline,
-            padding: spacing.lg,
-          }}
-        >
-          <View
-            style={{
-              width: 40, height: 40, borderRadius: 12,
-              backgroundColor: theme.color.primarySoft,
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="share-social" size={20} color={theme.color.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="callout">Share your progress</Text>
-            <Text variant="caption" dim style={{ marginTop: 1 }}>Turn your streak into a card</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
-        </View>
-      </Pressable>
 
       {/* Daily motivation - today's quote first, saved favorites after. */}
       <Text variant="callout" style={{ marginTop: spacing.xl, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
@@ -407,6 +377,160 @@ export function HomeScreen() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
+interface RecoveryHeroProps {
+  days: number;
+  timer: { days: number; hours: number; minutes: number };
+  target: number;
+  freeLabel: string;
+  mascotActive: boolean;
+  onCheckIn: () => void;
+  onShare: () => void;
+}
+
+function RecoveryHero({
+  days,
+  timer,
+  target,
+  freeLabel,
+  mascotActive,
+  onCheckIn,
+  onShare,
+}: RecoveryHeroProps) {
+  const theme = useTheme();
+  const { width } = useResponsive();
+  const reduceMotion = useReducedMotion();
+  const compact = width < 360;
+  const mascotSize = compact ? 112 : Math.min(148, width * 0.36);
+  const progress = target > 0 ? Math.min(1, days / target) : 0;
+
+  const select = (action: () => void) => {
+    Haptics.selectionAsync().catch(() => {});
+    action();
+  };
+
+  return (
+    <Animated.View
+      entering={reduceMotion ? undefined : FadeInDown.duration(420)}
+      style={{
+        marginTop: spacing.lg,
+        alignSelf: 'stretch',
+        paddingHorizontal: compact ? spacing.sm : spacing.lg,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          minHeight: mascotSize,
+          gap: compact ? spacing.xs : spacing.sm,
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="shield-checkmark" size={16} color={theme.color.primary} />
+            <Text variant="caption" color={theme.color.primary}>
+              YOUR RECOVERY
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.sm }}>
+            <Text
+              variant="display"
+              style={{ fontSize: compact ? 42 : 48, lineHeight: compact ? 46 : 52, fontVariant: ['tabular-nums'] }}
+            >
+              {days}
+            </Text>
+            <Text variant="headline" dim style={{ marginLeft: 6 }}>
+              day{days === 1 ? '' : 's'}
+            </Text>
+          </View>
+          <Text variant="headline" color={theme.color.primary} numberOfLines={2}>
+            {freeLabel}
+          </Text>
+          <Text variant="caption" dim style={{ marginTop: spacing.sm, fontVariant: ['tabular-nums'] }}>
+            {timer.days}d {timer.hours}h {timer.minutes}m in this streak
+          </Text>
+        </View>
+
+        <Mascot
+          state="happy"
+          size={mascotSize}
+          motion="hero"
+          interactive
+          still={!mascotActive}
+        />
+      </View>
+
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: theme.color.hairline,
+          paddingTop: spacing.md,
+          marginTop: spacing.md,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+          <Text variant="footnote" dim style={{ flex: 1 }}>
+            Next milestone
+          </Text>
+          <Text variant="footnote" color={theme.color.primary} style={{ fontVariant: ['tabular-nums'] }}>
+            {Math.min(days, target)} / {target} days
+          </Text>
+        </View>
+        <ProgressBar
+          progress={progress}
+          color={theme.color.primary}
+          track={theme.color.surface}
+          height={8}
+        />
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg }}>
+        <Pressable
+          onPress={() => select(onCheckIn)}
+          accessibilityRole="button"
+          accessibilityLabel="Daily check-in"
+          style={({ pressed }) => ({
+            flex: 1,
+            minHeight: 48,
+            borderRadius: radius.button,
+            backgroundColor: theme.color.primary,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: spacing.sm,
+            opacity: pressed ? 0.78 : 1,
+            transform: [{ scale: pressed ? 0.98 : 1 }],
+          })}
+        >
+          <Ionicons name="checkmark-circle" size={20} color={theme.color.onPrimary} />
+          <Text variant="callout" color={theme.color.onPrimary}>
+            Check in
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => select(onShare)}
+          accessibilityRole="button"
+          accessibilityLabel="Share your progress"
+          style={({ pressed }) => ({
+            width: 48,
+            height: 48,
+            borderRadius: radius.button,
+            borderWidth: 1,
+            borderColor: theme.color.hairline,
+            backgroundColor: theme.color.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.7 : 1,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          })}
+        >
+          <Ionicons name="share-social" size={20} color={theme.color.primary} />
+        </Pressable>
+      </View>
+    </Animated.View>
+  );
+}
 
 /** Compact iOS-style action tile - 3-up grid, flat surface with a hairline
  *  border and a tinted rounded-square glyph. Calm, not carnival. */

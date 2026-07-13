@@ -159,7 +159,7 @@ export function OnboardingScreen() {
       {/* ── Welcome ─────────────────────────────────────────────────────── */}
       {step === 'welcome' && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Mascot state="happy" size={180} />
+          <Mascot state="happy" size={180} motion="hero" interactive />
           <Text variant="display" center style={{ marginTop: spacing.lg, fontSize: 34, lineHeight: 40 }}>
             Welcome to Unchainly
           </Text>
@@ -499,7 +499,7 @@ export function OnboardingScreen() {
       {/* ── Start ───────────────────────────────────────────────────────── */}
       {step === 'start' && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Mascot state="braced" size={170} />
+          <Mascot state="celebrate" size={170} motion="celebrate" interactive />
           <Text variant="title1" center style={{ marginTop: spacing.lg }}>
             You're ready, {nickname.trim() || 'friend'}.
           </Text>

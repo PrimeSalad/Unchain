@@ -3,6 +3,8 @@ import { Animated, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { Text } from '@/presentation/components/Text';
+import { Mascot } from '@/presentation/components/Mascot';
+import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 import { spacing } from '@/presentation/theme/tokens';
 
 /**
@@ -12,6 +14,7 @@ import { spacing } from '@/presentation/theme/tokens';
 export default function LoadingScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
 
   const dot1 = useRef(new Animated.Value(0.3)).current;
   const dot2 = useRef(new Animated.Value(0.3)).current;
@@ -19,6 +22,15 @@ export default function LoadingScreen() {
   const fadeIn = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (reduceMotion) {
+      fadeIn.setValue(1);
+      dot1.setValue(0.65);
+      dot2.setValue(0.65);
+      dot3.setValue(0.65);
+      const timer = setTimeout(() => router.replace('/onboarding'), 2000);
+      return () => clearTimeout(timer);
+    }
+
     // Fade the whole screen in
     Animated.timing(fadeIn, {
       toValue: 1,
@@ -48,7 +60,7 @@ export default function LoadingScreen() {
       clearTimeout(timer);
       anim.stop();
     };
-  }, []);
+  }, [dot1, dot2, dot3, fadeIn, reduceMotion, router]);
 
   const Dot = ({ anim }: { anim: Animated.Value }) => (
     <Animated.View
@@ -74,7 +86,9 @@ export default function LoadingScreen() {
         opacity: fadeIn,
       }}
     >
-      <Text variant="title2" color={theme.color.primary} style={{ marginBottom: spacing.xl }}>
+      <Mascot state="happy" size={136} motion="gentle" still={reduceMotion} decorative />
+
+      <Text variant="title2" color={theme.color.primary} style={{ marginTop: spacing.lg, marginBottom: spacing.xl }}>
         Clearing data…
       </Text>
 

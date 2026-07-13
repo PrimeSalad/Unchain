@@ -148,7 +148,7 @@ export default function RootLayout() {
             <Stack.Screen name="celebrate" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
             <Stack.Screen name="alternatives" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="protection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="checkin" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="checkin" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="log-urge" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="porn-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />

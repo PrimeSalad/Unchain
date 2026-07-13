@@ -211,7 +211,7 @@ export function QuoteFeed() {
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.sm }}>
-          <Mascot state={isToday ? 'happy' : 'comfort'} size={52} still />
+          <Mascot state="happy" size={52} still decorative />
           <View
             style={{
               flex: 1,

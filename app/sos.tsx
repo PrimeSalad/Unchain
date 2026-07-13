@@ -71,7 +71,12 @@ function PulseHero({ reduce }: { reduce: boolean }) {
           justifyContent: 'center',
         }}
       >
-        <Mascot state="comfort" size={118} />
+        <Mascot
+          state="braced"
+          size={118}
+          still
+          accessibilityLabel="Unchainly is here with you through this urge"
+        />
       </View>
     </View>
   );

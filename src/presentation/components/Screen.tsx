@@ -1,5 +1,4 @@
 import {
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -41,10 +40,9 @@ interface ScreenProps {
  *   keyboard is open.
  *
  * scroll=false
- *   KAV → View with onTouchStart.
- *   onTouchStart calls Keyboard.dismiss() only when the keyboard is visible,
- *   without claiming the responder, so child TextInputs still receive taps
- *   and open the keyboard normally.
+ *   KAV → View. Screens that contain their own ScrollView should use
+ *   the dismissal mode appropriate for their form. On iOS, "interactive"
+ *   keeps focused fields reachable while the keyboard follows the drag.
  */
 export function Screen({
   children,
@@ -121,11 +119,6 @@ export function Screen({
             hPad,
             contentStyle,
           ]}
-          onTouchStart={() => {
-            // Fires before children claim the touch — does NOT block them.
-            // Only dismisses when the keyboard is actually visible.
-            if (Keyboard.isVisible()) Keyboard.dismiss();
-          }}
         >
           {children}
         </View>
