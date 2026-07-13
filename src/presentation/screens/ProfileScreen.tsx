@@ -2,11 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
+  findNodeHandle,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,12 +18,20 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
-import { Pill } from '../components/Pill';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { useReliableSafeAreaInsets } from '../hooks/useReliableSafeAreaInsets';
 import { useStore, useProfile, initialGames } from '@/application/store';
 import { shareCapturedContent } from '@/application/shareMedia';
-import { DEFAULT_CURRENCY, formatMoney, streakDays, addictionMeta, TRIGGERS, currentStreakStart } from '@/domain/gambling';
+import {
+  DEFAULT_CURRENCY,
+  addictionMeta,
+  currentStreakStart,
+  formatMoney,
+  streakDays,
+  triggersForAddiction,
+} from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
 const BACKUP_MARKER = 'unchainly-backup';
@@ -29,10 +41,14 @@ const LEGACY_BACKUP_MARKER = 'unchain-backup';
 // Constants
 // ---------------------------------------------------------------------------
 
-const THEMES: { key: 'system' | 'light' | 'dark'; label: string }[] = [
-  { key: 'system', label: 'System' },
-  { key: 'light', label: 'Light' },
-  { key: 'dark', label: 'Dark' },
+const THEMES: {
+  key: 'system' | 'light' | 'dark';
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { key: 'system', label: 'System', icon: 'phone-portrait-outline' },
+  { key: 'light', label: 'Light', icon: 'sunny-outline' },
+  { key: 'dark', label: 'Dark', icon: 'moon-outline' },
 ];
 
 type ModalConfig = {
@@ -53,6 +69,8 @@ type ToastConfig = {
 
 export function ProfileScreen() {
   const theme = useTheme();
+  const insets = useReliableSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const router = useRouter();
   const profile = useProfile();
   const update = useStore((s) => s.updateProfile);
@@ -66,12 +84,14 @@ export function ProfileScreen() {
   // Name edit state
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const nameRef = useRef<TextInput>(null);
 
   // Reason edit state (mirrors the name editor)
   const [editingReason, setEditingReason] = useState(false);
   const [reasonValue, setReasonValue] = useState('');
   const reasonRef = useRef<TextInput>(null);
+  const screenScrollRef = useRef<ScrollView>(null);
 
   // Modal state
   const [modal, setModal] = useState<ModalConfig | null>(null);
@@ -93,7 +113,8 @@ export function ProfileScreen() {
 
   // Same event-derived streak as Home/Progress - never counts through a relapse.
   const days = streakDays(currentStreakStart(profile.startedAt, relapses, journal));
-  const typeLabel = addictionMeta(profile.addictionType).label;
+  const meta = addictionMeta(profile.addictionType);
+  const typeLabel = meta.label;
   const initials = profile.name
     .split(/\s+/)
     .filter(Boolean)
@@ -103,6 +124,18 @@ export function ProfileScreen() {
     .slice(0, 2) || 'U';
   const currency = profile.currency ?? DEFAULT_CURRENCY;
   const formatProfileMoney = (value: number) => formatMoney(Math.max(0, value), currency);
+  const recoveryStart = new Date(profile.startedAt).toLocaleDateString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const standardTriggerOptions: readonly string[] = profile.addictionType === 'pornography'
+    ? PORN_TRIGGERS
+    : triggersForAddiction(profile.addictionType);
+  // Keep saved legacy/custom values editable instead of silently hiding them.
+  const triggerOptions = [...new Set<string>([...standardTriggerOptions, ...profile.triggers])];
+  const selectedTriggerCount = triggerOptions.filter((trigger) => profile.triggers.includes(trigger)).length;
+  const filledTextColor = theme.color.textInverse;
 
   // ── Toast ────────────────────────────────────────────────────────────────
 
@@ -112,18 +145,26 @@ export function ProfileScreen() {
     // Screen readers can't see the transient toast - announce it.
     AccessibilityInfo.announceForAccessibility(message);
     toastAnim.setValue(0);
-    Animated.spring(toastAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      damping: 15,
-      stiffness: 140,
-    }).start();
-    toastTimer.current = setTimeout(() => {
-      Animated.timing(toastAnim, {
-        toValue: 0,
-        duration: 250,
+    if (reduceMotion) {
+      toastAnim.setValue(1);
+    } else {
+      Animated.spring(toastAnim, {
+        toValue: 1,
         useNativeDriver: true,
-      }).start(() => setToast(null));
+        damping: 15,
+        stiffness: 140,
+      }).start();
+    }
+    toastTimer.current = setTimeout(() => {
+      if (reduceMotion) {
+        setToast(null);
+      } else {
+        Animated.timing(toastAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start(() => setToast(null));
+      }
     }, 3000);
   };
 
@@ -131,6 +172,7 @@ export function ProfileScreen() {
 
   const startEditName = () => {
     setNameValue(profile.name);
+    setNameError(null);
     setEditingName(true);
     setTimeout(() => nameRef.current?.focus(), 140);
   };
@@ -138,7 +180,9 @@ export function ProfileScreen() {
   const commitName = () => {
     const trimmed = nameValue.trim().replace(/\s+/g, ' ');
     if (!trimmed) {
-      showToast('Name cannot be empty', 'error');
+      setNameError('Enter a name before saving.');
+      AccessibilityInfo.announceForAccessibility('Enter a name before saving.');
+      nameRef.current?.focus();
       return;
     }
     if (trimmed !== profile.name) {
@@ -149,10 +193,14 @@ export function ProfileScreen() {
         showToast('Failed to update name', 'error');
       }
     }
+    Keyboard.dismiss();
+    setNameError(null);
     setEditingName(false);
   };
 
   const cancelName = () => {
+    Keyboard.dismiss();
+    setNameError(null);
     setEditingName(false);
   };
 
@@ -161,7 +209,19 @@ export function ProfileScreen() {
   const startEditReason = () => {
     setReasonValue(profile.reason ?? '');
     setEditingReason(true);
-    setTimeout(() => reasonRef.current?.focus(), 50);
+    setTimeout(() => {
+      const input = reasonRef.current;
+      input?.focus();
+      if (Platform.OS === 'web') {
+        const active = typeof document === 'undefined' ? null : document.activeElement;
+        if (active instanceof HTMLElement) active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      const node = findNodeHandle(input);
+      if (node != null) {
+        screenScrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(node, 112, true);
+      }
+    }, 180);
   };
 
   const commitReason = () => {
@@ -174,10 +234,12 @@ export function ProfileScreen() {
         showToast('Failed to update reason', 'error');
       }
     }
+    Keyboard.dismiss();
     setEditingReason(false);
   };
 
   const cancelReason = () => {
+    Keyboard.dismiss();
     setEditingReason(false);
   };
 
@@ -376,379 +438,368 @@ export function ProfileScreen() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <Screen tabPadding>
-      <View style={{ gap: spacing.md, marginTop: spacing.xs }}>
-        <View
-          style={{
-            backgroundColor: 'transparent',
-            borderBottomWidth: 1,
-            borderBottomColor: theme.color.hairline,
-            paddingBottom: spacing.md,
-            gap: spacing.md,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 15,
-                backgroundColor: theme.color.primarySoft,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text variant="headline" color={theme.color.primary}>{initials}</Text>
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              {editingName ? (
-                <View style={{ gap: spacing.xs }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                    <TextInput
-                      ref={nameRef}
-                      value={nameValue}
-                      onChangeText={setNameValue}
-                      placeholder="Nickname"
-                      placeholderTextColor={theme.color.textDim}
-                      returnKeyType="done"
-                      onSubmitEditing={commitName}
-                      selectTextOnFocus
-                      maxLength={32}
-                      style={{
-                        ...inputStyle,
-                        minHeight: 44,
-                        minWidth: 0,
-                        flex: 1,
-                        paddingVertical: 8,
-                        paddingHorizontal: spacing.sm,
-                      }}
-                    />
-                    <Pressable
-                      onPress={commitName}
-                      accessibilityRole="button"
-                      accessibilityLabel="Save profile name"
-                      style={({ pressed }) => ({
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                        backgroundColor: theme.color.success,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: pressed ? 0.7 : 1,
-                      })}
-                    >
-                      <Ionicons name="checkmark" size={19} color="#fff" />
-                    </Pressable>
-                    <Pressable
-                      onPress={cancelName}
-                      accessibilityRole="button"
-                      accessibilityLabel="Cancel editing profile name"
-                      style={({ pressed }) => ({
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                        backgroundColor: theme.color.surfaceAlt,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: pressed ? 0.7 : 1,
-                      })}
-                    >
-                      <Ionicons name="close" size={19} color={theme.color.textDim} />
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  <Text variant="title2" numberOfLines={1}>{profile.name}</Text>
-                  <Text variant="footnote" dim numberOfLines={1} style={{ marginTop: 2 }}>
-                    {typeLabel} recovery · {days} day streak
-                  </Text>
-                </>
-              )}
-            </View>
-            {editingName ? null : (
-              <Pressable
-                onPress={startEditName}
-                accessibilityRole="button"
-                accessibilityLabel="Edit profile name"
-                style={({ pressed }) => ({
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: theme.color.primarySoft,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
-              </Pressable>
-            )}
-          </View>
+    <View style={{ flex: 1, backgroundColor: theme.color.bg }}>
+      <Screen scrollRef={screenScrollRef} tabPadding contentStyle={{ paddingTop: spacing.md }}>
+        <Text variant="title1" accessibilityRole="header">Profile</Text>
 
-          <Text variant="footnote" dim style={{ lineHeight: 19 }}>
-            {profile.reason || 'Add your recovery reason so the app can keep it visible when it matters most.'}
-          </Text>
-
-          <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-            <ProfileStat label="Streak" value={`${days} days`} first />
-            <ProfileStat label="Start" value={new Date(profile.startedAt).toLocaleDateString()} />
-            <ProfileStat label="Expense" value={formatProfileMoney(profile.expenseAmount)} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg }}>
+          <View
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: radius.button,
+              backgroundColor: theme.color.primarySoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text variant="title2" color={theme.color.primary}>{initials}</Text>
           </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="title2" numberOfLines={2}>{profile.name}</Text>
+            <Text variant="footnote" dim style={{ marginTop: 2 }}>{typeLabel} recovery</Text>
+          </View>
+          {!editingName && (
+            <IconAction
+              icon="pencil-outline"
+              label={`Edit profile name, ${profile.name}`}
+              onPress={startEditName}
+            />
+          )}
         </View>
 
-        <SectionTitle title="Recovery Details" />
-        <FlatGroup>
-          <ReadRow label="Name" value={profile.name} first onPress={startEditName} actionLabel="Edit profile name" />
-          <ReadRow label="Addiction" value={typeLabel} />
-          {profile.addictionDetail ? <ReadRow label="Specifically" value={profile.addictionDetail} /> : null}
-          <ReadRow label="Current streak" value={`${days} days`} />
-          <ReadRow label="Recovery start" value={new Date(profile.startedAt).toLocaleDateString()} />
-          <ReadRow label="Currency" value={currency} />
-          <ReadRow
-            label="Average expense"
-            value={`${formatProfileMoney(profile.expenseAmount)} / ${profile.expensePeriod}`}
-          />
-        </FlatGroup>
-
-        <SectionTitle title="Personal Recovery Reason" />
-        {editingReason ? (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
-            <TextInput
-              ref={reasonRef}
-              value={reasonValue}
-              onChangeText={setReasonValue}
-              multiline
-              placeholder="Your reason…"
-              placeholderTextColor={theme.color.textDim}
-              style={{
-                ...inputStyle,
-                minHeight: 88,
-                padding: spacing.md,
-                textAlignVertical: 'top',
-                backgroundColor: theme.color.surface,
-              }}
-            />
-            <Pressable
-              onPress={commitReason}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Save reason"
-              style={{
-                width: 44, height: 44, borderRadius: radius.round,
-                backgroundColor: theme.color.success,
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Ionicons name="checkmark" size={20} color="#fff" />
-            </Pressable>
-            <Pressable
-              onPress={cancelReason}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel editing reason"
-              style={{
-                width: 44, height: 44, borderRadius: radius.round,
-                backgroundColor: theme.color.surfaceAlt,
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Ionicons name="close" size={20} color={theme.color.textDim} />
-            </Pressable>
-          </View>
-        ) : (
+        {editingName && (
           <View
             style={{
-              borderRadius: radius.card,
+              marginTop: spacing.md,
+              padding: spacing.md,
+              borderRadius: radius.input,
               borderWidth: 1,
               borderColor: theme.color.hairline,
               backgroundColor: theme.color.surface,
-              padding: spacing.md,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-              <View
-                style={{
-                  width: 4,
-                  alignSelf: 'stretch',
-                  borderRadius: 999,
-                  backgroundColor: theme.color.primarySoft,
-                }}
-              />
-              <Text variant="footnote" style={{ flex: 1, lineHeight: 20 }} color={profile.reason ? theme.color.text : theme.color.textDim}>
-                {profile.reason || 'Add your reason…'}
+            <Text variant="footnote" dim>Display name</Text>
+            <TextInput
+              ref={nameRef}
+              value={nameValue}
+              onChangeText={(value) => {
+                setNameValue(value);
+                if (nameError) setNameError(null);
+              }}
+              accessibilityLabel="Profile name"
+              placeholder="Nickname"
+              placeholderTextColor={theme.color.textDim}
+              returnKeyType="done"
+              onSubmitEditing={commitName}
+              selectTextOnFocus
+              autoCapitalize="words"
+              textContentType="name"
+              maxLength={32}
+              style={[
+                inputStyle,
+                {
+                  flex: 0,
+                  minHeight: 48,
+                  marginTop: spacing.sm,
+                  borderColor: nameError ? theme.color.danger : theme.color.primary,
+                },
+              ]}
+            />
+            {nameError && (
+              <Text
+                variant="footnote"
+                color={theme.color.danger}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                style={{ marginTop: spacing.sm }}
+              >
+                {nameError}
               </Text>
-              <Pressable onPress={startEditReason} hitSlop={14} accessibilityRole="button" accessibilityLabel="Edit reason">
-                <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
-              </Pressable>
+            )}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md }}>
+              <IconAction icon="close" label="Cancel editing profile name" onPress={cancelName} tone="neutral" />
+              <IconAction icon="checkmark" label="Save profile name" onPress={commitName} tone="success" />
             </View>
           </View>
         )}
 
-        <SectionTitle title="Trigger Preferences" />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {(profile.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => {
-            const active = profile.triggers.includes(t);
-            return (
-              <Pill
-                key={t}
-                label={t}
-                active={active}
-                size="compact"
-                onPress={() =>
-                  update({
-                    triggers: active
-                      ? profile.triggers.filter((x) => x !== t)
-                      : [...profile.triggers, t],
-                  })
-                }
-              />
-            );
-          })}
-        </View>
-
-        <SectionTitle title="Appearance" />
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          {THEMES.map((t) => (
-            <Pill
-              key={t.key}
-              label={t.label}
-              active={themePref === t.key}
-              size="compact"
-              onPress={() => setTheme(t.key)}
-            />
-          ))}
-        </View>
-
-        <SectionTitle title="Your Data" />
-        <FlatGroup>
-          <ActionRow icon="share-outline" label="Export local data" onPress={exportData} first />
-          <ActionRow icon="download-outline" label="Import backup" onPress={importData} />
-          <ActionRow
-            icon="trash-outline"
-            label="Reset recovery data"
-            danger
-            onPress={openResetRecoveryModal}
-          />
-          <ActionRow
-            icon="close-circle-outline"
-            label="Delete all local data"
-            danger
-            onPress={openDeleteAllModal}
-          />
-        </FlatGroup>
-
         <View
           style={{
-            borderRadius: radius.card,
-            borderWidth: 1,
+            flexDirection: 'row',
+            marginTop: spacing.lg,
+            paddingVertical: spacing.md,
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
             borderColor: theme.color.hairline,
-            backgroundColor: theme.color.surfaceAlt,
-            padding: spacing.md,
-            marginTop: spacing.xs,
           }}
         >
-          <Text variant="footnote" color={theme.color.primary}>Privacy</Text>
-          <Text variant="footnote" dim style={{ marginTop: 4, lineHeight: 19 }}>
-            Everything stays on this device. No account, no internet, no data ever leaves your phone.
-          </Text>
+          <ProfileMetric label="Current streak" value={`${days} day${days === 1 ? '' : 's'}`} first />
+          <ProfileMetric label="Recovery start" value={recoveryStart} />
         </View>
-        <Text variant="caption" dim center style={{ marginTop: spacing.xs, marginBottom: spacing.lg }}>
-          Unchainly · Recovery Companion · v1.0
-        </Text>
-      </View>
 
-      {/* ── Confirmation modal ─────────────────────────────────────────── */}
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionTitle title="Recovery details" />
+          <FlatGroup>
+            <ReadRow icon="shield-checkmark-outline" label="Addiction" value={typeLabel} first />
+            {profile.addictionDetail ? (
+              <ReadRow icon="locate-outline" label="Focus" value={profile.addictionDetail} />
+            ) : null}
+            {meta.hasExpense ? (
+              <>
+                <ReadRow
+                  icon="wallet-outline"
+                  label="Average expense"
+                  value={`${formatProfileMoney(profile.expenseAmount)} / ${profile.expensePeriod}`}
+                />
+                <ReadRow icon="cash-outline" label="Currency" value={currency} />
+              </>
+            ) : null}
+          </FlatGroup>
+        </View>
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionTitle title="Recovery reason" />
+          {editingReason ? (
+            <View
+              style={{
+                borderRadius: radius.input,
+                borderWidth: 1,
+                borderColor: theme.color.hairline,
+                backgroundColor: theme.color.surface,
+                padding: spacing.md,
+              }}
+            >
+              <Text variant="footnote" dim>Your reason</Text>
+              <TextInput
+                ref={reasonRef}
+                value={reasonValue}
+                onChangeText={setReasonValue}
+                accessibilityLabel="Recovery reason"
+                multiline
+                maxLength={320}
+                autoCapitalize="sentences"
+                placeholder="What keeps you committed?"
+                placeholderTextColor={theme.color.textDim}
+                style={[
+                  inputStyle,
+                  {
+                    flex: 0,
+                    minHeight: 112,
+                    marginTop: spacing.sm,
+                    textAlignVertical: 'top',
+                  },
+                ]}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md }}>
+                <IconAction icon="close" label="Cancel editing reason" onPress={cancelReason} tone="neutral" />
+                <IconAction icon="checkmark" label="Save recovery reason" onPress={commitReason} tone="success" />
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              onPress={startEditReason}
+              accessibilityRole="button"
+              accessibilityLabel={`Recovery reason, ${profile.reason || 'not set'}`}
+              accessibilityHint="Edits your recovery reason"
+              style={({ pressed }) => ({
+                minHeight: 72,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                borderRadius: radius.input,
+                borderWidth: 1,
+                borderColor: theme.color.hairline,
+                backgroundColor: pressed ? theme.color.surfaceAlt : theme.color.surface,
+                padding: spacing.md,
+              })}
+            >
+              <Ionicons name="heart-outline" size={22} color={theme.color.primary} />
+              <Text
+                variant="callout"
+                style={{ flex: 1, lineHeight: 22 }}
+                color={profile.reason ? theme.color.text : theme.color.textDim}
+              >
+                {profile.reason || 'Add a personal recovery reason'}
+              </Text>
+              <Ionicons name="pencil-outline" size={18} color={theme.color.primary} />
+            </Pressable>
+          )}
+        </View>
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionTitle title="Triggers" trailing={`${selectedTriggerCount} selected`} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {triggerOptions.map((trigger) => {
+              const active = profile.triggers.includes(trigger);
+              return (
+                <TriggerOption
+                  key={trigger}
+                  label={trigger}
+                  active={active}
+                  onPress={() =>
+                    update({
+                      triggers: active
+                        ? profile.triggers.filter((value) => value !== trigger)
+                        : [...profile.triggers, trigger],
+                    })
+                  }
+                />
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionTitle title="Appearance" />
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Appearance"
+            style={{
+              flexDirection: 'row',
+              gap: spacing.xs,
+              padding: spacing.xs,
+              borderRadius: radius.input,
+              borderWidth: 1,
+              borderColor: theme.color.hairline,
+              backgroundColor: theme.color.surfaceAlt,
+            }}
+          >
+            {THEMES.map((option) => (
+              <ThemeOption
+                key={option.key}
+                label={option.label}
+                icon={option.icon}
+                active={themePref === option.key}
+                onPress={() => setTheme(option.key)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionTitle title="Backup" />
+          <FlatGroup>
+            <ActionRow icon="share-outline" label="Export local data" onPress={exportData} first />
+            <ActionRow icon="download-outline" label="Import backup" onPress={importData} />
+          </FlatGroup>
+        </View>
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionTitle title="Danger zone" danger />
+          <FlatGroup>
+            <ActionRow icon="refresh-outline" label="Reset recovery data" danger onPress={openResetRecoveryModal} first />
+            <ActionRow icon="trash-outline" label="Delete all local data" danger onPress={openDeleteAllModal} />
+          </FlatGroup>
+        </View>
+
+        <View
+          accessible
+          accessibilityLabel="Private by design. Everything stays on this device."
+          style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.xxl, paddingHorizontal: spacing.xs }}
+        >
+          <Ionicons name="lock-closed-outline" size={18} color={theme.color.primary} />
+          <View style={{ flex: 1 }}>
+            <Text variant="footnote" color={theme.color.text}>Private by design</Text>
+            <Text variant="caption" dim style={{ marginTop: 2 }}>Everything stays on this device.</Text>
+          </View>
+        </View>
+        <Text variant="caption" dim center style={{ marginTop: spacing.xl, marginBottom: spacing.lg }}>
+          Unchainly · v1.0
+        </Text>
+      </Screen>
+
       <Modal
         visible={modal !== null}
         transparent
-        animationType="fade"
+        animationType={reduceMotion ? 'none' : 'fade'}
         onRequestClose={() => setModal(null)}
       >
-        {/* Scrim and dialog are siblings - nesting the dialog inside a
-            Pressable nests buttons inside a button (invalid on web). */}
         <View
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: spacing.xl,
-          }}
+          onAccessibilityEscape={() => setModal(null)}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl }}
         >
           <Pressable
+            accessible={false}
+            importantForAccessibility="no"
             style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]}
             onPress={() => setModal(null)}
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss"
           />
           <View
+            accessibilityViewIsModal
             style={{
-              backgroundColor: theme.color.surface,
-              borderRadius: radius.sheet,
-              padding: spacing.xl,
               width: '100%',
               maxWidth: 380,
+              maxHeight: '84%',
+              overflow: 'hidden',
+              borderRadius: radius.card,
+              backgroundColor: theme.color.surface,
               ...elevation.e2,
             }}
           >
-            <Text variant="title2" style={{ marginBottom: spacing.md }}>
-              {modal?.title}
-            </Text>
-            <Text variant="body" dim style={{ marginBottom: spacing.xl, lineHeight: 24 }}>
-              {modal?.body}
-            </Text>
-
-            {/* Confirm (destructive) */}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                const fn = modal?.onConfirm;
-                setModal(null);
-                fn?.();
-              }}
-              style={{
-                backgroundColor: theme.color.danger,
-                borderRadius: radius.button,
-                paddingVertical: spacing.md,
-                alignItems: 'center',
-                marginBottom: spacing.sm,
-              }}
+            <ScrollView
+              style={{ flexShrink: 1 }}
+              contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing.lg }}
+              showsVerticalScrollIndicator={false}
             >
-              <Text variant="headline" color="#fff">
-                {modal?.confirmLabel}
-              </Text>
-            </Pressable>
-
-            {/* Cancel */}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setModal(null)}
-              style={{
-                backgroundColor: theme.color.surfaceAlt,
-                borderRadius: radius.button,
-                paddingVertical: spacing.md,
-                alignItems: 'center',
-              }}
-            >
-              <Text variant="headline" color={theme.color.textDim}>
-                Cancel
-              </Text>
-            </Pressable>
+              <Text variant="title2" accessibilityRole="header">{modal?.title}</Text>
+              <Text variant="body" dim style={{ marginTop: spacing.md, lineHeight: 24 }}>{modal?.body}</Text>
+            </ScrollView>
+            <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xl, paddingBottom: spacing.xl }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                onPress={() => setModal(null)}
+                style={({ pressed }) => ({
+                  minHeight: 48,
+                  borderRadius: radius.input,
+                  backgroundColor: theme.color.surfaceAlt,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.72 : 1,
+                })}
+              >
+                <Text variant="headline">Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={modal?.confirmLabel}
+                onPress={() => {
+                  const fn = modal?.onConfirm;
+                  setModal(null);
+                  fn?.();
+                }}
+                style={({ pressed }) => ({
+                  minHeight: 48,
+                  borderRadius: radius.input,
+                  backgroundColor: theme.color.danger,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.78 : 1,
+                })}
+              >
+                <Text variant="headline" color={filledTextColor}>{modal?.confirmLabel}</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* ── Toast ─────────────────────────────────────────────────────── */}
-      {toast && (
+      {toast && modal === null && (
         <Animated.View
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
           style={{
             position: 'absolute',
-            bottom: 100,
-            left: spacing.xl,
-            right: spacing.xl,
-            backgroundColor:
-              toast.type === 'success' ? theme.color.success : theme.color.danger,
-            borderRadius: radius.card,
+            bottom: Math.max(104, insets.bottom + 80),
+            left: spacing.lg,
+            right: spacing.lg,
+            minHeight: 52,
+            backgroundColor: toast.type === 'success' ? theme.color.success : theme.color.danger,
+            borderRadius: radius.input,
             paddingVertical: spacing.md,
             paddingHorizontal: spacing.lg,
             flexDirection: 'row',
@@ -756,27 +807,20 @@ export function ProfileScreen() {
             gap: spacing.sm,
             ...elevation.e2,
             opacity: toastAnim,
-            transform: [
-              {
-                translateY: toastAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [20, 0],
-                }),
-              },
-            ],
+            transform: [{
+              translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }),
+            }],
           }}
         >
           <Ionicons
             name={toast.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
             size={20}
-            color="#fff"
+            color={filledTextColor}
           />
-          <Text variant="callout" color="#fff" style={{ flex: 1 }}>
-            {toast.message}
-          </Text>
+          <Text variant="callout" color={filledTextColor} style={{ flex: 1 }}>{toast.message}</Text>
         </Animated.View>
       )}
-    </Screen>
+    </View>
   );
 }
 
@@ -785,58 +829,42 @@ export function ProfileScreen() {
 // ---------------------------------------------------------------------------
 
 function ReadRow({
+  icon,
   label,
   value,
   first,
-  onPress,
-  actionLabel,
 }: {
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
   first?: boolean;
-  onPress?: () => void;
-  actionLabel?: string;
 }) {
   const theme = useTheme();
-  const rowStyle = {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-    gap: spacing.md,
-    borderTopWidth: first ? 0 : 1,
-    borderTopColor: theme.color.hairline,
-  };
-  const content = (
-    <>
-      <Text variant="footnote" dim>{label}</Text>
-      <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.xs }}>
-        <Text variant="footnote" color={theme.color.text} numberOfLines={1} style={{ flexShrink: 1, textAlign: 'right' }}>
-          {value}
-        </Text>
-        {onPress ? <Ionicons name="pencil-outline" size={16} color={theme.color.primary} /> : null}
-      </View>
-    </>
-  );
-  if (onPress) {
-    return (
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={actionLabel ?? label}
-        style={({ pressed }) => ({
-          ...rowStyle,
-          opacity: pressed ? 0.65 : 1,
-        })}
-      >
-        {content}
-      </Pressable>
-    );
-  }
   return (
-    <View style={rowStyle}>
-      {content}
+    <View
+      accessible
+      accessibilityLabel={`${label}, ${value}`}
+      style={{
+        minHeight: 58,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderTopWidth: first ? 0 : 1,
+        borderTopColor: theme.color.hairline,
+      }}
+    >
+      <View
+        accessible={false}
+        style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Ionicons name={icon} size={19} color={theme.color.primary} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="caption" dim>{label}</Text>
+        <Text variant="callout" style={{ marginTop: 1 }}>{value}</Text>
+      </View>
     </View>
   );
 }
@@ -846,7 +874,7 @@ function FlatGroup({ children }: { children: React.ReactNode }) {
   return (
     <View
       style={{
-        borderRadius: radius.card,
+        borderRadius: radius.input,
         borderWidth: 1,
         borderColor: theme.color.hairline,
         backgroundColor: theme.color.surface,
@@ -858,36 +886,196 @@ function FlatGroup({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SectionTitle({ title }: { title: string }) {
+function SectionTitle({
+  title,
+  trailing,
+  danger,
+}: {
+  title: string;
+  trailing?: string;
+  danger?: boolean;
+}) {
   const theme = useTheme();
   return (
-    <Text variant="caption" color={theme.color.textDim} style={{ textTransform: 'uppercase', marginTop: spacing.xs }}>
-      {title}
-    </Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, paddingHorizontal: spacing.xs }}>
+      <Text
+        variant="caption"
+        accessibilityRole="header"
+        color={danger ? theme.color.danger : theme.color.textDim}
+        style={{ flex: 1, textTransform: 'uppercase' }}
+      >
+        {title}
+      </Text>
+      {trailing ? <Text variant="caption" dim>{trailing}</Text> : null}
+    </View>
   );
 }
 
-function ProfileStat({ label, value, first }: { label: string; value: string; first?: boolean }) {
+function ProfileMetric({ label, value, first }: { label: string; value: string; first?: boolean }) {
   const theme = useTheme();
   return (
     <View
+      accessible
+      accessibilityLabel={`${label}, ${value}`}
       style={{
         flex: 1,
         minWidth: 0,
         borderLeftWidth: first ? 0 : 1,
         borderLeftColor: theme.color.hairline,
-        paddingLeft: first ? 0 : spacing.sm,
-        paddingVertical: 2,
+        paddingHorizontal: spacing.md,
         gap: 2,
       }}
     >
-      <Text variant="callout" color={theme.color.text} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontSize: 15 }}>
-        {value}
-      </Text>
-      <Text variant="caption" dim numberOfLines={1}>
+      <Text variant="headline" style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
+      <Text variant="caption" dim>{label}</Text>
+    </View>
+  );
+}
+
+function IconAction({
+  icon,
+  label,
+  onPress,
+  tone = 'primary',
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  tone?: 'primary' | 'neutral' | 'success';
+}) {
+  const theme = useTheme();
+  const backgroundColor = tone === 'success'
+    ? theme.color.success
+    : tone === 'neutral'
+      ? theme.color.surfaceAlt
+      : theme.color.primarySoft;
+  const color = tone === 'success'
+    ? theme.color.textInverse
+    : tone === 'neutral'
+      ? theme.color.textDim
+      : theme.color.primary;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        borderRadius: radius.input,
+        backgroundColor,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <Ionicons name={icon} size={20} color={color} />
+    </Pressable>
+  );
+}
+
+function TriggerOption({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: active }}
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        flexBasis: '47%',
+        flexGrow: 1,
+        minWidth: 0,
+        minHeight: 52,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.sm,
+        borderRadius: radius.input,
+        borderWidth: 1,
+        borderColor: active ? theme.color.primary : theme.color.hairline,
+        backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+        opacity: pressed ? 0.72 : 1,
+      })}
+    >
+      <View
+        style={{
+          width: 22,
+          height: 22,
+          flexShrink: 0,
+          borderRadius: 6,
+          borderWidth: 1.5,
+          borderColor: active ? theme.color.primary : theme.color.textDim,
+          backgroundColor: active ? theme.color.primary : 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {active ? <Ionicons name="checkmark" size={15} color={theme.color.onPrimary} /> : null}
+      </View>
+      <Text variant="footnote" style={{ flex: 1, lineHeight: 18 }} color={active ? theme.color.primary : theme.color.text}>
         {label}
       </Text>
-    </View>
+    </Pressable>
+  );
+}
+
+function ThemeOption({
+  label,
+  icon,
+  active,
+  onPress,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: active }}
+      accessibilityLabel={`${label} appearance`}
+      style={({ pressed }) => ({
+        flex: 1,
+        minWidth: 0,
+        minHeight: 48,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
+        paddingHorizontal: spacing.xs,
+        borderRadius: radius.chip,
+        borderWidth: 1,
+        borderColor: active ? theme.color.primary : 'transparent',
+        backgroundColor: active ? theme.color.surface : 'transparent',
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <Ionicons name={icon} size={17} color={active ? theme.color.primary : theme.color.textDim} />
+      <Text
+        variant="footnote"
+        color={active ? theme.color.primary : theme.color.textDim}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
+        style={{ flexShrink: 1 }}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -912,19 +1100,32 @@ function ActionRow({
       accessibilityRole="button"
       accessibilityLabel={label}
       style={({ pressed }) => ({
+        minHeight: 58,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
         borderTopWidth: first ? 0 : 1,
         borderTopColor: theme.color.hairline,
-        opacity: pressed ? 0.6 : 1,
+        backgroundColor: pressed ? theme.color.surfaceAlt : 'transparent',
       })}
     >
-      <Ionicons name={icon} size={20} color={color} />
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: radius.chip,
+          backgroundColor: danger ? theme.color.accentSoft : theme.color.primarySoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name={icon} size={18} color={color} />
+      </View>
       <Text variant="callout" style={{ flex: 1, marginLeft: spacing.md }} color={color}>
         {label}
       </Text>
+      <Ionicons name="chevron-forward" size={18} color={danger ? theme.color.danger : theme.color.textDim} />
     </Pressable>
   );
 }
