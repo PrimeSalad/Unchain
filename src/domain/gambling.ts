@@ -79,6 +79,7 @@ export const SUPPORTED_CURRENCIES = [
   { symbol: '₹', code: 'INR', label: 'Indian Rupee' },
 ] as const;
 
+/** Legacy generic list kept for backward-compatibility. Not used in UI. */
 export const TRIGGERS = [
   'Stress',
   'Boredom',
@@ -90,6 +91,112 @@ export const TRIGGERS = [
   'Other',
 ] as const;
 export type Trigger = (typeof TRIGGERS)[number];
+
+// ---------------------------------------------------------------------------
+// Per-addiction trigger lists
+// ---------------------------------------------------------------------------
+
+export const GAMBLING_TRIGGERS = [
+  'Stress',
+  'Boredom',
+  'Payday',
+  'Watching sports',
+  'Casino / betting ads',
+  'Friends who gamble',
+  'Winning streak',
+  'Financial problems',
+  'Celebrating a win',
+  'Loneliness',
+  'After drinking',
+  'Other',
+] as const;
+
+export const SMOKING_TRIGGERS = [
+  'Stress',
+  'After a meal',
+  'Morning coffee / tea',
+  'Drinking alcohol',
+  'Boredom',
+  'Work break',
+  'Driving',
+  'Around other smokers',
+  'Anxiety',
+  'Craving the routine',
+  'After waking up',
+  'Other',
+] as const;
+
+export const ALCOHOL_TRIGGERS = [
+  'Stress',
+  'Social pressure',
+  'Celebrations / parties',
+  'Loneliness',
+  'Boredom',
+  'After work',
+  'Negative emotions',
+  'Habitual drinking time',
+  'Seeing alcohol ads',
+  'Relationship problems',
+  'Anxiety',
+  'Other',
+] as const;
+
+export const DRUGS_TRIGGERS = [
+  'Stress',
+  'Peer pressure',
+  'Emotional pain',
+  'Boredom',
+  'Withdrawal symptoms',
+  'Past trauma',
+  'Availability / easy access',
+  'Celebratory moments',
+  'Loneliness',
+  'Mental health episodes',
+  'Old environment / places',
+  'Other',
+] as const;
+
+export const SOCIAL_MEDIA_TRIGGERS = [
+  'Boredom',
+  'Procrastinating tasks',
+  'Waking up / before bed',
+  'FOMO',
+  'Loneliness',
+  'Waiting (queues, commute)',
+  'Anxiety or stress',
+  'Seeking validation',
+  'Habit / muscle memory',
+  "Watching other people's highlights",
+  'Idle moments',
+  'Other',
+] as const;
+
+export const OTHER_TRIGGERS = [
+  'Stress',
+  'Boredom',
+  'Loneliness',
+  'Anxiety',
+  'Emotional pain',
+  'Peer / social pressure',
+  'Idle time',
+  'Habit / routine',
+  'Negative emotions',
+  'Environmental cues',
+  'Other',
+] as const;
+
+/** Returns the appropriate trigger list for a given addiction type. */
+export function triggersForAddiction(type: AddictionType): readonly string[] {
+  switch (type) {
+    case 'gambling':     return GAMBLING_TRIGGERS;
+    case 'smoking':      return SMOKING_TRIGGERS;
+    case 'alcohol':      return ALCOHOL_TRIGGERS;
+    case 'drugs':        return DRUGS_TRIGGERS;
+    case 'social_media': return SOCIAL_MEDIA_TRIGGERS;
+    case 'pornography':  return []; // handled separately via PORN_TRIGGERS
+    default:             return OTHER_TRIGGERS;
+  }
+}
 
 export interface RecoveryProfile {
   name: string;

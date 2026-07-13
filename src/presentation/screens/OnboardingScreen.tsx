@@ -19,7 +19,7 @@ import {
   addictionMeta,
   formatMoneyInput,
   parseMoneyInput,
-  TRIGGERS,
+  triggersForAddiction,
   type AddictionType,
   type ExpensePeriod,
 } from '@/domain/gambling';
@@ -463,7 +463,7 @@ export function OnboardingScreen() {
             Select all that apply.
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            {(atype === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((tr) => (
+            {(atype === 'pornography' ? PORN_TRIGGERS : triggersForAddiction(atype ?? 'other')).map((tr) => (
               <Pill
                 key={tr}
                 label={tr}
