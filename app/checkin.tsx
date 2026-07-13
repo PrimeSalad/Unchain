@@ -29,6 +29,7 @@ import {
   useTodayPornJournal,
   useTodaySocialJournal,
   useTodaySmokeJournal,
+  useTodayAlcoholJournal,
 } from '@/application/store';
 import { addictionMeta } from '@/domain/gambling';
 
@@ -37,6 +38,7 @@ function journalRoute(addictionType: string): string {
   if (addictionType === 'pornography') return '/porn-journal-entry';
   if (addictionType === 'social_media') return '/social-journal-entry';
   if (addictionType === 'smoking') return '/smoke-journal-entry';
+  if (addictionType === 'alcohol') return '/alcohol-journal-entry';
   return '/journal-entry';
 }
 
@@ -46,9 +48,11 @@ function useTodayEntry(addictionType: string | undefined) {
   const porn     = useTodayPornJournal();
   const social   = useTodaySocialJournal();
   const smoke    = useTodaySmokeJournal();
+  const alcohol  = useTodayAlcoholJournal();
   if (addictionType === 'pornography') return porn;
   if (addictionType === 'social_media') return social;
   if (addictionType === 'smoking') return smoke;
+  if (addictionType === 'alcohol') return alcohol;
   return gambling;
 }
 
@@ -77,7 +81,8 @@ export default function CheckIn() {
     const isRelapse =
       todayEntry?.gambled === true ||
       todayEntry?.watched === true ||
-      todayEntry?.binged  === true;
+      todayEntry?.binged  === true ||
+      todayEntry?.drank   === true;
 
     const accent  = isRelapse ? theme.color.danger : theme.color.success;
     const timeStr = new Date(todayEntry!.at).toLocaleTimeString([], {

@@ -137,6 +137,28 @@ export interface JournalEntry {
   nextTimePlan?: string;
   /** How they feel now after watching (relapse day). */
   feelingNow?: string;
+
+  // ── Alcohol-specific fields (only populated for alcohol addiction) ─────────
+  /**
+   * Did the user drink alcohol on this day?
+   * true  → relapse (red calendar day, streak resets)
+   * false → clean   (green calendar day)
+   */
+  drank?: boolean;
+  /** Number of standard drinks consumed on a relapse day. */
+  drankCount?: string;
+  /** Type of alcohol consumed (beer, spirits, wine, etc.). */
+  drankType?: string;
+  /** What triggered the drinking relapse. */
+  drankTrigger?: string;
+  /** Emotions felt before drinking. */
+  drankEmotions?: string[];
+  /** What could help next time. */
+  drankNextTimePlan?: string;
+  /** Urge intensity on a clean day (1–10). */
+  alcoholUrgeIntensity?: number;
+  /** What helped the user stay alcohol-free on a clean day. */
+  alcoholWhatHelped?: string;
 }
 
 /** Emergency Reflection - captured during a crisis (SOS). Stored separately
