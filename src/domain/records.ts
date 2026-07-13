@@ -74,6 +74,28 @@ export interface JournalEntry {
    */
   watched?: boolean;
 
+  // ── Smoking-specific fields (only populated for smoking addiction) ────────
+  /**
+   * Did the user smoke on this day?
+   * true  → relapse (red calendar day, streak resets)
+   * false → clean   (green calendar day)
+   */
+  smoked?: boolean;
+  /** Number of cigarettes / vapes smoked on a relapse day. */
+  smokedCount?: number;
+  /** What type they smoked (cigarette, vape, cigar, etc.) */
+  smokedType?: string;
+  /** What triggered the smoking relapse. */
+  smokeTrigger?: string;
+  /** Emotions felt before smoking. */
+  smokeEmotions?: string[];
+  /** What could help next time. */
+  smokeNextTimePlan?: string;
+  /** Urge intensity on a clean day (1–10). */
+  smokeUrgeIntensity?: number;
+  /** What helped the user resist on a clean day. */
+  smokeWhatHelped?: string;
+
   // ── Social-media-specific fields (only populated for social_media addiction) ──
   /**
    * Did the user binge social media on this day?

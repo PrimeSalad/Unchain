@@ -116,10 +116,13 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
   // Social media entry detection
   const isBinged      = entry.binged === true;
   const isSocialClean = entry.binged === false;
+  // Smoking entry detection
+  const isSmoked      = entry.smoked === true;
+  const isSmokeClean  = entry.smoked === false;
 
   const accent =
-    isGamble || isWatched || isBinged ? theme.color.danger :
-    isClean || isPornClean || isSocialClean ? theme.color.success :
+    isGamble || isWatched || isBinged || isSmoked ? theme.color.danger :
+    isClean || isPornClean || isSocialClean || isSmokeClean ? theme.color.success :
     theme.color.primary;
 
   const statusLabel =
@@ -129,11 +132,13 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
     isPornClean   ? 'Clean day' :
     isBinged      ? 'Relapse' :
     isSocialClean ? 'Clean day' :
+    isSmoked      ? 'Relapse' :
+    isSmokeClean  ? 'Clean day' :
     'Entry';
 
   const statusIcon =
-    isGamble || isWatched || isBinged          ? 'alert-circle' :
-    isClean  || isPornClean || isSocialClean   ? 'checkmark-circle' :
+    isGamble || isWatched || isBinged || isSmoked        ? 'alert-circle' :
+    isClean  || isPornClean || isSocialClean || isSmokeClean ? 'checkmark-circle' :
     'document-text-outline';
 
   const dateStr = new Date(entry.at).toLocaleDateString('en-PH', {
@@ -164,7 +169,8 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
     entry.text !== 'Gambling relapse recorded.' &&
     entry.text !== 'Clean day recorded.' &&
     entry.text !== 'Social media binge recorded.' &&
-    entry.text !== 'Relapse recorded.';
+    entry.text !== 'Relapse recorded.' &&
+    entry.text !== 'Smoking relapse recorded.';
 
   // The recovery-adjusted balance: raw balance minus the wager on a losing
   // day (wins are never added). This is the figure the app tracks everywhere.
@@ -398,6 +404,34 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
               {entry.binged === true && entry.bingeNextTimePlan && (
                 <DetailRow icon="bulb-outline" color={theme.color.primary} label="Next time" value={entry.bingeNextTimePlan} />
               )}
+
+              {/* ── Smoking clean-day rows ── */}
+              {entry.smoked === false && entry.smokeUrgeIntensity != null && (
+                <DetailRow icon="pulse-outline" color={theme.color.celebrate} label="Urge" value={`${entry.smokeUrgeIntensity}/10`} />
+              )}
+              {entry.smoked === false && entry.smokeTrigger && (
+                <DetailRow icon="warning-outline" color={theme.color.textDim} label="Trigger" value={entry.smokeTrigger} />
+              )}
+              {entry.smoked === false && entry.smokeWhatHelped && (
+                <DetailRow icon="shield-checkmark-outline" color={theme.color.success} label="Helped" value={entry.smokeWhatHelped} />
+              )}
+
+              {/* ── Smoking relapse rows ── */}
+              {entry.smoked === true && entry.smokedCount != null && (
+                <DetailRow icon="flame-outline" color={theme.color.danger} label="Smoked" value={`${entry.smokedCount} cigarette${entry.smokedCount !== 1 ? 's' : ''}`} />
+              )}
+              {entry.smoked === true && entry.smokedType && (
+                <DetailRow icon="ellipse-outline" color={theme.color.textDim} label="Type" value={entry.smokedType} />
+              )}
+              {entry.smoked === true && entry.smokeEmotions != null && entry.smokeEmotions.length > 0 && (
+                <DetailRow icon="heart-outline" color={theme.color.danger} label="Emotions" value={entry.smokeEmotions.join(', ')} />
+              )}
+              {entry.smoked === true && entry.smokeTrigger && (
+                <DetailRow icon="warning-outline" color={theme.color.danger} label="Trigger" value={entry.smokeTrigger} />
+              )}
+              {entry.smoked === true && entry.smokeNextTimePlan && (
+                <DetailRow icon="bulb-outline" color={theme.color.primary} label="Next time" value={entry.smokeNextTimePlan} />
+              )}
             </View>
           )}
         </Animated.View>
@@ -582,6 +616,7 @@ export function JournalScreen() {
   const isGambling = profile?.addictionType === 'gambling';
   const isPorn     = profile?.addictionType === 'pornography';
   const isSocial   = profile?.addictionType === 'social_media';
+  const isSmoke    = profile?.addictionType === 'smoking';
 
   const [query, setQuery]         = useState('');
   const [filter, setFilter]       = useState<Filter>('all');
@@ -612,11 +647,14 @@ export function JournalScreen() {
     // Social media stats
     const socialClean    = entries.filter((e) => e.binged === false).length;
     const socialRelapses = entries.filter((e) => e.binged === true).length;
+    // Smoking stats
+    const smokeClean    = entries.filter((e) => e.smoked === false).length;
+    const smokeRelapses = entries.filter((e) => e.smoked === true).length;
     const withMood = entries.filter((e) => e.mood != null);
     const avgMood  = withMood.length
       ? Math.round(withMood.reduce((s, e) => s + (e.mood ?? 0), 0) / withMood.length * 10) / 10
       : null;
-    return { total, clean, relapses, pornClean, pornRelapses, socialClean, socialRelapses, avgMood };
+    return { total, clean, relapses, pornClean, pornRelapses, socialClean, socialRelapses, smokeClean, smokeRelapses, avgMood };
   }, [entries, profile]);
 
   // ── Filtered + sorted entries ─────────────────────────────────────────────
@@ -657,6 +695,10 @@ export function JournalScreen() {
         if (isSocial) {
           if (filter === 'clean'   && e.binged !== false) return false;
           if (filter === 'gambled' && e.binged !== true)  return false;
+        }
+        if (isSmoke) {
+          if (filter === 'clean'   && e.smoked !== false) return false;
+          if (filter === 'gambled' && e.smoked !== true)  return false;
         }
         // Search
         if (query && !e.text.toLowerCase().includes(query.toLowerCase())) return false;
@@ -711,7 +753,7 @@ export function JournalScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            router.push(isPorn ? '/porn-journal-entry' : isSocial ? '/social-journal-entry' : '/journal-entry');
+            router.push(isPorn ? '/porn-journal-entry' : isSocial ? '/social-journal-entry' : isSmoke ? '/smoke-journal-entry' : '/journal-entry');
           }}
           accessibilityRole="button"
           accessibilityLabel="Write new entry"
@@ -730,18 +772,18 @@ export function JournalScreen() {
       {searching && <SearchBar query={query} onChange={setQuery} />}
 
       {/* ── Stats: three compact tiles, only when there are entries ── */}
-      {(isGambling || isPorn || isSocial) && entries.length > 0 && (
+      {(isGambling || isPorn || isSocial || isSmoke) && entries.length > 0 && (
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
           <StatCard
             icon="checkmark-circle"
-            value={isGambling ? stats.clean : isPorn ? stats.pornClean : stats.socialClean}
+            value={isGambling ? stats.clean : isPorn ? stats.pornClean : isSocial ? stats.socialClean : stats.smokeClean}
             label="Clean"
             color={theme.color.success}
             delay={0}
           />
           <StatCard
             icon="alert-circle"
-            value={isGambling ? stats.relapses : isPorn ? stats.pornRelapses : stats.socialRelapses}
+            value={isGambling ? stats.relapses : isPorn ? stats.pornRelapses : isSocial ? stats.socialRelapses : stats.smokeRelapses}
             label="Relapses"
             color={theme.color.danger}
             delay={60}

@@ -956,11 +956,13 @@ export const useStore = create<RecoveryState>()(
           const isGamblingEntry = data.gambled !== undefined;
           const isPornEntry = data.watched !== undefined;
           const isSocialEntry = data.binged !== undefined;
+          const isSmokeEntry = data.smoked !== undefined;
           const alreadyToday = s.journal.some((j) => {
             if (!sameDay(j.at, Date.now())) return false;
             if (isGamblingEntry) return j.gambled !== undefined;
             if (isPornEntry) return j.watched !== undefined;
             if (isSocialEntry) return j.binged !== undefined;
+            if (isSmokeEntry) return j.smoked !== undefined;
             return true; // generic entry - block any duplicate
           });
           if (alreadyToday) return s;
@@ -1147,6 +1149,59 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
+          // ── Smoking: smoked=true → relapse; smoked=false → clean ──────────
+          if (data.smoked === true) {
+            const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
+            const prevDays = streakDays(streakStart);
+            const relapseEntry: RelapseEvent = {
+              id: uid(),
+              at: Date.now(),
+              whatHappened: data.smokeTrigger,
+              cause: data.smokeTrigger,
+              feeling: data.smokeEmotions?.join(', '),
+            };
+            return {
+              journal: journalAfter,
+              relapses: [relapseEntry, ...s.relapses],
+              longestStreak: Math.max(s.longestStreak, prevDays),
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Journal entry - smoking relapse logged'),
+                evt('relapse', 'Logged a relapse via journal - recovery continues'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          if (data.smoked === false) {
+            const now = Date.now();
+            const urgeEntry: UrgeLog = {
+              id: uid(),
+              at: now,
+              intensity: data.smokeUrgeIntensity ?? 1,
+              trigger: data.smokeTrigger ?? 'Daily journal',
+              triggers: data.smokeTrigger ? [data.smokeTrigger] : ['Daily journal'],
+              notes: data.smokeWhatHelped ?? data.text,
+              resisted: true,
+              mood: data.mood,
+            };
+            return {
+              journal: journalAfter,
+              urges: [urgeEntry, ...s.urges],
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...resistedCounterPatch(s, now),
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Wrote a journal entry - clean day'),
+                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
+                ...s.timeline,
+              ],
+            };
+          }
+
           return {
             journal: journalAfter,
             points: s.points + 5 + altUnlocked.length * 5,
@@ -1314,6 +1369,16 @@ export function useTodayAnyJournal(): import('@/domain/records').JournalEntry | 
 export function useTodaySocialJournal(): import('@/domain/records').JournalEntry | undefined {
   return useStore((s) =>
     s.journal.find((j) => sameDay(j.at, Date.now()) && j.binged !== undefined),
+  );
+}
+
+/**
+ * Today's journal entry for smoking users, or undefined if none submitted yet.
+ * Finds any entry today where `smoked` is defined (smoking-specific gate).
+ */
+export function useTodaySmokeJournal(): import('@/domain/records').JournalEntry | undefined {
+  return useStore((s) =>
+    s.journal.find((j) => sameDay(j.at, Date.now()) && j.smoked !== undefined),
   );
 }
 
