@@ -213,14 +213,16 @@ export interface JournalEntry {
    * false → clean   (green calendar day)
    */
   played?: boolean;
+  /** Did the user spend money on gaming? */
+  gamingDidSpend?: boolean;
+  /** General gaming spend amount (money balance question). */
+  gamingGeneralSpend?: number;
+  /** Remaining money after gaming spend (moneyBalance - gamingGeneralSpend). */
+  gamingRemainingMoney?: number;
   /** Hours spent gaming on a relapse day. */
   gamingHours?: string;
   /** What was played (relapse day). */
   gamingType?: string;
-  /** How much was spent on in-game purchases (relapse day). */
-  gamingAmountSpent?: number;
-  /** Currency symbol used for the spend amount. */
-  gamingSpendCurrency?: string;
   /** What triggered the gaming relapse. */
   gamingTrigger?: string;
   /** Emotions felt before gaming (relapse day). */

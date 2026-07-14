@@ -417,6 +417,9 @@ export interface FinancialJournalEntry {
   used?: boolean;
   drugDidSpend?: boolean;
   drugSpendAmount?: number;
+  played?: boolean;
+  gamingDidSpend?: boolean;
+  gamingGeneralSpend?: number;
 }
 
 /**
@@ -429,6 +432,7 @@ export interface FinancialJournalEntry {
  *   - Smoked and spent → `moneyBalance - smokeSpendAmount`, floored at 0.
  *   - Drank and spent → `moneyBalance - drinkSpendAmount`, floored at 0.
  *   - Used drugs and spent → `moneyBalance - drugSpendAmount`, floored at 0.
+ *   - Played games and spent → `moneyBalance - gamingGeneralSpend`, floored at 0.
  *   - Did not spend → `moneyBalance` unchanged.
  */
 export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null {
@@ -451,6 +455,9 @@ export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null
   }
   if (e.used === true && e.drugDidSpend === true && e.drugSpendAmount != null) {
     return Math.max(0, e.moneyBalance - e.drugSpendAmount);
+  }
+  if (e.played === true && e.gamingDidSpend === true && e.gamingGeneralSpend != null) {
+    return Math.max(0, e.moneyBalance - e.gamingGeneralSpend);
   }
   return e.moneyBalance;
 }

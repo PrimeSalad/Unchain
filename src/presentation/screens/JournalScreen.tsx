@@ -29,7 +29,7 @@ import { Text } from '../components/Text';
 import { elevation, spacing, radius, palette, motion } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
-import { DEFAULT_CURRENCY, recoveryAdjustedBalance } from '@/domain/gambling';
+import { DEFAULT_CURRENCY, formatMoney, recoveryAdjustedBalance } from '@/domain/gambling';
 import type { JournalEntry } from '@/domain/records';
 
 // Enable layout animation on Android
@@ -519,8 +519,8 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
               {entry.played === true && entry.gamingHours && (
                 <DetailRow icon="time-outline" color={theme.color.textDim} label="Duration" value={entry.gamingHours} />
               )}
-              {entry.played === true && entry.gamingAmountSpent != null && entry.gamingAmountSpent > 0 && (
-                <DetailRow icon="wallet-outline" color={theme.color.danger} label="Spent" value={`${entry.gamingSpendCurrency ?? currency}${entry.gamingAmountSpent.toLocaleString()}`} />
+              {entry.played === true && entry.gamingDidSpend === true && entry.gamingGeneralSpend != null && entry.gamingGeneralSpend > 0 && (
+                <DetailRow icon="wallet-outline" color={theme.color.danger} label="Spent" value={formatMoney(entry.gamingGeneralSpend, currency)} />
               )}
               {entry.played === true && entry.gamingEmotions != null && entry.gamingEmotions.length > 0 && (
                 <DetailRow icon="heart-outline" color={theme.color.danger} label="Emotions" value={entry.gamingEmotions.join(', ')} />

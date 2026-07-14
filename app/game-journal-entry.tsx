@@ -35,7 +35,7 @@ import { radius, spacing, elevation, fonts } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile, useTodayGamingJournal } from '@/application/store';
-import { GAMING_TRIGGERS, DEFAULT_CURRENCY, formatMoneyInput, parseMoneyInput, SUPPORTED_CURRENCIES } from '@/domain/gambling';
+import { GAMING_TRIGGERS, DEFAULT_CURRENCY, formatMoneyInput, parseMoneyInput, formatMoney, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
 // Step IDs
@@ -43,30 +43,33 @@ import { GAMING_TRIGGERS, DEFAULT_CURRENCY, formatMoneyInput, parseMoneyInput, S
 
 type StepId =
   | 'did_play'
+  | 'money_balance'
+  | 'did_gaming_spend'
+  | 'gaming_spend_amount'
   | 'mood'
   | 'urge_intensity'
   | 'what_helped'
   | 'reflection_clean'
   | 'gaming_hours'
   | 'gaming_type'
-  | 'amount_spent'
   | 'emotions'
   | 'trigger_relapse'
   | 'next_time_plan'
   | 'feeling_now'
   | 'summary';
 
-function buildSteps(played: boolean | null): StepId[] {
+function buildSteps(played: boolean | null, didGamingSpend?: boolean | null): StepId[] {
   if (played === false) {
-    // Clean day: mood → urge intensity → what helped → reflection
-    return ['did_play', 'mood', 'what_helped', 'reflection_clean', 'summary'];
+    return ['did_play', 'money_balance', 'mood', 'what_helped', 'reflection_clean', 'summary'];
   }
   if (played === true) {
-    // Relapse day: mood → urge intensity → hours → type → amount spent → emotions → trigger → next time → feeling now
-    return ['did_play', 'mood', 'urge_intensity', 'gaming_hours', 'gaming_type', 'amount_spent', 'emotions', 'trigger_relapse', 'next_time_plan', 'feeling_now', 'summary'];
+    const steps: StepId[] = ['did_play', 'money_balance', 'did_gaming_spend'];
+    if (didGamingSpend === true) steps.push('gaming_spend_amount');
+    steps.push('mood', 'urge_intensity', 'gaming_hours', 'gaming_type', 'emotions', 'trigger_relapse', 'next_time_plan', 'feeling_now', 'summary');
+    return steps;
   }
   // Default before yes/no: show clean-day path so progress bar is sensible
-  return ['did_play', 'mood', 'what_helped', 'reflection_clean', 'summary'];
+  return ['did_play', 'money_balance', 'mood', 'what_helped', 'reflection_clean', 'summary'];
 }
 
 // ---------------------------------------------------------------------------
@@ -286,14 +289,15 @@ export default function GameJournalEntry() {
 
   // ── Form state ──────────────────────────────────────────────────────────
   const [played,         setPlayed]         = useState<boolean | null>(null);
+  const [moneyBalance,   setMoneyBalance]   = useState('');
+  const [didGamingSpend, setDidGamingSpend] = useState<boolean | null>(null);
+  const [gamingSpendAmount, setGamingSpendAmount] = useState('');
   const [mood,           setMood]           = useState(5);
   const [urgeIntensity,  setUrgeIntensity]  = useState(3);
   const [whatHelped,     setWhatHelped]     = useState('');
   const [reflection,     setReflection]     = useState('');
   const [gamingHours,    setGamingHours]    = useState<HoursOption | null>(null);
   const [gamingType,     setGamingType]     = useState<GamingTypeOption | null>(null);
-  const [amountSpent,    setAmountSpent]    = useState('');
-  const [spendCurrency,  setSpendCurrency]  = useState(profile?.currency ?? DEFAULT_CURRENCY);
   const [emotions,       setEmotions]       = useState<EmotionOption[]>([]);
   const [triggerRelapse, setTriggerRelapse] = useState<string | null>(null);
   const [nextTimePlan,   setNextTimePlan]   = useState('');
@@ -316,21 +320,32 @@ export default function GameJournalEntry() {
 
   function canProceed(): boolean {
     switch (currentStep) {
-      case 'did_play':        return played !== null;
-      case 'gaming_hours':    return gamingHours !== null;
-      case 'gaming_type':     return gamingType !== null;
-      case 'emotions':        return emotions.length > 0;
-      case 'trigger_relapse': return triggerRelapse !== null;
-      case 'feeling_now':     return feelingNow !== null;
-      default:                return true;
+      case 'did_play':            return played !== null;
+      case 'money_balance':       return moneyBalance.trim() !== '';
+      case 'did_gaming_spend':    return didGamingSpend !== null;
+      case 'gaming_spend_amount': return gamingSpendAmount.trim() !== '';
+      case 'gaming_hours':        return gamingHours !== null;
+      case 'gaming_type':         return gamingType !== null;
+      case 'emotions':            return emotions.length > 0;
+      case 'trigger_relapse':     return triggerRelapse !== null;
+      case 'feeling_now':         return feelingNow !== null;
+      default:                    return true;
     }
   }
 
   function goNext() {
     if (!canProceed()) return;
     Haptics.selectionAsync().catch(() => {});
+    // Freeze at did_play to switch to relapse or clean path
     if (currentStep === 'did_play' && frozenSteps.current === null) {
       frozenSteps.current = buildSteps(played);
+    }
+    // Always rebuild at did_gaming_spend so gaming_spend_amount is included or excluded
+    if (currentStep === 'did_gaming_spend') {
+      frozenSteps.current = buildSteps(played, didGamingSpend);
+      if (didGamingSpend !== true) {
+        setGamingSpendAmount('');
+      }
     }
     const active = frozenSteps.current ?? steps;
     if (stepIdx < active.length - 1) slide('forward', () => setStepIdx((i) => i + 1));
@@ -349,16 +364,23 @@ export default function GameJournalEntry() {
     submitting.current = true;
     setConfirmVisible(false);
 
+    // Calculate remaining money: moneyBalance - gamingSpendAmount
+    const balance = moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || 0 : 0;
+    const gamingSpend = played === true && didGamingSpend === true ? parseFloat(gamingSpendAmount.replace(/,/g, '')) || 0 : 0;
+    const remainingMoney = Math.max(0, balance - gamingSpend);
+
     addJournal({
       played: played === true,
       text: reflection.trim() || (played === true ? 'Gaming relapse recorded.' : 'Clean day recorded.'),
       mood,
+      moneyBalance: balance || undefined,
+      gamingDidSpend: played === true ? didGamingSpend === true : undefined,
+      gamingGeneralSpend: played === true && didGamingSpend === true ? gamingSpend || undefined : undefined,
+      gamingRemainingMoney: played === true && didGamingSpend === true ? remainingMoney : undefined,
       gamingUrgeIntensity: played === false ? urgeIntensity : undefined,
       gamingWhatHelped: played === false && whatHelped.trim() ? whatHelped.trim() : undefined,
       gamingHours: played === true && gamingHours ? gamingHours : undefined,
       gamingType: played === true && gamingType ? gamingType : undefined,
-      gamingAmountSpent: played === true && amountSpent.trim() ? parseMoneyInput(amountSpent) || undefined : undefined,
-      gamingSpendCurrency: played === true && amountSpent.trim() && parseMoneyInput(amountSpent) > 0 ? spendCurrency : undefined,
       gamingEmotions: played === true && emotions.length > 0 ? emotions : undefined,
       gamingTrigger: played === true ? (triggerRelapse ?? undefined) : undefined,
       gamingNextTimePlan: played === true && nextTimePlan.trim() ? nextTimePlan.trim() : undefined,
@@ -456,6 +478,136 @@ export default function GameJournalEntry() {
           </>
         );
 
+      case 'money_balance':
+        return (
+          <>
+            <StepHeading title="How much money do you have today?" subtitle="Enter your current balance. This helps track your financial wellbeing." />
+            <View style={{ gap: spacing.xl }}>
+              <View style={{
+                width: '100%', alignSelf: 'center', borderRadius: radius.card,
+                backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+                padding: spacing.lg, gap: spacing.lg,
+              }}>
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="footnote" dim center>Current balance</Text>
+                  <View style={{
+                    minHeight: 76, borderRadius: radius.card, backgroundColor: theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: theme.color.hairline, flexDirection: 'row',
+                    alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md,
+                  }}>
+                    <View style={{
+                      width: 54, height: 54, borderRadius: 18, backgroundColor: theme.color.primary,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                    </View>
+                    <TextInput value={moneyBalance} onChangeText={(t) => setMoneyBalance(formatMoneyInput(t, true))}
+                      placeholder="0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad"
+                      autoFocus underlineColorAndroid="transparent" selectionColor={theme.color.primary}
+                      style={{ flex: 1, minWidth: 0, color: theme.color.text, fontSize: 34, lineHeight: 40,
+                        fontFamily: 'Nunito_900Black', paddingVertical: spacing.sm }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ width: '100%', alignSelf: 'center', gap: spacing.sm }}>
+                <Text variant="footnote" dim center>Currency</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+                  {SUPPORTED_CURRENCIES.map((option) => {
+                    const active = currency === option.symbol;
+                    return (
+                      <Pressable key={option.code} onPress={() => useStore.getState().updateProfile({ currency: option.symbol })}
+                        accessibilityRole="button" accessibilityLabel={`${option.label}, ${option.code}`}
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => ({
+                          width: '30.5%', minWidth: 86, minHeight: 52, borderRadius: radius.input,
+                          borderWidth: 1, borderColor: active ? theme.color.primary : theme.color.hairline,
+                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                          paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
+                          alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1,
+                        })}>
+                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>{option.symbol}</Text>
+                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>{option.code}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          </>
+        );
+
+      case 'did_gaming_spend':
+        return (
+          <>
+            <StepHeading title="Did you spend money on gaming today?" subtitle="This helps track spending on games, in-game items, etc." />
+            <YesNoToggle value={didGamingSpend} onChange={setDidGamingSpend} />
+            {didGamingSpend === false && (
+              <Card tone="successSoft" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, borderLeftWidth: 3, borderLeftColor: theme.color.success }}>
+                <Ionicons name="checkmark-circle-outline" size={22} color={theme.color.success} />
+                <Text variant="callout" style={{ flex: 1, lineHeight: 22 }}>Good job avoiding impulse purchases!</Text>
+              </Card>
+            )}
+          </>
+        );
+
+      case 'gaming_spend_amount':
+        return (
+          <>
+            <StepHeading title="How much did you spend?" subtitle="Enter the amount you spent on gaming." />
+            <View style={{ gap: spacing.xl }}>
+              <View style={{
+                width: '100%', alignSelf: 'center', borderRadius: radius.card,
+                backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+                padding: spacing.lg, gap: spacing.lg,
+              }}>
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="footnote" dim center>Amount spent</Text>
+                  <View style={{
+                    minHeight: 76, borderRadius: radius.card, backgroundColor: theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: theme.color.hairline, flexDirection: 'row',
+                    alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md,
+                  }}>
+                    <View style={{
+                      width: 54, height: 54, borderRadius: 18, backgroundColor: theme.color.primary,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                    </View>
+                    <TextInput value={gamingSpendAmount} onChangeText={(t) => setGamingSpendAmount(formatMoneyInput(t, true))}
+                      placeholder="0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad"
+                      autoFocus underlineColorAndroid="transparent" selectionColor={theme.color.primary}
+                      style={{ flex: 1, minWidth: 0, color: theme.color.text, fontSize: 34, lineHeight: 40,
+                        fontFamily: 'Nunito_900Black', paddingVertical: spacing.sm }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ width: '100%', alignSelf: 'center', gap: spacing.sm }}>
+                <Text variant="footnote" dim center>Currency</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+                  {SUPPORTED_CURRENCIES.map((option) => {
+                    const active = currency === option.symbol;
+                    return (
+                      <Pressable key={option.code} onPress={() => useStore.getState().updateProfile({ currency: option.symbol })}
+                        accessibilityRole="button" accessibilityLabel={`${option.label}, ${option.code}`}
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => ({
+                          width: '30.5%', minWidth: 86, minHeight: 52, borderRadius: radius.input,
+                          borderWidth: 1, borderColor: active ? theme.color.primary : theme.color.hairline,
+                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                          paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
+                          alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1,
+                        })}>
+                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>{option.symbol}</Text>
+                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>{option.code}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          </>
+        );
+
       case 'mood':
         return (
           <>
@@ -520,100 +672,6 @@ export default function GameJournalEntry() {
           </>
         );
 
-      case 'amount_spent':
-        return (
-          <>
-            <StepHeading title="How much did you spend?" subtitle="Use your average spend on in-game purchases." />
-            <View style={{
-              borderRadius: radius.card,
-              backgroundColor: theme.color.surface,
-              borderWidth: 1,
-              borderColor: theme.color.hairline,
-              padding: spacing.lg,
-              gap: spacing.lg,
-            }}>
-              <View style={{ gap: spacing.sm }}>
-                <Text variant="footnote" dim center>Average spend</Text>
-                <View style={{
-                  minHeight: 76,
-                  borderRadius: radius.card,
-                  backgroundColor: theme.color.surfaceAlt,
-                  borderWidth: 1,
-                  borderColor: theme.color.hairline,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: spacing.md,
-                  gap: spacing.md,
-                }}>
-                  <View style={{
-                    width: 54, height: 54, borderRadius: 18,
-                    backgroundColor: theme.color.primary,
-                    alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <Text variant="title2" color={theme.color.onPrimary}>{spendCurrency}</Text>
-                  </View>
-                  <TextInput
-                    value={amountSpent}
-                    onChangeText={(t) => setAmountSpent(formatMoneyInput(t))}
-                    placeholder="0"
-                    placeholderTextColor={theme.color.textDim}
-                    keyboardType="number-pad"
-                    autoFocus
-                    underlineColorAndroid="transparent"
-                    selectionColor={theme.color.primary}
-                    style={{
-                      flex: 1, minWidth: 0,
-                      color: theme.color.text, fontSize: 34, lineHeight: 40,
-                      fontFamily: fonts.displayHeavy,
-                      paddingVertical: spacing.sm,
-                    }}
-                  />
-                </View>
-              </View>
-
-              <View style={{ gap: spacing.sm }}>
-                <Text variant="footnote" dim center>Currency</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
-                  {SUPPORTED_CURRENCIES.map((option) => {
-                    const active = spendCurrency === option.symbol;
-                    return (
-                      <Pressable
-                        key={option.code}
-                        onPress={() => setSpendCurrency(option.symbol)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${option.label}, ${option.code}`}
-                        accessibilityState={{ selected: active }}
-                        style={({ pressed }) => ({
-                          width: '30.5%',
-                          minWidth: 86,
-                          minHeight: 52,
-                          borderRadius: radius.input,
-                          borderWidth: 1,
-                          borderColor: active ? theme.color.primary : theme.color.hairline,
-                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
-                          paddingHorizontal: spacing.sm,
-                          paddingVertical: spacing.sm,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          opacity: pressed ? 0.72 : 1,
-                        })}
-                      >
-                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>
-                          {option.symbol}
-                        </Text>
-                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>
-                          {option.code}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
-          </>
-        );
-
       case 'emotions':
         return (
           <>
@@ -662,7 +720,10 @@ export default function GameJournalEntry() {
           </>
         );
 
-      case 'summary':
+      case 'summary': {
+        const balance = moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || 0 : 0;
+        const gamingSpend = played === true && didGamingSpend === true ? parseFloat(gamingSpendAmount.replace(/,/g, '')) || 0 : 0;
+        const remaining = Math.max(0, balance - gamingSpend);
         return (
           <>
             <StepHeading title="Review your entry" subtitle="Take a moment before saving." />
@@ -673,6 +734,15 @@ export default function GameJournalEntry() {
                 label="Today"
                 value={played ? 'Relapse' : 'Clean day'}
               />
+              {moneyBalance !== '' && (
+                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={formatMoney(balance, currency)} />
+              )}
+              {played === true && didGamingSpend === true && gamingSpendAmount !== '' && (
+                <SummaryRow icon="cash-outline" iconColor={theme.color.danger} label="Spent" value={formatMoney(gamingSpend, currency)} />
+              )}
+              {played === true && didGamingSpend === true && moneyBalance !== '' && gamingSpendAmount !== '' && (
+                <SummaryRow icon="trending-down-outline" iconColor={theme.color.success} label="Remaining" value={formatMoney(remaining, currency)} />
+              )}
               <SummaryRow icon="bar-chart-outline" iconColor={theme.color.primary} label="Mood" value={`${mood} / 10`} />
               {played === false && urgeIntensity > 0 && (
                 <SummaryRow icon="pulse-outline" iconColor={theme.color.celebrate} label="Urge level" value={`${urgeIntensity} / 10`} />
@@ -685,9 +755,6 @@ export default function GameJournalEntry() {
               )}
               {played === true && gamingType && (
                 <SummaryRow icon="game-controller-outline" iconColor={theme.color.textDim} label="Type" value={gamingType} />
-              )}
-              {played === true && amountSpent.trim() !== '' && parseMoneyInput(amountSpent) > 0 && (
-                <SummaryRow icon="wallet-outline" iconColor={theme.color.danger} label="Spent" value={`${spendCurrency}${parseMoneyInput(amountSpent).toLocaleString()}`} />
               )}
               {played === true && emotions.length > 0 && (
                 <SummaryRow icon="heart-outline" iconColor={theme.color.danger} label="Emotions" value={emotions.join(', ')} />
@@ -707,6 +774,7 @@ export default function GameJournalEntry() {
             </View>
           </>
         );
+      }
 
       default: return null;
     }
