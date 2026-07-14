@@ -32,8 +32,9 @@ import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useTodayPornJournal } from '@/application/store';
+import { useStore, useTodayPornJournal, useProfile } from '@/application/store';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
+import { formatMoneyInput, parseMoneyInput, formatMoney, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
 // Step IDs
@@ -41,6 +42,9 @@ import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 
 type StepId =
   | 'did_watch'
+  | 'money_balance'
+  | 'did_buy_porn'
+  | 'porn_spend_amount'
   | 'mood'
   | 'urge_intensity'
   | 'triggers_clean'
@@ -54,17 +58,20 @@ type StepId =
   | 'feeling_now'
   | 'summary';
 
-function buildSteps(watched: boolean | null): StepId[] {
+function buildSteps(watched: boolean | null, didBuyPorn?: boolean | null): StepId[] {
   if (watched === false) {
-    // Clean day: mood → urge intensity → what helped → reflection
-    return ['did_watch', 'mood', 'urge_intensity', 'what_helped', 'reflection_clean', 'summary'];
+    // Clean day: no relapse steps
+    return ['did_watch', 'money_balance', 'mood', 'urge_intensity', 'what_helped', 'reflection_clean', 'summary'];
   }
   if (watched === true) {
-    // Relapse day: mood → duration → lead-up → emotions → trigger → next-time plan → feeling now
-    return ['did_watch', 'mood', 'watch_duration', 'lead_up', 'emotions_before', 'relapse_trigger', 'next_time_plan', 'feeling_now', 'summary'];
+    // Relapse day: money balance → porn spending questions → mood → duration etc.
+    const steps: StepId[] = ['did_watch', 'money_balance', 'did_buy_porn'];
+    if (didBuyPorn === true) steps.push('porn_spend_amount');
+    steps.push('mood', 'watch_duration', 'lead_up', 'emotions_before', 'relapse_trigger', 'next_time_plan', 'feeling_now', 'summary');
+    return steps;
   }
   // Default (before yes/no answered): show clean-day path length so progress bar is sensible
-  return ['did_watch', 'mood', 'urge_intensity', 'what_helped', 'reflection_clean', 'summary'];
+  return ['did_watch', 'money_balance', 'mood', 'urge_intensity', 'what_helped', 'reflection_clean', 'summary'];
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +225,8 @@ export default function PornJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
   const addJournal = useStore((s) => s.addJournal);
+  const profile = useProfile();
+  const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const insets   = useSafeAreaInsets();
 
   const todayJournal     = useTodayPornJournal();
@@ -228,6 +237,9 @@ export default function PornJournalEntry() {
 
   // ── Form state ─────────────────────────────────────────────────────────
   const [watched,        setWatched]        = useState<boolean | null>(null);
+  const [moneyBalance,   setMoneyBalance]   = useState('');
+  const [didBuyPorn,     setDidBuyPorn]     = useState<boolean | null>(null);
+  const [pornSpendAmount, setPornSpendAmount] = useState('');
   const [mood,           setMood]           = useState(5);
   const [urgeIntensity,  setUrgeIntensity]  = useState(3);
   const [cleanTriggers,  setCleanTriggers]  = useState<string[]>([]);
@@ -257,21 +269,32 @@ export default function PornJournalEntry() {
 
   function canProceed(): boolean {
     switch (currentStep) {
-      case 'did_watch':     return watched !== null;
-      case 'watch_duration': return durationOpt !== null;
-      case 'lead_up':       return leadUp !== null;
+      case 'did_watch':       return watched !== null;
+      case 'money_balance':   return moneyBalance.trim() !== '';
+      case 'did_buy_porn':    return didBuyPorn !== null;
+      case 'porn_spend_amount': return pornSpendAmount.trim() !== '';
+      case 'watch_duration':  return durationOpt !== null;
+      case 'lead_up':         return leadUp !== null;
       case 'emotions_before': return emotions.length > 0;
       case 'relapse_trigger': return relapseTrigger !== null;
-      case 'feeling_now':   return feelingNow !== null;
-      default:              return true;
+      case 'feeling_now':     return feelingNow !== null;
+      default:                return true;
     }
   }
 
   function goNext() {
     if (!canProceed()) return;
     Haptics.selectionAsync().catch(() => {});
+    // Freeze at did_watch to switch to relapse or clean path
     if (currentStep === 'did_watch' && frozenSteps.current === null) {
       frozenSteps.current = buildSteps(watched);
+    }
+    // Always rebuild at did_buy_porn so porn_spend_amount is included or excluded
+    if (currentStep === 'did_buy_porn') {
+      frozenSteps.current = buildSteps(watched, didBuyPorn);
+      if (didBuyPorn !== true) {
+        setPornSpendAmount('');
+      }
     }
     const active = frozenSteps.current ?? steps;
     if (stepIdx < active.length - 1) slide('forward', () => setStepIdx((i) => i + 1));
@@ -281,7 +304,6 @@ export default function PornJournalEntry() {
     if (stepIdx === 0) { safeBack(); return; }
     Haptics.selectionAsync().catch(() => {});
     const active = frozenSteps.current ?? steps;
-    if (active[stepIdx - 1] === 'did_watch') frozenSteps.current = null;
     slide('back', () => setStepIdx((i) => i - 1));
   }
 
@@ -290,11 +312,20 @@ export default function PornJournalEntry() {
     submitting.current = true;
     setConfirmVisible(false);
 
+    // Calculate remaining money: moneyBalance - pornSpendAmount
+    const balance = moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || 0 : 0;
+    const pornSpend = watched === true && didBuyPorn === true ? parseFloat(pornSpendAmount.replace(/,/g, '')) || 0 : 0;
+    const remainingMoney = Math.max(0, balance - pornSpend);
+
     addJournal({
       watched: watched === true,
       gambled: undefined,
       text: reflection.trim() || (watched === true ? 'Relapse recorded.' : 'Clean day recorded.'),
       mood,
+      moneyBalance: balance || undefined,
+      pornDidSpend: watched === true ? didBuyPorn === true : undefined,
+      pornSpendAmount: watched === true && didBuyPorn === true ? pornSpend || undefined : undefined,
+      pornRemainingMoney: watched === true && didBuyPorn === true ? remainingMoney : undefined,
       urgeIntensity: watched === false ? urgeIntensity : undefined,
       triggersEncountered: watched === false && cleanTriggers.length > 0 ? cleanTriggers : undefined,
       whatHelped: watched === false && whatHelped.trim() ? whatHelped.trim() : undefined,
@@ -363,6 +394,136 @@ export default function PornJournalEntry() {
                 <Text variant="callout" style={{ flex: 1, lineHeight: 22 }}>It takes courage to be honest. You are not alone in this.</Text>
               </Card>
             )}
+          </>
+        );
+
+      case 'money_balance':
+        return (
+          <>
+            <StepHeading title="How much money do you have today?" subtitle="Enter your current balance. This helps track your financial wellbeing." />
+            <View style={{ gap: spacing.xl }}>
+              <View style={{
+                width: '100%', alignSelf: 'center', borderRadius: radius.card,
+                backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+                padding: spacing.lg, gap: spacing.lg,
+              }}>
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="footnote" dim center>Current balance</Text>
+                  <View style={{
+                    minHeight: 76, borderRadius: radius.card, backgroundColor: theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: theme.color.hairline, flexDirection: 'row',
+                    alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md,
+                  }}>
+                    <View style={{
+                      width: 54, height: 54, borderRadius: 18, backgroundColor: theme.color.primary,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                    </View>
+                    <TextInput value={moneyBalance} onChangeText={(t) => setMoneyBalance(formatMoneyInput(t, true))}
+                      placeholder="0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad"
+                      autoFocus underlineColorAndroid="transparent" selectionColor={theme.color.primary}
+                      style={{ flex: 1, minWidth: 0, color: theme.color.text, fontSize: 34, lineHeight: 40,
+                        fontFamily: 'Nunito_900Black', paddingVertical: spacing.sm }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ width: '100%', alignSelf: 'center', gap: spacing.sm }}>
+                <Text variant="footnote" dim center>Currency</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+                  {SUPPORTED_CURRENCIES.map((option) => {
+                    const active = currency === option.symbol;
+                    return (
+                      <Pressable key={option.code} onPress={() => useStore.getState().updateProfile({ currency: option.symbol })}
+                        accessibilityRole="button" accessibilityLabel={`${option.label}, ${option.code}`}
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => ({
+                          width: '30.5%', minWidth: 86, minHeight: 52, borderRadius: radius.input,
+                          borderWidth: 1, borderColor: active ? theme.color.primary : theme.color.hairline,
+                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                          paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
+                          alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1,
+                        })}>
+                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>{option.symbol}</Text>
+                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>{option.code}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          </>
+        );
+
+      case 'did_buy_porn':
+        return (
+          <>
+            <StepHeading title="Did you buy anything porn/R18 related?" subtitle="This helps track spending on adult content." />
+            <YesNoToggle value={didBuyPorn} onChange={setDidBuyPorn} />
+            {didBuyPorn === false && (
+              <Card tone="successSoft" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, borderLeftWidth: 3, borderLeftColor: theme.color.success }}>
+                <Ionicons name="checkmark-circle-outline" size={22} color={theme.color.success} />
+                <Text variant="callout" style={{ flex: 1, lineHeight: 22 }}>Good job avoiding impulse purchases!</Text>
+              </Card>
+            )}
+          </>
+        );
+
+      case 'porn_spend_amount':
+        return (
+          <>
+            <StepHeading title="How much did you spend?" subtitle="Enter the amount you spent on porn/R18 content." />
+            <View style={{ gap: spacing.xl }}>
+              <View style={{
+                width: '100%', alignSelf: 'center', borderRadius: radius.card,
+                backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+                padding: spacing.lg, gap: spacing.lg,
+              }}>
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="footnote" dim center>Amount spent</Text>
+                  <View style={{
+                    minHeight: 76, borderRadius: radius.card, backgroundColor: theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: theme.color.hairline, flexDirection: 'row',
+                    alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md,
+                  }}>
+                    <View style={{
+                      width: 54, height: 54, borderRadius: 18, backgroundColor: theme.color.primary,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                    </View>
+                    <TextInput value={pornSpendAmount} onChangeText={(t) => setPornSpendAmount(formatMoneyInput(t, true))}
+                      placeholder="0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad"
+                      autoFocus underlineColorAndroid="transparent" selectionColor={theme.color.primary}
+                      style={{ flex: 1, minWidth: 0, color: theme.color.text, fontSize: 34, lineHeight: 40,
+                        fontFamily: 'Nunito_900Black', paddingVertical: spacing.sm }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ width: '100%', alignSelf: 'center', gap: spacing.sm }}>
+                <Text variant="footnote" dim center>Currency</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+                  {SUPPORTED_CURRENCIES.map((option) => {
+                    const active = currency === option.symbol;
+                    return (
+                      <Pressable key={option.code} onPress={() => useStore.getState().updateProfile({ currency: option.symbol })}
+                        accessibilityRole="button" accessibilityLabel={`${option.label}, ${option.code}`}
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => ({
+                          width: '30.5%', minWidth: 86, minHeight: 52, borderRadius: radius.input,
+                          borderWidth: 1, borderColor: active ? theme.color.primary : theme.color.hairline,
+                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                          paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
+                          alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1,
+                        })}>
+                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>{option.symbol}</Text>
+                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>{option.code}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
           </>
         );
 
@@ -479,11 +640,23 @@ export default function PornJournalEntry() {
         );
 
       case 'summary': {
+        const balance = moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || 0 : 0;
+        const pornSpend = watched === true && didBuyPorn === true ? parseFloat(pornSpendAmount.replace(/,/g, '')) || 0 : 0;
+        const remaining = Math.max(0, balance - pornSpend);
         return (
           <>
             <StepHeading title="Review your entry" subtitle="Take a moment before saving." />
             <View style={{ backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm }}>
               <SummaryRow icon={watched ? 'alert-circle-outline' : 'checkmark-circle-outline'} iconColor={watched ? theme.color.danger : theme.color.success} label="Today" value={watched ? 'Relapse' : 'Clean day'} />
+              {moneyBalance !== '' && (
+                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={formatMoney(balance, currency)} />
+              )}
+              {watched === true && didBuyPorn === true && pornSpendAmount !== '' && (
+                <SummaryRow icon="cash-outline" iconColor={theme.color.danger} label="Spent" value={formatMoney(pornSpend, currency)} />
+              )}
+              {watched === true && didBuyPorn === true && moneyBalance !== '' && pornSpendAmount !== '' && (
+                <SummaryRow icon="trending-down-outline" iconColor={theme.color.success} label="Remaining" value={formatMoney(remaining, currency)} />
+              )}
               <SummaryRow icon="bar-chart-outline" iconColor={theme.color.primary} label="Mood" value={`${mood} / 10`} />
               {watched === false && urgeIntensity > 0 && (
                 <SummaryRow icon="pulse-outline" iconColor={theme.color.celebrate} label="Urge level" value={`${urgeIntensity} / 10`} />

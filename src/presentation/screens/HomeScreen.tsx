@@ -162,8 +162,21 @@ export function HomeScreen() {
         <View style={{ alignSelf: 'stretch', gap: spacing.md }}>
           {profile.addictionType === 'pornography' ? (
             <>
-              {/* Compact values + context in the label - same visual rhythm
-                  as the gambling money tiles. */}
+              {/* Porn-specific stats + money tiles */}
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <StatTile
+                  value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '-'}
+                  label="Current Balance"
+                />
+                <StatTile
+                  value={
+                    moneyStats.change != null
+                      ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
+                      : '-'
+                  }
+                  label="Since Last Entry"
+                />
+              </View>
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
                 <StatTile
                   value={`${Math.max(longestStreak, days)}`}

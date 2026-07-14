@@ -304,44 +304,42 @@ export function ProgressScreen() {
       </Text>
       <BadgesPager badges={badges} />
 
-      {/* Financial Tracker - gambling users only */}
-      {!isPorn && (
-        <Card style={{ marginTop: spacing.xl }}>
-          <Text variant="headline" style={{ marginBottom: spacing.md }}>Financial Tracker</Text>
-          <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
-            Based on your daily balance entries in the journal. A lost wager is subtracted from your balance; winnings are never counted - recovery comes first. Financial changes do not affect your streak or achievements.
-          </Text>
-          <Row
-            label="Current balance"
-            value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '-'}
-            bold
-          />
-          <Row
-            label="Since last entry"
-            value={
-              moneyStats.change != null
-                ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
-                : '-'
-            }
-          />
-          <Row
-            label="Weekly trend (avg/day)"
-            value={
-              moneyStats.weeklyTrend != null
-                ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency)
-                : '-'
-            }
-          />
-          <Row
-            label="Monthly trend (avg/day)"
-            value={
-              moneyStats.monthlyTrend != null
-                ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency)
-                : '-'
-            }
-          />
-        </Card>
-      )}
+      {/* Financial Tracker - all addiction types with money balance */}
+      <Card style={{ marginTop: spacing.xl }}>
+        <Text variant="headline" style={{ marginBottom: spacing.md }}>Financial Tracker</Text>
+        <Text variant="footnote" dim style={{ marginBottom: spacing.md, lineHeight: 18 }}>
+          Based on your daily balance entries in the journal. Spending is subtracted from your balance. Financial changes do not affect your streak or achievements.
+        </Text>
+        <Row
+          label="Current balance"
+          value={moneyStats.current != null ? formatMoney(moneyStats.current, currency) : '-'}
+          bold
+        />
+        <Row
+          label="Since last entry"
+          value={
+            moneyStats.change != null
+              ? (moneyStats.change >= 0 ? '+' : '') + formatMoney(moneyStats.change, currency)
+              : '-'
+          }
+        />
+        <Row
+          label="Weekly trend (avg/day)"
+          value={
+            moneyStats.weeklyTrend != null
+              ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency)
+              : '-'
+          }
+        />
+        <Row
+          label="Monthly trend (avg/day)"
+          value={
+            moneyStats.monthlyTrend != null
+              ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency)
+              : '-'
+          }
+        />
+      </Card>
 
       {/* Porn Recovery Tracker - pornography users only */}
       {isPorn && (

@@ -73,6 +73,12 @@ export interface JournalEntry {
    * false → clean   (green calendar day, urgesResisted++)
    */
   watched?: boolean;
+  /** Did the user spend money on porn/R18 content? */
+  pornDidSpend?: boolean;
+  /** How much was spent on porn/R18 content. */
+  pornSpendAmount?: number;
+  /** Remaining money after porn spend (moneyBalance - pornSpendAmount). */
+  pornRemainingMoney?: number;
 
   // ── Smoking-specific fields (only populated for smoking addiction) ────────
   /**

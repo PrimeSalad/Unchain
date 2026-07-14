@@ -405,6 +405,9 @@ export interface FinancialJournalEntry {
   amountLost?: number;
   shopped?: boolean;
   shopAmountSpent?: number;
+  watched?: boolean;
+  pornDidSpend?: boolean;
+  pornSpendAmount?: number;
 }
 
 /**
@@ -416,7 +419,8 @@ export interface FinancialJournalEntry {
  *     rule, so historical trends stay correct.)
  *   - Gambled and won  → `moneyBalance` unchanged; winnings are never added.
  *   - Shopped online  → `moneyBalance - shopAmountSpent`, floored at 0.
- *   - Did not gamble / Did not shop → `moneyBalance` unchanged.
+ *   - Watched porn and spent → `moneyBalance - pornSpendAmount`, floored at 0.
+ *   - Did not gamble / Did not shop / Did not spend on porn → `moneyBalance` unchanged.
  */
 export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null {
   if (e.moneyBalance == null) return null;
@@ -426,6 +430,9 @@ export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null
   }
   if (e.shopped === true && e.shopAmountSpent != null) {
     return Math.max(0, e.moneyBalance - e.shopAmountSpent);
+  }
+  if (e.watched === true && e.pornDidSpend === true && e.pornSpendAmount != null) {
+    return Math.max(0, e.moneyBalance - e.pornSpendAmount);
   }
   return e.moneyBalance;
 }
