@@ -83,6 +83,7 @@ const SPECIFIC_CATEGORIES: Partial<Record<AddictionType, EduCategory[]>> = {
   smoking: [{ id: 'smoking', label: 'Quitting Smoking', icon: 'cloud-offline' }],
   alcohol: [{ id: 'alcohol', label: 'Alcohol Recovery', icon: 'wine' }],
   drugs: [{ id: 'substances', label: 'Substance Recovery', icon: 'medkit' }],
+  gaming: [{ id: 'gaming', label: 'Gaming Recovery', icon: 'game-controller' }],
 };
 
 /** The category set a user of this addiction type sees, specific first. */
@@ -584,6 +585,89 @@ const GUIDES: Guide[] = [
         ],
       },
       SEEK_HELP('Withdrawal is physically rough, or use involves opioids, alcohol, or benzodiazepines - medical support makes this far safer.'),
+    ],
+  },
+
+  // ── Gaming ──────────────────────────────────────────────────────────────
+  {
+    id: 'g-gaming',
+    title: 'Understanding Gaming Addiction',
+    subtitle: 'Dopamine loops, escapism, and reclaiming your time',
+    icon: 'game-controller',
+    audience: ['gaming'],
+    minutes: 8,
+    sections: [
+      {
+        heading: 'What gaming addiction is',
+        body: [
+          'Gaming addiction means the habit has moved from fun to compulsion: playing longer than intended, feeling unable to stop, and continuing despite costs to sleep, work, relationships, or health.',
+          'Games are engineered around reward loops - variable rewards, progression systems, social pressure, and daily login mechanics that keep the brain chasing the next achievement. This is not a character flaw; it is design working as intended.',
+        ],
+      },
+      {
+        heading: 'Why it hooks us',
+        body: [
+          'Gaming satisfies real needs: mastery (ranked progress), social connection (guilds, voice chat), escapism (stress, boredom, loneliness), and identity (avatars, achievements). When those needs are unmet elsewhere, the game becomes the default answer.',
+          'Live-service games add artificial urgency - daily quests, limited events, battle passes - that turn leisure into obligation. Missing a day feels like falling behind, which is how play becomes pressure.',
+        ],
+      },
+      {
+        heading: 'Myths and facts',
+        body: [],
+        bullets: [
+          'Myth: "It is not a real addiction if there is no substance." Fact: gaming addiction engages the same reward circuitry and responds to the same habit-change methods.',
+          'Myth: "I can stop whenever I want." Fact: try stopping for 30 days. If that feels impossible or triggers strong anxiety, the loop has more grip than you think.',
+          'Myth: "Gaming is wasted time if it is not productive." Fact: the issue is not gaming itself but loss of control. Moderate, chosen play is fine.',
+          'Myth: "Only teenagers get addicted." Fact: adults of every age struggle with gaming compulsion, especially live-service and competitive games.',
+        ],
+      },
+      {
+        heading: 'How it affects life',
+        body: [
+          'The costs are time-shaped: hours vanish, sleep shortens for late sessions, physical activity drops, and relationships feel the absence. Academic or work performance declines quietly - not from inability but from divided attention and tiredness.',
+          'Financial costs from in-game purchases (skins, gacha, battle passes) can be significant and hidden. The social cost is real too - online communities can feel supportive while quietly replacing in-person connections.',
+        ],
+      },
+      {
+        heading: 'Signs it is becoming a problem',
+        body: [],
+        bullets: [
+          'Playing longer than planned, repeatedly.',
+          'Irritability or anxiety when you cannot play.',
+          'Skipping meals, sleep, or exercise to play.',
+          'Spending more than intended on in-game purchases.',
+          'Hiding play time or spending from people close to you.',
+          'Feeling empty or restless when not gaming.',
+          'Work, study, or relationships taking damage.',
+        ],
+      },
+      {
+        heading: 'Recovery strategies that work',
+        body: [
+          'You are not fighting willpower against willpower. Change the environment, not just the behavior.',
+        ],
+        bullets: [
+          'Set hard time limits: use device-level screen time controls, not just good intentions.',
+          'Remove friction from real life and add friction to gaming: move the console, log out of accounts, delete mobile games.',
+          'Protect sleep: set a non-negotiable gaming curfew - sleep is the keystone habit.',
+          'Fill the time slot: the urge arrives at predictable moments - schedule something real there.',
+          'Track clean days and urges here - visible progress is powerful fuel.',
+          'Address the need underneath: if gaming solves loneliness, boredom, or stress, find better answers for those.',
+          'Consider temporary abstinence from the most compulsive game while building new habits.',
+        ],
+      },
+      {
+        heading: 'Healthy coping in the moment',
+        body: ['The urge to play is loud but time-limited. Outlast, don\'t out-argue.'],
+        bullets: [
+          'Set a 15-minute timer before opening a game. Most urges fade before it rings.',
+          'Change location: stand up, leave the room where you game.',
+          'Name the urge: "I want to play because I am bored / stressed / lonely." Awareness weakens the pull.',
+          'Do something physical: a walk, push-ups, stretching - anything that changes your state.',
+          'Open this app instead: SOS tools, a breathing exercise, or a journal entry.',
+        ],
+      },
+      SEEK_HELP('Gaming keeps overriding sleep, work, or relationships despite real attempts to cut down.'),
     ],
   },
 

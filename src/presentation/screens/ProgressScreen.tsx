@@ -183,6 +183,8 @@ export function ProgressScreen() {
         journalByDay.set(localMidnight(j.at), j.drank);
       } else if (j.used !== undefined) {
         journalByDay.set(localMidnight(j.at), j.used);
+      } else if (j.played !== undefined) {
+        journalByDay.set(localMidnight(j.at), j.played);
       }
     });
 

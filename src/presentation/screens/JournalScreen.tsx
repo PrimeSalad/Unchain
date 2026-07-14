@@ -125,10 +125,13 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
   // Drugs entry detection
   const isUsed        = entry.used === true;
   const isDrugClean   = entry.used === false;
+  // Gaming entry detection
+  const isPlayed      = entry.played === true;
+  const isGamingClean = entry.played === false;
 
   const accent =
-    isGamble || isWatched || isBinged || isSmoked || isDrank || isUsed ? theme.color.danger :
-    isClean || isPornClean || isSocialClean || isSmokeClean || isAlcoholClean || isDrugClean ? theme.color.success :
+    isGamble || isWatched || isBinged || isSmoked || isDrank || isUsed || isPlayed ? theme.color.danger :
+    isClean || isPornClean || isSocialClean || isSmokeClean || isAlcoholClean || isDrugClean || isGamingClean ? theme.color.success :
     theme.color.primary;
 
   const statusLabel =
@@ -144,11 +147,13 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
     isAlcoholClean ? 'Clean day' :
     isUsed        ? 'Relapse' :
     isDrugClean   ? 'Clean day' :
+    isPlayed      ? 'Relapse' :
+    isGamingClean ? 'Clean day' :
     'Entry';
 
   const statusIcon =
-    isGamble || isWatched || isBinged || isSmoked || isDrank || isUsed  ? 'alert-circle' :
-    isClean  || isPornClean || isSocialClean || isSmokeClean || isAlcoholClean || isDrugClean ? 'checkmark-circle' :
+    isGamble || isWatched || isBinged || isSmoked || isDrank || isUsed || isPlayed  ? 'alert-circle' :
+    isClean  || isPornClean || isSocialClean || isSmokeClean || isAlcoholClean || isDrugClean || isGamingClean ? 'checkmark-circle' :
     'document-text-outline';
 
   const dateStr = new Date(entry.at).toLocaleDateString('en-PH', {
@@ -182,6 +187,8 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
     entry.text !== 'Relapse recorded.' &&
     entry.text !== 'Smoking relapse recorded.' &&
     entry.text !== 'Alcohol relapse recorded.' &&
+    entry.text !== 'Substance use relapse recorded.' &&
+    entry.text !== 'Gaming relapse recorded.' &&
     entry.text !== 'Last use before recovery.';
 
   // The recovery-adjusted balance: raw balance minus the wager on a losing
@@ -491,6 +498,37 @@ function EntryCard({ entry, index, currency }: { entry: JournalEntry; index: num
               {entry.used === true && entry.drugNextTimePlan && (
                 <DetailRow icon="bulb-outline" color={theme.color.primary} label="Next time" value={entry.drugNextTimePlan} />
               )}
+
+              {/* ── Gaming clean day rows ── */}
+              {entry.played === false && entry.gamingUrgeIntensity != null && (
+                <DetailRow icon="pulse-outline" color={theme.color.celebrate} label="Urge level" value={`${entry.gamingUrgeIntensity}/10`} />
+              )}
+              {entry.played === false && entry.gamingWhatHelped && (
+                <DetailRow icon="shield-checkmark-outline" color={theme.color.success} label="Helped" value={entry.gamingWhatHelped} />
+              )}
+
+              {/* ── Gaming relapse rows ── */}
+              {entry.played === true && entry.gamingType && (
+                <DetailRow icon="game-controller-outline" color={theme.color.textDim} label="Type" value={entry.gamingType} />
+              )}
+              {entry.played === true && entry.gamingHours && (
+                <DetailRow icon="time-outline" color={theme.color.textDim} label="Duration" value={entry.gamingHours} />
+              )}
+              {entry.played === true && entry.gamingAmountSpent != null && entry.gamingAmountSpent > 0 && (
+                <DetailRow icon="wallet-outline" color={theme.color.danger} label="Spent" value={`${entry.gamingSpendCurrency ?? currency}${entry.gamingAmountSpent.toLocaleString()}`} />
+              )}
+              {entry.played === true && entry.gamingEmotions != null && entry.gamingEmotions.length > 0 && (
+                <DetailRow icon="heart-outline" color={theme.color.danger} label="Emotions" value={entry.gamingEmotions.join(', ')} />
+              )}
+              {entry.played === true && entry.gamingTrigger && (
+                <DetailRow icon="warning-outline" color={theme.color.danger} label="Trigger" value={entry.gamingTrigger} />
+              )}
+              {entry.played === true && entry.gamingNextTimePlan && (
+                <DetailRow icon="bulb-outline" color={theme.color.primary} label="Next time" value={entry.gamingNextTimePlan} />
+              )}
+              {entry.played === true && entry.gamingFeelingNow && (
+                <DetailRow icon="happy-outline" color={theme.color.primary} label="Feeling now" value={entry.gamingFeelingNow} />
+              )}
             </View>
           )}
         </Animated.View>
@@ -678,6 +716,7 @@ export function JournalScreen() {
   const isSmoke    = profile?.addictionType === 'smoking';
   const isAlcohol  = profile?.addictionType === 'alcohol';
   const isDrugs    = profile?.addictionType === 'drugs';
+  const isGaming   = profile?.addictionType === 'gaming';
 
   const [query, setQuery]         = useState('');
   const [filter, setFilter]       = useState<Filter>('all');
@@ -717,11 +756,14 @@ export function JournalScreen() {
     // Drugs stats
     const drugClean    = entries.filter((e) => e.used === false).length;
     const drugRelapses = entries.filter((e) => e.used === true).length;
+    // Gaming stats
+    const gamingClean    = entries.filter((e) => e.played === false).length;
+    const gamingRelapses = entries.filter((e) => e.played === true).length;
     const withMood = entries.filter((e) => e.mood != null);
     const avgMood  = withMood.length
       ? Math.round(withMood.reduce((s, e) => s + (e.mood ?? 0), 0) / withMood.length * 10) / 10
       : null;
-    return { total, clean, relapses, pornClean, pornRelapses, socialClean, socialRelapses, smokeClean, smokeRelapses, alcoholClean, alcoholRelapses, drugClean, drugRelapses, avgMood };
+    return { total, clean, relapses, pornClean, pornRelapses, socialClean, socialRelapses, smokeClean, smokeRelapses, alcoholClean, alcoholRelapses, drugClean, drugRelapses, gamingClean, gamingRelapses, avgMood };
   }, [entries, profile]);
 
   // ── Filtered + sorted entries ─────────────────────────────────────────────
@@ -775,13 +817,17 @@ export function JournalScreen() {
           if (filter === 'clean'   && e.used !== false) return false;
           if (filter === 'gambled' && e.used !== true)  return false;
         }
+        if (isGaming) {
+          if (filter === 'clean'   && e.played !== false) return false;
+          if (filter === 'gambled' && e.played !== true)  return false;
+        }
         // Search
         if (query && !e.text.toLowerCase().includes(query.toLowerCase())) return false;
         return true;
       })
       // Newest first
       .sort((a, b) => b.at - a.at);
-  }, [entries, query, filter, dateRange, isGambling, isPorn, isSocial, isSmoke, isAlcohol, isDrugs]);
+  }, [entries, query, filter, dateRange, isGambling, isPorn, isSocial, isSmoke, isAlcohol, isDrugs, isGaming]);
 
   // Status filter options per addiction type
   const statusFilters: { key: Filter; label: string }[] =
@@ -791,6 +837,7 @@ export function JournalScreen() {
     : isSocial ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
     : isSmoke  ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
     : isAlcohol ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
+    : isGaming ? [{ key: 'all', label: 'All' }, { key: 'clean', label: 'Clean' }, { key: 'gambled', label: 'Relapses' }]
     : [];
 
   // Date ranges
@@ -832,7 +879,7 @@ export function JournalScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            router.push(isPorn ? '/porn-journal-entry' : isSocial ? '/social-journal-entry' : isSmoke ? '/smoke-journal-entry' : isAlcohol ? '/alcohol-journal-entry' : isDrugs ? '/drug-journal-entry' : '/journal-entry');
+            router.push(isPorn ? '/porn-journal-entry' : isSocial ? '/social-journal-entry' : isSmoke ? '/smoke-journal-entry' : isAlcohol ? '/alcohol-journal-entry' : isDrugs ? '/drug-journal-entry' : isGaming ? '/game-journal-entry' : '/journal-entry');
           }}
           accessibilityRole="button"
           accessibilityLabel="Write new entry"
@@ -851,18 +898,18 @@ export function JournalScreen() {
       {searching && <SearchBar query={query} onChange={setQuery} />}
 
       {/* ── Stats: three compact tiles, only when there are entries ── */}
-      {(isGambling || isPorn || isSocial || isSmoke || isAlcohol || isDrugs) && entries.length > 0 && (
+      {(isGambling || isPorn || isSocial || isSmoke || isAlcohol || isDrugs || isGaming) && entries.length > 0 && (
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
           <StatCard
             icon="checkmark-circle"
-            value={isGambling ? stats.clean : isPorn ? stats.pornClean : isSocial ? stats.socialClean : isSmoke ? stats.smokeClean : isAlcohol ? stats.alcoholClean : stats.drugClean}
+            value={isGambling ? stats.clean : isPorn ? stats.pornClean : isSocial ? stats.socialClean : isSmoke ? stats.smokeClean : isAlcohol ? stats.alcoholClean : isGaming ? stats.gamingClean : stats.drugClean}
             label="Clean"
             color={theme.color.success}
             delay={0}
           />
           <StatCard
             icon="alert-circle"
-            value={isGambling ? stats.relapses : isPorn ? stats.pornRelapses : isSocial ? stats.socialRelapses : isSmoke ? stats.smokeRelapses : isAlcohol ? stats.alcoholRelapses : stats.drugRelapses}
+            value={isGambling ? stats.relapses : isPorn ? stats.pornRelapses : isSocial ? stats.socialRelapses : isSmoke ? stats.smokeRelapses : isAlcohol ? stats.alcoholRelapses : isGaming ? stats.gamingRelapses : stats.drugRelapses}
             label="Relapses"
             color={theme.color.danger}
             delay={60}

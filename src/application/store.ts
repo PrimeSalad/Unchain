@@ -807,6 +807,7 @@ export const useStore = create<RecoveryState>()(
         const isDrugs = profile.addictionType === 'drugs';
         const isSmoke = profile.addictionType === 'smoking';
         const isSocial = profile.addictionType === 'social_media';
+        const isGaming = profile.addictionType === 'gaming';
 
         const initialRelapses: RelapseEvent[] = isToday
           ? []
@@ -827,6 +828,8 @@ export const useStore = create<RecoveryState>()(
               ? { id: uid(), at: seedAt, smoked: true,   text: 'Last use before recovery.' }
               : isSocial
               ? { id: uid(), at: seedAt, binged: true,   text: 'Last use before recovery.' }
+              : isGaming
+              ? { id: uid(), at: seedAt, played: true,   text: 'Last use before recovery.' }
               : { id: uid(), at: seedAt, gambled: true,  text: 'Last use before recovery.' },
           );
 
@@ -847,6 +850,8 @@ export const useStore = create<RecoveryState>()(
                 ? { id: uid(), at: dayMid + 12 * 3_600_000, smoked: false,  text: 'Clean day.' }
                 : isSocial
                 ? { id: uid(), at: dayMid + 12 * 3_600_000, binged: false,  text: 'Clean day.' }
+                : isGaming
+                ? { id: uid(), at: dayMid + 12 * 3_600_000, played: false,  text: 'Clean day.' }
                 : { id: uid(), at: dayMid + 12 * 3_600_000, gambled: false, text: 'Clean day.' },
             );
             dayMid += MS_PER_DAY;
@@ -979,6 +984,7 @@ export const useStore = create<RecoveryState>()(
           const isSmokeEntry = data.smoked !== undefined;
           const isAlcoholEntry = data.drank !== undefined;
           const isDrugEntry = data.used !== undefined;
+          const isGamingEntry = data.played !== undefined;
           const alreadyToday = s.journal.some((j) => {
             if (!sameDay(j.at, Date.now())) return false;
             if (isGamblingEntry) return j.gambled !== undefined;
@@ -987,6 +993,7 @@ export const useStore = create<RecoveryState>()(
             if (isSmokeEntry) return j.smoked !== undefined;
             if (isAlcoholEntry) return j.drank !== undefined;
             if (isDrugEntry) return j.used !== undefined;
+            if (isGamingEntry) return j.played !== undefined;
             return true; // generic entry - block any duplicate
           });
           if (alreadyToday) return s;
@@ -1333,6 +1340,59 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
+          // ── Gaming: played=true → relapse; played=false → clean ──────────
+          if (data.played === true) {
+            const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
+            const prevDays = streakDays(streakStart);
+            const relapseEntry: RelapseEvent = {
+              id: uid(),
+              at: Date.now(),
+              whatHappened: data.gamingTrigger,
+              cause: data.gamingTrigger,
+              feeling: data.gamingEmotions?.join(', '),
+            };
+            return {
+              journal: journalAfter,
+              relapses: [relapseEntry, ...s.relapses],
+              longestStreak: Math.max(s.longestStreak, prevDays),
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Journal entry - gaming relapse logged'),
+                evt('relapse', 'Logged a relapse via journal - recovery continues'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          if (data.played === false) {
+            const now = Date.now();
+            const urgeEntry: UrgeLog = {
+              id: uid(),
+              at: now,
+              intensity: data.gamingUrgeIntensity ?? 1,
+              trigger: data.gamingWhatHelped ?? 'Daily journal',
+              triggers: data.gamingWhatHelped ? [data.gamingWhatHelped] : ['Daily journal'],
+              notes: data.gamingWhatHelped ?? data.text,
+              resisted: true,
+              mood: data.mood,
+            };
+            return {
+              journal: journalAfter,
+              urges: [urgeEntry, ...s.urges],
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...resistedCounterPatch(s, now),
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Wrote a journal entry - clean day'),
+                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
+                ...s.timeline,
+              ],
+            };
+          }
+
           return {
             journal: journalAfter,
             points: s.points + 5 + altUnlocked.length * 5,
@@ -1530,6 +1590,16 @@ export function useTodayAlcoholJournal(): import('@/domain/records').JournalEntr
 export function useTodayDrugJournal(): import('@/domain/records').JournalEntry | undefined {
   return useStore((s) =>
     s.journal.find((j) => sameDay(j.at, Date.now()) && j.used !== undefined),
+  );
+}
+
+/**
+ * Today's journal entry for gaming users, or undefined if none submitted yet.
+ * Finds any entry today where `played` is defined (gaming-specific gate).
+ */
+export function useTodayGamingJournal(): import('@/domain/records').JournalEntry | undefined {
+  return useStore((s) =>
+    s.journal.find((j) => sameDay(j.at, Date.now()) && j.played !== undefined),
   );
 }
 

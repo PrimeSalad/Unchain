@@ -10,6 +10,7 @@ export type AddictionType =
   | 'smoking'
   | 'alcohol'
   | 'drugs'
+  | 'gaming'
   | 'other';
 
 export interface AddictionMeta {
@@ -55,6 +56,11 @@ export const ADDICTIONS: AddictionMeta[] = [
   {
     key: 'drugs', label: 'Drugs / Substances', verb: 'use', freeLabel: 'Substance-Free', hasExpense: true,
     specificQuestion: 'What substance? (optional)',
+  },
+  {
+    key: 'gaming', label: 'Gaming', verb: 'play', freeLabel: 'Gaming-Free', hasExpense: true,
+    specificQuestion: 'What do you mostly play?',
+    specificOptions: ['Mobile games', 'Console (PlayStation, Xbox, Switch)', 'PC games', 'Online multiplayer', 'Browser / web games', 'Gambling-style games (gacha, loot boxes)', 'Other'],
   },
   {
     key: 'other', label: 'Other', verb: 'do it', freeLabel: 'Free', hasExpense: true,
@@ -195,6 +201,21 @@ export const OTHER_TRIGGERS = [
   'Other',
 ] as const;
 
+export const GAMING_TRIGGERS = [
+  'Boredom',
+  'Stress',
+  'Loneliness',
+  'Friends online',
+  'FOMO / missing events',
+  'Daily login rewards',
+  'Competitive streak / rank',
+  'Escaping responsibilities',
+  'Late night / can\'t sleep',
+  'Winning streak',
+  'Anxiety',
+  'Other',
+] as const;
+
 /** Returns the appropriate trigger list for a given addiction type. */
 export function triggersForAddiction(type: AddictionType): readonly string[] {
   switch (type) {
@@ -203,6 +224,7 @@ export function triggersForAddiction(type: AddictionType): readonly string[] {
     case 'alcohol':      return ALCOHOL_TRIGGERS;
     case 'drugs':        return DRUGS_TRIGGERS;
     case 'social_media': return SOCIAL_MEDIA_TRIGGERS;
+    case 'gaming':       return GAMING_TRIGGERS;
     case 'pornography':  return []; // handled separately via PORN_TRIGGERS
     default:             return OTHER_TRIGGERS;
   }
@@ -249,7 +271,7 @@ const MS_PER_DAY = 86_400_000;
 export function currentStreakStart(
   profileStartedAt: number,
   relapses: Array<{ at: number }>,
-  journalEntries: Array<{ gambled?: boolean; watched?: boolean; drank?: boolean; smoked?: boolean; binged?: boolean; used?: boolean; at: number }>,
+  journalEntries: Array<{ gambled?: boolean; watched?: boolean; drank?: boolean; smoked?: boolean; binged?: boolean; used?: boolean; played?: boolean; at: number }>,
 ): number {
   const relapseTimestamps: number[] = [
     ...relapses.map((r) => r.at),
@@ -259,7 +281,8 @@ export function currentStreakStart(
     // Smoking relapse: smoked === true
     // Social media relapse: binged === true
     // Drugs relapse: used === true
-    ...journalEntries.filter((j) => j.gambled === true || j.watched === true || j.drank === true || j.smoked === true || j.binged === true || j.used === true).map((j) => j.at),
+    // Gaming relapse: played === true
+    ...journalEntries.filter((j) => j.gambled === true || j.watched === true || j.drank === true || j.smoked === true || j.binged === true || j.used === true || j.played === true).map((j) => j.at),
   ];
 
   if (relapseTimestamps.length === 0) {

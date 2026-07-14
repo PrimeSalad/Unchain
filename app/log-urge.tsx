@@ -13,8 +13,7 @@ import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useProfile } from '@/application/store';
-import { TRIGGERS, urgeLevel } from '@/domain/gambling';
-import { PORN_TRIGGERS } from '@/domain/pornRecovery';
+import { triggersForAddiction, urgeLevel } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
 // Mood label helpers
@@ -227,7 +226,7 @@ export default function LogUrge() {
             What triggered it?
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            {(profile?.addictionType === 'pornography' ? PORN_TRIGGERS : TRIGGERS).map((t) => (
+            {(profile?.addictionType ? triggersForAddiction(profile.addictionType) : triggersForAddiction('gambling')).map((t) => (
               <Pill
                 key={t}
                 label={t}
