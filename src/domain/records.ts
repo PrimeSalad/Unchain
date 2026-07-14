@@ -87,6 +87,12 @@ export interface JournalEntry {
    * false → clean   (green calendar day)
    */
   smoked?: boolean;
+  /** Did the user spend money on smoking? */
+  smokeDidSpend?: boolean;
+  /** How much was spent on smoking. */
+  smokeSpendAmount?: number;
+  /** Remaining money after smoking spend (moneyBalance - smokeSpendAmount). */
+  smokeRemainingMoney?: number;
   /** Number of cigarettes / vapes smoked on a relapse day. */
   smokedCount?: number;
   /** What type they smoked (cigarette, vape, cigar, etc.) */

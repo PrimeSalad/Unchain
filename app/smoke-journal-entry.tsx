@@ -34,8 +34,8 @@ import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useTodaySmokeJournal } from '@/application/store';
-import { SMOKING_TRIGGERS } from '@/domain/gambling';
+import { useStore, useTodaySmokeJournal, useProfile } from '@/application/store';
+import { SMOKING_TRIGGERS, formatMoneyInput, parseMoneyInput, formatMoney, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
 // Step IDs
@@ -43,6 +43,9 @@ import { SMOKING_TRIGGERS } from '@/domain/gambling';
 
 type StepId =
   | 'did_smoke'
+  | 'money_balance'
+  | 'did_smoke_spend'
+  | 'smoke_spend_amount'
   | 'mood'
   | 'urge_intensity'
   | 'what_helped'
@@ -54,15 +57,18 @@ type StepId =
   | 'next_time_plan'
   | 'summary';
 
-function buildSteps(smoked: boolean | null): StepId[] {
+function buildSteps(smoked: boolean | null, didSmokeSpend?: boolean | null): StepId[] {
   if (smoked === false) {
-    return ['did_smoke', 'mood', 'what_helped', 'reflection_clean', 'summary'];
+    return ['did_smoke', 'money_balance', 'mood', 'what_helped', 'reflection_clean', 'summary'];
   }
   if (smoked === true) {
-    return ['did_smoke', 'mood', 'urge_intensity', 'trigger_relapse', 'smoked_count', 'smoked_type', 'emotions', 'next_time_plan', 'summary'];
+    const steps: StepId[] = ['did_smoke', 'money_balance', 'did_smoke_spend'];
+    if (didSmokeSpend === true) steps.push('smoke_spend_amount');
+    steps.push('mood', 'urge_intensity', 'trigger_relapse', 'smoked_count', 'smoked_type', 'emotions', 'next_time_plan', 'summary');
+    return steps;
   }
   // Default before yes/no: show clean-day path so progress bar is sensible
-  return ['did_smoke', 'mood', 'what_helped', 'reflection_clean', 'summary'];
+  return ['did_smoke', 'money_balance', 'mood', 'what_helped', 'reflection_clean', 'summary'];
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +245,8 @@ export default function SmokeJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
   const addJournal = useStore((s) => s.addJournal);
+  const profile = useProfile();
+  const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const insets   = useSafeAreaInsets();
 
   const todayJournal     = useTodaySmokeJournal();
@@ -249,6 +257,9 @@ export default function SmokeJournalEntry() {
 
   // ── Form state ──────────────────────────────────────────────────────────
   const [smoked,        setSmoked]        = useState<boolean | null>(null);
+  const [moneyBalance,  setMoneyBalance]  = useState('');
+  const [didSmokeSpend, setDidSmokeSpend] = useState<boolean | null>(null);
+  const [smokeSpendAmount, setSmokeSpendAmount] = useState('');
   const [mood,          setMood]          = useState(5);
   const [urgeIntensity, setUrgeIntensity] = useState(3);
   const [whatHelped,    setWhatHelped]    = useState('');
@@ -276,19 +287,30 @@ export default function SmokeJournalEntry() {
 
   function canProceed(): boolean {
     switch (currentStep) {
-      case 'did_smoke':     return smoked !== null;
-      case 'smoked_type':   return smokedType !== null;
-      case 'emotions':      return emotions.length > 0;
-      case 'trigger_relapse': return triggerRelapse !== null;
-      default:              return true;
+      case 'did_smoke':        return smoked !== null;
+      case 'money_balance':    return moneyBalance.trim() !== '';
+      case 'did_smoke_spend':  return didSmokeSpend !== null;
+      case 'smoke_spend_amount': return smokeSpendAmount.trim() !== '';
+      case 'smoked_type':      return smokedType !== null;
+      case 'emotions':         return emotions.length > 0;
+      case 'trigger_relapse':  return triggerRelapse !== null;
+      default:                 return true;
     }
   }
 
   function goNext() {
     if (!canProceed()) return;
     Haptics.selectionAsync().catch(() => {});
+    // Freeze at did_smoke to switch to relapse or clean path
     if (currentStep === 'did_smoke' && frozenSteps.current === null) {
       frozenSteps.current = buildSteps(smoked);
+    }
+    // Always rebuild at did_smoke_spend so smoke_spend_amount is included or excluded
+    if (currentStep === 'did_smoke_spend') {
+      frozenSteps.current = buildSteps(smoked, didSmokeSpend);
+      if (didSmokeSpend !== true) {
+        setSmokeSpendAmount('');
+      }
     }
     const active = frozenSteps.current ?? steps;
     if (stepIdx < active.length - 1) slide('forward', () => setStepIdx((i) => i + 1));
@@ -309,10 +331,19 @@ export default function SmokeJournalEntry() {
 
     const countNum = smokedCount.trim() ? parseInt(smokedCount.trim(), 10) : undefined;
 
+    // Calculate remaining money: moneyBalance - smokeSpendAmount
+    const balance = moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || 0 : 0;
+    const smokeSpend = smoked === true && didSmokeSpend === true ? parseFloat(smokeSpendAmount.replace(/,/g, '')) || 0 : 0;
+    const remainingMoney = Math.max(0, balance - smokeSpend);
+
     addJournal({
       smoked: smoked === true,
       text: reflection.trim() || (smoked === true ? 'Smoking relapse recorded.' : 'Clean day recorded.'),
       mood,
+      moneyBalance: balance || undefined,
+      smokeDidSpend: smoked === true ? didSmokeSpend === true : undefined,
+      smokeSpendAmount: smoked === true && didSmokeSpend === true ? smokeSpend || undefined : undefined,
+      smokeRemainingMoney: smoked === true && didSmokeSpend === true ? remainingMoney : undefined,
       smokeUrgeIntensity: smoked === true ? urgeIntensity : undefined,
       smokeTrigger: smoked === true ? (triggerRelapse ?? undefined) : undefined,
       smokeWhatHelped: smoked === false && whatHelped.trim() ? whatHelped.trim() : undefined,
@@ -387,6 +418,136 @@ export default function SmokeJournalEntry() {
                 <Text variant="callout" style={{ flex: 1, lineHeight: 22 }}>It takes courage to be honest. You are not alone in this.</Text>
               </Card>
             )}
+          </>
+        );
+
+      case 'money_balance':
+        return (
+          <>
+            <StepHeading title="How much money do you have today?" subtitle="Enter your current balance. This helps track your financial wellbeing." />
+            <View style={{ gap: spacing.xl }}>
+              <View style={{
+                width: '100%', alignSelf: 'center', borderRadius: radius.card,
+                backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+                padding: spacing.lg, gap: spacing.lg,
+              }}>
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="footnote" dim center>Current balance</Text>
+                  <View style={{
+                    minHeight: 76, borderRadius: radius.card, backgroundColor: theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: theme.color.hairline, flexDirection: 'row',
+                    alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md,
+                  }}>
+                    <View style={{
+                      width: 54, height: 54, borderRadius: 18, backgroundColor: theme.color.primary,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                    </View>
+                    <TextInput value={moneyBalance} onChangeText={(t) => setMoneyBalance(formatMoneyInput(t, true))}
+                      placeholder="0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad"
+                      autoFocus underlineColorAndroid="transparent" selectionColor={theme.color.primary}
+                      style={{ flex: 1, minWidth: 0, color: theme.color.text, fontSize: 34, lineHeight: 40,
+                        fontFamily: 'Nunito_900Black', paddingVertical: spacing.sm }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ width: '100%', alignSelf: 'center', gap: spacing.sm }}>
+                <Text variant="footnote" dim center>Currency</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+                  {SUPPORTED_CURRENCIES.map((option) => {
+                    const active = currency === option.symbol;
+                    return (
+                      <Pressable key={option.code} onPress={() => useStore.getState().updateProfile({ currency: option.symbol })}
+                        accessibilityRole="button" accessibilityLabel={`${option.label}, ${option.code}`}
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => ({
+                          width: '30.5%', minWidth: 86, minHeight: 52, borderRadius: radius.input,
+                          borderWidth: 1, borderColor: active ? theme.color.primary : theme.color.hairline,
+                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                          paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
+                          alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1,
+                        })}>
+                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>{option.symbol}</Text>
+                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>{option.code}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          </>
+        );
+
+      case 'did_smoke_spend':
+        return (
+          <>
+            <StepHeading title="Did you spend money on smoking today?" subtitle="This helps track spending on cigarettes, vapes, etc." />
+            <YesNoToggle value={didSmokeSpend} onChange={setDidSmokeSpend} />
+            {didSmokeSpend === false && (
+              <Card tone="successSoft" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, borderLeftWidth: 3, borderLeftColor: theme.color.success }}>
+                <Ionicons name="checkmark-circle-outline" size={22} color={theme.color.success} />
+                <Text variant="callout" style={{ flex: 1, lineHeight: 22 }}>Good job avoiding impulse purchases!</Text>
+              </Card>
+            )}
+          </>
+        );
+
+      case 'smoke_spend_amount':
+        return (
+          <>
+            <StepHeading title="How much did you spend?" subtitle="Enter the amount you spent on smoking." />
+            <View style={{ gap: spacing.xl }}>
+              <View style={{
+                width: '100%', alignSelf: 'center', borderRadius: radius.card,
+                backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+                padding: spacing.lg, gap: spacing.lg,
+              }}>
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="footnote" dim center>Amount spent</Text>
+                  <View style={{
+                    minHeight: 76, borderRadius: radius.card, backgroundColor: theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: theme.color.hairline, flexDirection: 'row',
+                    alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md,
+                  }}>
+                    <View style={{
+                      width: 54, height: 54, borderRadius: 18, backgroundColor: theme.color.primary,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                    </View>
+                    <TextInput value={smokeSpendAmount} onChangeText={(t) => setSmokeSpendAmount(formatMoneyInput(t, true))}
+                      placeholder="0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad"
+                      autoFocus underlineColorAndroid="transparent" selectionColor={theme.color.primary}
+                      style={{ flex: 1, minWidth: 0, color: theme.color.text, fontSize: 34, lineHeight: 40,
+                        fontFamily: 'Nunito_900Black', paddingVertical: spacing.sm }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ width: '100%', alignSelf: 'center', gap: spacing.sm }}>
+                <Text variant="footnote" dim center>Currency</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+                  {SUPPORTED_CURRENCIES.map((option) => {
+                    const active = currency === option.symbol;
+                    return (
+                      <Pressable key={option.code} onPress={() => useStore.getState().updateProfile({ currency: option.symbol })}
+                        accessibilityRole="button" accessibilityLabel={`${option.label}, ${option.code}`}
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => ({
+                          width: '30.5%', minWidth: 86, minHeight: 52, borderRadius: radius.input,
+                          borderWidth: 1, borderColor: active ? theme.color.primary : theme.color.hairline,
+                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                          paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
+                          alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1,
+                        })}>
+                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>{option.symbol}</Text>
+                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>{option.code}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
           </>
         );
 
@@ -501,7 +662,10 @@ export default function SmokeJournalEntry() {
           </>
         );
 
-      case 'summary':
+      case 'summary': {
+        const balance = moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || 0 : 0;
+        const smokeSpend = smoked === true && didSmokeSpend === true ? parseFloat(smokeSpendAmount.replace(/,/g, '')) || 0 : 0;
+        const remaining = Math.max(0, balance - smokeSpend);
         return (
           <>
             <StepHeading title="Review your entry" subtitle="Take a moment before saving." />
@@ -512,6 +676,15 @@ export default function SmokeJournalEntry() {
                 label="Today"
                 value={smoked ? 'Relapse' : 'Clean day'}
               />
+              {moneyBalance !== '' && (
+                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={formatMoney(balance, currency)} />
+              )}
+              {smoked === true && didSmokeSpend === true && smokeSpendAmount !== '' && (
+                <SummaryRow icon="cash-outline" iconColor={theme.color.danger} label="Spent" value={formatMoney(smokeSpend, currency)} />
+              )}
+              {smoked === true && didSmokeSpend === true && moneyBalance !== '' && smokeSpendAmount !== '' && (
+                <SummaryRow icon="trending-down-outline" iconColor={theme.color.success} label="Remaining" value={formatMoney(remaining, currency)} />
+              )}
               <SummaryRow icon="bar-chart-outline" iconColor={theme.color.primary} label="Mood" value={`${mood} / 10`} />
               {smoked === false && whatHelped.trim() !== '' && (
                 <SummaryRow icon="shield-checkmark-outline" iconColor={theme.color.success} label="Helped" value={whatHelped.trim()} />
@@ -540,6 +713,7 @@ export default function SmokeJournalEntry() {
             </View>
           </>
         );
+      }
 
       default: return null;
     }
