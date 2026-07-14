@@ -185,6 +185,12 @@ export interface JournalEntry {
    * false → clean   (green calendar day)
    */
   used?: boolean;
+  /** Did the user spend money on drugs/substances? */
+  drugDidSpend?: boolean;
+  /** How much was spent on drugs/substances. */
+  drugSpendAmount?: number;
+  /** Remaining money after drug spend (moneyBalance - drugSpendAmount). */
+  drugRemainingMoney?: number;
   /** What substance was used (relapse day). */
   drugType?: string;
   /** How much was used (relapse day). */
