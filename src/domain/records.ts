@@ -209,6 +209,34 @@ export interface JournalEntry {
   gamingUrgeIntensity?: number;
   /** What helped the user stay gaming-free on a clean day. */
   gamingWhatHelped?: string;
+
+  // ── Online-shopping-specific fields (only populated for online_shopping addiction) ──
+  /**
+   * Did the user shop online on this day?
+   * true  → relapse (red calendar day, streak resets)
+   * false → clean   (green calendar day)
+   */
+  shopped?: boolean;
+  /** Where they shopped (relapse day). */
+  shopWhere?: string;
+  /** How much was spent (relapse day). */
+  shopAmountSpent?: number;
+  /** Currency symbol used for the spend amount. */
+  shopSpendCurrency?: string;
+  /** Remaining money after shopping (moneyBalance - shopAmountSpent). */
+  shopRemainingMoney?: number;
+  /** What triggered the shopping relapse. */
+  shopTrigger?: string;
+  /** Emotions felt before shopping (relapse day). */
+  shopEmotions?: string[];
+  /** What could help next time (relapse day). */
+  shopNextTimePlan?: string;
+  /** How they feel now after shopping (relapse day). */
+  shopFeelingNow?: string;
+  /** Urge intensity on a clean day (1–10). */
+  shopUrgeIntensity?: number;
+  /** What helped the user stay shop-free on a clean day. */
+  shopWhatHelped?: string;
 }
 
 /** Emergency Reflection - captured during a crisis (SOS). Stored separately

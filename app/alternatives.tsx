@@ -1461,7 +1461,7 @@ export default function Alternatives() {
   // Any addiction type's entry counts as "journaled today" here; the wizard
   // route below still picks the correct addiction-specific flow.
   const todayJournal = useTodayAnyJournal();
-  const journalRoute = profile?.addictionType === 'pornography' ? '/porn-journal-entry' : profile?.addictionType === 'drugs' ? '/drug-journal-entry' : profile?.addictionType === 'alcohol' ? '/alcohol-journal-entry' : profile?.addictionType === 'smoking' ? '/smoke-journal-entry' : profile?.addictionType === 'social_media' ? '/social-journal-entry' : profile?.addictionType === 'gaming' ? '/game-journal-entry' : '/journal-entry';
+  const journalRoute = profile?.addictionType === 'pornography' ? '/porn-journal-entry' : profile?.addictionType === 'drugs' ? '/drug-journal-entry' : profile?.addictionType === 'alcohol' ? '/alcohol-journal-entry' : profile?.addictionType === 'smoking' ? '/smoke-journal-entry' : profile?.addictionType === 'social_media' ? '/social-journal-entry' : profile?.addictionType === 'online_shopping' ? '/online-shopping-journal-entry' : profile?.addictionType === 'gaming' ? '/game-journal-entry' : '/journal-entry';
   const scrollRef = useRef<ScrollView>(null);
   const cardYRef = useRef<Record<string, number>>({});
 

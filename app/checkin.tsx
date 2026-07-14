@@ -39,6 +39,7 @@ import { addictionMeta } from '@/domain/gambling';
 function journalRoute(addictionType: string): string {
   if (addictionType === 'pornography') return '/porn-journal-entry';
   if (addictionType === 'social_media') return '/social-journal-entry';
+  if (addictionType === 'online_shopping') return '/online-shopping-journal-entry';
   if (addictionType === 'smoking') return '/smoke-journal-entry';
   if (addictionType === 'alcohol') return '/alcohol-journal-entry';
   if (addictionType === 'drugs') return '/drug-journal-entry';

@@ -985,6 +985,7 @@ export const useStore = create<RecoveryState>()(
           const isAlcoholEntry = data.drank !== undefined;
           const isDrugEntry = data.used !== undefined;
           const isGamingEntry = data.played !== undefined;
+          const isShopEntry = data.shopped !== undefined;
           const alreadyToday = s.journal.some((j) => {
             if (!sameDay(j.at, Date.now())) return false;
             if (isGamblingEntry) return j.gambled !== undefined;
@@ -994,6 +995,7 @@ export const useStore = create<RecoveryState>()(
             if (isAlcoholEntry) return j.drank !== undefined;
             if (isDrugEntry) return j.used !== undefined;
             if (isGamingEntry) return j.played !== undefined;
+            if (isShopEntry) return j.shopped !== undefined;
             return true; // generic entry - block any duplicate
           });
           if (alreadyToday) return s;
@@ -1393,6 +1395,60 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
+          // ── Online Shopping: shopped=true → relapse; shopped=false → clean ──
+          if (data.shopped === true) {
+            const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
+            const prevDays = streakDays(streakStart);
+            const relapseEntry: RelapseEvent = {
+              id: uid(),
+              at: Date.now(),
+              amount: data.shopAmountSpent,
+              whatHappened: data.shopTrigger,
+              cause: data.shopTrigger,
+              feeling: data.shopEmotions?.join(', '),
+            };
+            return {
+              journal: journalAfter,
+              relapses: [relapseEntry, ...s.relapses],
+              longestStreak: Math.max(s.longestStreak, prevDays),
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Journal entry - online shopping relapse logged'),
+                evt('relapse', 'Logged a relapse via journal - recovery continues'),
+                ...s.timeline,
+              ],
+            };
+          }
+
+          if (data.shopped === false) {
+            const now = Date.now();
+            const urgeEntry: UrgeLog = {
+              id: uid(),
+              at: now,
+              intensity: data.shopUrgeIntensity ?? 1,
+              trigger: data.shopWhatHelped ?? 'Daily journal',
+              triggers: data.shopWhatHelped ? [data.shopWhatHelped] : ['Daily journal'],
+              notes: data.shopWhatHelped ?? data.text,
+              resisted: true,
+              mood: data.mood,
+            };
+            return {
+              journal: journalAfter,
+              urges: [urgeEntry, ...s.urges],
+              points: s.points + 5 + altUnlocked.length * 5,
+              ...resistedCounterPatch(s, now),
+              ...altPatch,
+              timeline: [
+                ...altEvents,
+                evt('journal', 'Wrote a journal entry - clean day'),
+                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
+                ...s.timeline,
+              ],
+            };
+          }
+
           return {
             journal: journalAfter,
             points: s.points + 5 + altUnlocked.length * 5,
@@ -1600,6 +1656,16 @@ export function useTodayDrugJournal(): import('@/domain/records').JournalEntry |
 export function useTodayGamingJournal(): import('@/domain/records').JournalEntry | undefined {
   return useStore((s) =>
     s.journal.find((j) => sameDay(j.at, Date.now()) && j.played !== undefined),
+  );
+}
+
+/**
+ * Today's journal entry for online shopping users, or undefined if none submitted yet.
+ * Finds any entry today where `shopped` is defined (shopping-specific gate).
+ */
+export function useTodayOnlineShoppingJournal(): import('@/domain/records').JournalEntry | undefined {
+  return useStore((s) =>
+    s.journal.find((j) => sameDay(j.at, Date.now()) && j.shopped !== undefined),
   );
 }
 

@@ -7,6 +7,7 @@ export type AddictionType =
   | 'gambling'
   | 'pornography'
   | 'social_media'
+  | 'online_shopping'
   | 'smoking'
   | 'alcohol'
   | 'drugs'
@@ -44,6 +45,11 @@ export const ADDICTIONS: AddictionMeta[] = [
     specificOptions: ['Facebook', 'TikTok', 'Instagram', 'X (Twitter)', 'YouTube', 'Other'],
   },
   {
+    key: 'online_shopping', label: 'Online Shopping', verb: 'shop online', freeLabel: 'Shop-Free', hasExpense: true,
+    specificQuestion: 'Where do you mostly shop?',
+    specificOptions: ['Shopee', 'Lazada', 'Amazon', 'TikTok Shop', 'Instagram Shopping', 'Facebook Marketplace', 'Other'],
+  },
+  {
     key: 'smoking', label: 'Smoking', verb: 'smoke', freeLabel: 'Smoke-Free', hasExpense: true,
     specificQuestion: 'What do you smoke?',
     specificOptions: ['Cigarettes', 'Vape', 'Cigar', 'Roll-your-own', 'Other'],
@@ -75,6 +81,7 @@ export function addictionMeta(k: AddictionType): AddictionMeta {
 /** Addiction-specific streak wording for the Home recovery summary. */
 export function recoveryFreeLabel(k: AddictionType, addictionDetail?: string): string {
   if (k === 'social_media') return 'Social Media-Free';
+  if (k === 'online_shopping') return 'Shop-Free';
   if (k === 'other') {
     const customLabel = addictionDetail?.trim();
     return customLabel ? `${customLabel}-Free` : 'Habit-Free';
@@ -216,17 +223,33 @@ export const GAMING_TRIGGERS = [
   'Other',
 ] as const;
 
+export const ONLINE_SHOPPING_TRIGGERS = [
+  'Boredom',
+  'Stress',
+  'Sale / flash deals',
+  'Social media ads',
+  'FOMO / limited stock',
+  'Emotional spending',
+  'Payday / extra cash',
+  'Loneliness',
+  'Anxiety',
+  'Peer pressure',
+  'Habit / routine',
+  'Other',
+] as const;
+
 /** Returns the appropriate trigger list for a given addiction type. */
 export function triggersForAddiction(type: AddictionType): readonly string[] {
   switch (type) {
-    case 'gambling':     return GAMBLING_TRIGGERS;
-    case 'smoking':      return SMOKING_TRIGGERS;
-    case 'alcohol':      return ALCOHOL_TRIGGERS;
-    case 'drugs':        return DRUGS_TRIGGERS;
-    case 'social_media': return SOCIAL_MEDIA_TRIGGERS;
-    case 'gaming':       return GAMING_TRIGGERS;
-    case 'pornography':  return []; // handled separately via PORN_TRIGGERS
-    default:             return OTHER_TRIGGERS;
+    case 'gambling':       return GAMBLING_TRIGGERS;
+    case 'smoking':        return SMOKING_TRIGGERS;
+    case 'alcohol':        return ALCOHOL_TRIGGERS;
+    case 'drugs':          return DRUGS_TRIGGERS;
+    case 'social_media':   return SOCIAL_MEDIA_TRIGGERS;
+    case 'gaming':         return GAMING_TRIGGERS;
+    case 'online_shopping': return ONLINE_SHOPPING_TRIGGERS;
+    case 'pornography':    return []; // handled separately via PORN_TRIGGERS
+    default:               return OTHER_TRIGGERS;
   }
 }
 
@@ -271,7 +294,7 @@ const MS_PER_DAY = 86_400_000;
 export function currentStreakStart(
   profileStartedAt: number,
   relapses: Array<{ at: number }>,
-  journalEntries: Array<{ gambled?: boolean; watched?: boolean; drank?: boolean; smoked?: boolean; binged?: boolean; used?: boolean; played?: boolean; at: number }>,
+  journalEntries: Array<{ gambled?: boolean; watched?: boolean; drank?: boolean; smoked?: boolean; binged?: boolean; used?: boolean; played?: boolean; shopped?: boolean; at: number }>,
 ): number {
   const relapseTimestamps: number[] = [
     ...relapses.map((r) => r.at),
@@ -282,7 +305,8 @@ export function currentStreakStart(
     // Social media relapse: binged === true
     // Drugs relapse: used === true
     // Gaming relapse: played === true
-    ...journalEntries.filter((j) => j.gambled === true || j.watched === true || j.drank === true || j.smoked === true || j.binged === true || j.used === true || j.played === true).map((j) => j.at),
+    // Online shopping relapse: shopped === true
+    ...journalEntries.filter((j) => j.gambled === true || j.watched === true || j.drank === true || j.smoked === true || j.binged === true || j.used === true || j.played === true || j.shopped === true).map((j) => j.at),
   ];
 
   if (relapseTimestamps.length === 0) {
@@ -379,6 +403,8 @@ export interface FinancialJournalEntry {
   lost?: boolean;
   amountWagered?: number;
   amountLost?: number;
+  shopped?: boolean;
+  shopAmountSpent?: number;
 }
 
 /**
@@ -389,13 +415,17 @@ export interface FinancialJournalEntry {
  *     (Falls back to `amountLost` for older entries saved before the wager
  *     rule, so historical trends stay correct.)
  *   - Gambled and won  → `moneyBalance` unchanged; winnings are never added.
- *   - Did not gamble   → `moneyBalance` unchanged.
+ *   - Shopped online  → `moneyBalance - shopAmountSpent`, floored at 0.
+ *   - Did not gamble / Did not shop → `moneyBalance` unchanged.
  */
 export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null {
   if (e.moneyBalance == null) return null;
   if (e.gambled === true && e.lost === true) {
     const deduction = e.amountWagered ?? e.amountLost;
     if (deduction != null) return Math.max(0, e.moneyBalance - deduction);
+  }
+  if (e.shopped === true && e.shopAmountSpent != null) {
+    return Math.max(0, e.moneyBalance - e.shopAmountSpent);
   }
   return e.moneyBalance;
 }
