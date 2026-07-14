@@ -157,6 +157,12 @@ export interface JournalEntry {
    * false → clean   (green calendar day)
    */
   drank?: boolean;
+  /** Did the user spend money on alcohol? */
+  drinkDidSpend?: boolean;
+  /** How much was spent on alcohol. */
+  drinkSpendAmount?: number;
+  /** Remaining money after alcohol spend (moneyBalance - drinkSpendAmount). */
+  drinkRemainingMoney?: number;
   /** Number of standard drinks consumed on a relapse day. */
   drankCount?: string;
   /** Type of alcohol consumed (beer, spirits, wine, etc.). */

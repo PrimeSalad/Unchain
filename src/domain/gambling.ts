@@ -411,6 +411,9 @@ export interface FinancialJournalEntry {
   smoked?: boolean;
   smokeDidSpend?: boolean;
   smokeSpendAmount?: number;
+  drank?: boolean;
+  drinkDidSpend?: boolean;
+  drinkSpendAmount?: number;
 }
 
 /**
@@ -421,6 +424,7 @@ export interface FinancialJournalEntry {
  *   - Shopped online  → `moneyBalance - shopAmountSpent`, floored at 0.
  *   - Watched porn and spent → `moneyBalance - pornSpendAmount`, floored at 0.
  *   - Smoked and spent → `moneyBalance - smokeSpendAmount`, floored at 0.
+ *   - Drank and spent → `moneyBalance - drinkSpendAmount`, floored at 0.
  *   - Did not spend → `moneyBalance` unchanged.
  */
 export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null {
@@ -437,6 +441,9 @@ export function recoveryAdjustedBalance(e: FinancialJournalEntry): number | null
   }
   if (e.smoked === true && e.smokeDidSpend === true && e.smokeSpendAmount != null) {
     return Math.max(0, e.moneyBalance - e.smokeSpendAmount);
+  }
+  if (e.drank === true && e.drinkDidSpend === true && e.drinkSpendAmount != null) {
+    return Math.max(0, e.moneyBalance - e.drinkSpendAmount);
   }
   return e.moneyBalance;
 }

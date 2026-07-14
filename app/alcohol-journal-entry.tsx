@@ -34,8 +34,8 @@ import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useTodayAlcoholJournal } from '@/application/store';
-import { ALCOHOL_TRIGGERS } from '@/domain/gambling';
+import { useStore, useTodayAlcoholJournal, useProfile } from '@/application/store';
+import { ALCOHOL_TRIGGERS, formatMoneyInput, parseMoneyInput, formatMoney, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
 // Step IDs
@@ -43,6 +43,9 @@ import { ALCOHOL_TRIGGERS } from '@/domain/gambling';
 
 type StepId =
   | 'did_drink'
+  | 'money_balance'
+  | 'did_drink_spend'
+  | 'drink_spend_amount'
   | 'mood'
   | 'reflection_clean'
   | 'urge_intensity'
@@ -53,17 +56,18 @@ type StepId =
   | 'next_time_plan'
   | 'summary';
 
-function buildSteps(drank: boolean | null): StepId[] {
+function buildSteps(drank: boolean | null, didDrinkSpend?: boolean | null): StepId[] {
   if (drank === false) {
-    // Clean day: mood → reflection
-    return ['did_drink', 'mood', 'reflection_clean', 'summary'];
+    return ['did_drink', 'money_balance', 'mood', 'reflection_clean', 'summary'];
   }
   if (drank === true) {
-    // Relapse day: mood → urge intensity → drink count → drink type → emotions → trigger → next time plan
-    return ['did_drink', 'mood', 'urge_intensity', 'drink_count', 'drink_type', 'emotions', 'trigger_relapse', 'next_time_plan', 'summary'];
+    const steps: StepId[] = ['did_drink', 'money_balance', 'did_drink_spend'];
+    if (didDrinkSpend === true) steps.push('drink_spend_amount');
+    steps.push('mood', 'urge_intensity', 'drink_count', 'drink_type', 'emotions', 'trigger_relapse', 'next_time_plan', 'summary');
+    return steps;
   }
   // Default before yes/no: show clean-day path so progress bar is sensible
-  return ['did_drink', 'mood', 'reflection_clean', 'summary'];
+  return ['did_drink', 'money_balance', 'mood', 'reflection_clean', 'summary'];
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +205,8 @@ export default function AlcoholJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
   const addJournal = useStore((s) => s.addJournal);
+  const profile = useProfile();
+  const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const insets   = useSafeAreaInsets();
 
   const todayJournal     = useTodayAlcoholJournal();
@@ -211,6 +217,9 @@ export default function AlcoholJournalEntry() {
 
   // ── Form state ─────────────────────────────────────────────────────────
   const [drank,          setDrank]          = useState<boolean | null>(null);
+  const [moneyBalance,   setMoneyBalance]   = useState('');
+  const [didDrinkSpend,  setDidDrinkSpend]  = useState<boolean | null>(null);
+  const [drinkSpendAmount, setDrinkSpendAmount] = useState('');
   const [mood,           setMood]           = useState(5);
   const [reflection,     setReflection]     = useState('');
   const [urgeIntensity,  setUrgeIntensity]  = useState(3);
@@ -237,20 +246,31 @@ export default function AlcoholJournalEntry() {
 
   function canProceed(): boolean {
     switch (currentStep) {
-      case 'did_drink':       return drank !== null;
-      case 'drink_count':     return drinkCount !== null;
-      case 'drink_type':      return drinkType !== null;
-      case 'emotions':        return emotions.length > 0;
-      case 'trigger_relapse': return triggerRelapse !== null;
-      default:                return true;
+      case 'did_drink':         return drank !== null;
+      case 'money_balance':     return moneyBalance.trim() !== '';
+      case 'did_drink_spend':   return didDrinkSpend !== null;
+      case 'drink_spend_amount': return drinkSpendAmount.trim() !== '';
+      case 'drink_count':       return drinkCount !== null;
+      case 'drink_type':        return drinkType !== null;
+      case 'emotions':          return emotions.length > 0;
+      case 'trigger_relapse':   return triggerRelapse !== null;
+      default:                  return true;
     }
   }
 
   function goNext() {
     if (!canProceed()) return;
     Haptics.selectionAsync().catch(() => {});
+    // Freeze at did_drink to switch to relapse or clean path
     if (currentStep === 'did_drink' && frozenSteps.current === null) {
       frozenSteps.current = buildSteps(drank);
+    }
+    // Always rebuild at did_drink_spend so drink_spend_amount is included or excluded
+    if (currentStep === 'did_drink_spend') {
+      frozenSteps.current = buildSteps(drank, didDrinkSpend);
+      if (didDrinkSpend !== true) {
+        setDrinkSpendAmount('');
+      }
     }
     const active = frozenSteps.current ?? steps;
     if (stepIdx < active.length - 1) slide('forward', () => setStepIdx((i) => i + 1));
@@ -269,12 +289,21 @@ export default function AlcoholJournalEntry() {
     submitting.current = true;
     setConfirmVisible(false);
 
+    // Calculate remaining money: moneyBalance - drinkSpendAmount
+    const balance = moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || 0 : 0;
+    const drinkSpend = drank === true && didDrinkSpend === true ? parseFloat(drinkSpendAmount.replace(/,/g, '')) || 0 : 0;
+    const remainingMoney = Math.max(0, balance - drinkSpend);
+
     addJournal({
       drank: drank === true,
       gambled: undefined,
       watched: undefined,
       text: reflection.trim() || (drank === true ? 'Relapse recorded.' : 'Clean day recorded.'),
       mood,
+      moneyBalance: balance || undefined,
+      drinkDidSpend: drank === true ? didDrinkSpend === true : undefined,
+      drinkSpendAmount: drank === true && didDrinkSpend === true ? drinkSpend || undefined : undefined,
+      drinkRemainingMoney: drank === true && didDrinkSpend === true ? remainingMoney : undefined,
       // Relapse day: urge intensity, drink details, emotions, trigger, next time
       alcoholUrgeIntensity: drank === true ? urgeIntensity : undefined,
       drankCount: drank === true && drinkCount ? drinkCount : undefined,
@@ -341,6 +370,136 @@ export default function AlcoholJournalEntry() {
                 <Text variant="callout" style={{ flex: 1, lineHeight: 22 }}>It takes courage to be honest. You are not alone in this.</Text>
               </Card>
             )}
+          </>
+        );
+
+      case 'money_balance':
+        return (
+          <>
+            <StepHeading title="How much money do you have today?" subtitle="Enter your current balance. This helps track your financial wellbeing." />
+            <View style={{ gap: spacing.xl }}>
+              <View style={{
+                width: '100%', alignSelf: 'center', borderRadius: radius.card,
+                backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+                padding: spacing.lg, gap: spacing.lg,
+              }}>
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="footnote" dim center>Current balance</Text>
+                  <View style={{
+                    minHeight: 76, borderRadius: radius.card, backgroundColor: theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: theme.color.hairline, flexDirection: 'row',
+                    alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md,
+                  }}>
+                    <View style={{
+                      width: 54, height: 54, borderRadius: 18, backgroundColor: theme.color.primary,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                    </View>
+                    <TextInput value={moneyBalance} onChangeText={(t) => setMoneyBalance(formatMoneyInput(t, true))}
+                      placeholder="0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad"
+                      autoFocus underlineColorAndroid="transparent" selectionColor={theme.color.primary}
+                      style={{ flex: 1, minWidth: 0, color: theme.color.text, fontSize: 34, lineHeight: 40,
+                        fontFamily: 'Nunito_900Black', paddingVertical: spacing.sm }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ width: '100%', alignSelf: 'center', gap: spacing.sm }}>
+                <Text variant="footnote" dim center>Currency</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+                  {SUPPORTED_CURRENCIES.map((option) => {
+                    const active = currency === option.symbol;
+                    return (
+                      <Pressable key={option.code} onPress={() => useStore.getState().updateProfile({ currency: option.symbol })}
+                        accessibilityRole="button" accessibilityLabel={`${option.label}, ${option.code}`}
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => ({
+                          width: '30.5%', minWidth: 86, minHeight: 52, borderRadius: radius.input,
+                          borderWidth: 1, borderColor: active ? theme.color.primary : theme.color.hairline,
+                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                          paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
+                          alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1,
+                        })}>
+                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>{option.symbol}</Text>
+                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>{option.code}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          </>
+        );
+
+      case 'did_drink_spend':
+        return (
+          <>
+            <StepHeading title="Did you spend money on alcohol today?" subtitle="This helps track spending on drinks." />
+            <YesNoToggle value={didDrinkSpend} onChange={setDidDrinkSpend} />
+            {didDrinkSpend === false && (
+              <Card tone="successSoft" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, borderLeftWidth: 3, borderLeftColor: theme.color.success }}>
+                <Ionicons name="checkmark-circle-outline" size={22} color={theme.color.success} />
+                <Text variant="callout" style={{ flex: 1, lineHeight: 22 }}>Good job avoiding impulse purchases!</Text>
+              </Card>
+            )}
+          </>
+        );
+
+      case 'drink_spend_amount':
+        return (
+          <>
+            <StepHeading title="How much did you spend?" subtitle="Enter the amount you spent on alcohol." />
+            <View style={{ gap: spacing.xl }}>
+              <View style={{
+                width: '100%', alignSelf: 'center', borderRadius: radius.card,
+                backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+                padding: spacing.lg, gap: spacing.lg,
+              }}>
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="footnote" dim center>Amount spent</Text>
+                  <View style={{
+                    minHeight: 76, borderRadius: radius.card, backgroundColor: theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: theme.color.hairline, flexDirection: 'row',
+                    alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md,
+                  }}>
+                    <View style={{
+                      width: 54, height: 54, borderRadius: 18, backgroundColor: theme.color.primary,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Text variant="title2" color={theme.color.onPrimary}>{currency}</Text>
+                    </View>
+                    <TextInput value={drinkSpendAmount} onChangeText={(t) => setDrinkSpendAmount(formatMoneyInput(t, true))}
+                      placeholder="0" placeholderTextColor={theme.color.textDim} keyboardType="number-pad"
+                      autoFocus underlineColorAndroid="transparent" selectionColor={theme.color.primary}
+                      style={{ flex: 1, minWidth: 0, color: theme.color.text, fontSize: 34, lineHeight: 40,
+                        fontFamily: 'Nunito_900Black', paddingVertical: spacing.sm }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ width: '100%', alignSelf: 'center', gap: spacing.sm }}>
+                <Text variant="footnote" dim center>Currency</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' }}>
+                  {SUPPORTED_CURRENCIES.map((option) => {
+                    const active = currency === option.symbol;
+                    return (
+                      <Pressable key={option.code} onPress={() => useStore.getState().updateProfile({ currency: option.symbol })}
+                        accessibilityRole="button" accessibilityLabel={`${option.label}, ${option.code}`}
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => ({
+                          width: '30.5%', minWidth: 86, minHeight: 52, borderRadius: radius.input,
+                          borderWidth: 1, borderColor: active ? theme.color.primary : theme.color.hairline,
+                          backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+                          paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
+                          alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1,
+                        })}>
+                        <Text variant="headline" color={active ? theme.color.primary : theme.color.text}>{option.symbol}</Text>
+                        <Text variant="caption" dim={!active} color={active ? theme.color.primary : undefined}>{option.code}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
           </>
         );
 
@@ -429,11 +588,23 @@ export default function AlcoholJournalEntry() {
         );
 
       case 'summary': {
+        const balance = moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || 0 : 0;
+        const drinkSpend = drank === true && didDrinkSpend === true ? parseFloat(drinkSpendAmount.replace(/,/g, '')) || 0 : 0;
+        const remaining = Math.max(0, balance - drinkSpend);
         return (
           <>
             <StepHeading title="Review your entry" subtitle="Take a moment before saving." />
             <View style={{ backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm }}>
               <SummaryRow icon={drank ? 'alert-circle-outline' : 'checkmark-circle-outline'} iconColor={drank ? theme.color.danger : theme.color.success} label="Today" value={drank ? 'Relapse' : 'Clean day'} />
+              {moneyBalance !== '' && (
+                <SummaryRow icon="wallet-outline" iconColor={theme.color.primary} label="Balance" value={formatMoney(balance, currency)} />
+              )}
+              {drank === true && didDrinkSpend === true && drinkSpendAmount !== '' && (
+                <SummaryRow icon="cash-outline" iconColor={theme.color.danger} label="Spent" value={formatMoney(drinkSpend, currency)} />
+              )}
+              {drank === true && didDrinkSpend === true && moneyBalance !== '' && drinkSpendAmount !== '' && (
+                <SummaryRow icon="trending-down-outline" iconColor={theme.color.success} label="Remaining" value={formatMoney(remaining, currency)} />
+              )}
               <SummaryRow icon="bar-chart-outline" iconColor={theme.color.primary} label="Mood" value={`${mood} / 10`} />
               {/* Clean day summary */}
               {drank === false && reflection.trim() !== '' && (
