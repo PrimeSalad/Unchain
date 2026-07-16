@@ -36,7 +36,7 @@ import type {
   UrgeLog,
 } from '@/domain/records';
 import { sameDay } from '@/domain/records';
-import type { AltAchievement, AltCounts, AlternativeId } from '@/domain/alternatives';
+import type { AltAchievement, AltCounts, AlternativeId, NeedOrWantEntry } from '@/domain/alternatives';
 import {
   ALTERNATIVES,
   altAchievementById,
@@ -152,6 +152,13 @@ interface RecoveryState {
   waterToday: { day: string; glasses: number };
   /** Lifetime glasses logged. */
   waterGlassesTotal: number;
+  /** Need or Want? cooldown - timestamp when the 24-hour cooldown started.
+   *  null means no active cooldown. Persists across app restarts. */
+  needOrWantCooldown: number | null;
+  /** All need-or-want entries — the item, reflections, and outcome. */
+  needOrWantEntries: NeedOrWantEntry[];
+  /** Active need-or-want entry id during cooldown (so follow-up can load it). */
+  activeNeedOrWantId: string | null;
 
   // ── Porn Recovery Metrics ───────────────────────────────────────────────
   lastCheckedIn: number | null;
@@ -237,6 +244,15 @@ interface RecoveryState {
   /** Log glasses of water for today (clamped 1–24 per log). Returns today's
    *  running total after the log. */
   logWater: (glasses: number) => number;
+  /** Start the 24-hour Need or Want? cooldown. Completes the alternative
+   *  for today and records the start timestamp. */
+  startNeedOrWantCooldown: () => void;
+  /** Save a need-or-want entry when the cooldown starts. */
+  saveNeedOrWantEntry: (entry: Omit<NeedOrWantEntry, 'id' | 'at' | 'cooldownStart' | 'decision'>) => string;
+  /** Record the user's follow-up decision on a need-or-want entry. */
+  decideNeedOrWantEntry: (id: string, decision: boolean) => void;
+  /** Delete a need-or-want entry from history. */
+  deleteNeedOrWantEntry: (id: string) => void;
   /** Add a website to the permanent blocklist. Validates + de-duplicates.
    *  Protection starts immediately and never expires. */
   addBlockedSite: (domainInput: string, nickname?: string) => 'added' | 'duplicate' | 'invalid';
@@ -330,17 +346,21 @@ const persistentStorage = {
 };
 
 /** True when every Healthy Alternative has been completed today -
- *  the journal activity is derived from the journal entries themselves. */
+ *  the journal activity is derived from the journal entries themselves.
+ *  `need-or-want` is only required for online shopping addiction. */
 function altFullDay(
   alternatives: Partial<Record<AlternativeId, number>>,
   journal: Array<{ at: number }>,
   now: number,
+  addictionType?: string,
 ): boolean {
-  return ALTERNATIVES.every((a) =>
-    a.id === 'journal'
+  return ALTERNATIVES.every((a) => {
+    // 'need-or-want' only counts for online shopping addiction
+    if (a.id === 'need-or-want' && addictionType !== 'online_shopping') return true;
+    return a.id === 'journal'
       ? journal.some((j) => sameDay(j.at, now))
-      : alternatives[a.id] != null && sameDay(alternatives[a.id]!, now),
-  );
+      : alternatives[a.id] != null && sameDay(alternatives[a.id]!, now);
+  });
 }
 
 /** Habit-achievement ids newly satisfied and not yet unlocked. */
@@ -412,6 +432,9 @@ export const useStore = create<RecoveryState>()(
       walkMeters: 0,
       waterToday: { day: '', glasses: 0 },
       waterGlassesTotal: 0,
+      needOrWantCooldown: null,
+      needOrWantEntries: [],
+      activeNeedOrWantId: null,
       blockedSites: [],
       favoriteQuotes: [],
       dailyMissions: { day: '', completed: [] },
@@ -461,6 +484,42 @@ export const useStore = create<RecoveryState>()(
         });
         return total;
       },
+
+      startNeedOrWantCooldown: () => {
+        const now = Date.now();
+        set((s) => ({
+          needOrWantCooldown: now,
+        }));
+      },
+
+      saveNeedOrWantEntry: (data) => {
+        const id = uid();
+        const entry: NeedOrWantEntry = {
+          ...data,
+          id,
+          at: Date.now(),
+          cooldownStart: Date.now(),
+          decision: null,
+        };
+        set((s) => ({
+          needOrWantEntries: [entry, ...s.needOrWantEntries],
+          activeNeedOrWantId: id,
+        }));
+        return id;
+      },
+
+      decideNeedOrWantEntry: (id, decision) =>
+        set((s) => ({
+          needOrWantEntries: s.needOrWantEntries.map((e) =>
+            e.id === id ? { ...e, decision, decidedAt: Date.now() } : e,
+          ),
+          activeNeedOrWantId: s.activeNeedOrWantId === id ? null : s.activeNeedOrWantId,
+        })),
+
+      deleteNeedOrWantEntry: (id) =>
+        set((s) => ({
+          needOrWantEntries: s.needOrWantEntries.filter((e) => e.id !== id),
+        })),
 
       recordWalkMetrics: (steps, meters) =>
         set((s) => ({
@@ -578,7 +637,7 @@ export const useStore = create<RecoveryState>()(
           const counts: AltCounts = { ...altCounts, journal: s.journal.length };
           unlocked = newAltUnlocks(
             counts,
-            altFullDay(alternatives, s.journal, now),
+            altFullDay(alternatives, s.journal, now, s.profile?.addictionType),
             s.altAchievements,
           );
 
@@ -1007,7 +1066,7 @@ export const useStore = create<RecoveryState>()(
           const journalAfter = [entry, ...s.journal];
           const altUnlocked = newAltUnlocks(
             { ...s.altCounts, journal: journalAfter.length },
-            altFullDay(s.alternatives, journalAfter, Date.now()),
+            altFullDay(s.alternatives, journalAfter, Date.now(), s.profile?.addictionType),
             s.altAchievements,
           );
           const altPatch = altUnlocked.length
@@ -1486,6 +1545,9 @@ export const useStore = create<RecoveryState>()(
           goals: [],
           celebratedBadges: [],
           alternatives: {},
+          needOrWantCooldown: null,
+          needOrWantEntries: [],
+          activeNeedOrWantId: null,
           // Weekly porn-recovery counters are recovery data - restart them
           // with the streak. Lifetime habit totals are kept, like altCounts.
           urgesResisted: 0,
@@ -1522,6 +1584,9 @@ export const useStore = create<RecoveryState>()(
           walkMeters: 0,
           waterToday: { day: '', glasses: 0 },
           waterGlassesTotal: 0,
+          needOrWantCooldown: null,
+          needOrWantEntries: [],
+          activeNeedOrWantId: null,
           lastCheckedIn: null,
           urgesResisted: 0,
           urgesResistedWeek: 0,

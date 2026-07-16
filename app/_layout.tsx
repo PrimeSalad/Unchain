@@ -147,6 +147,8 @@ export default function RootLayout() {
             />
             <Stack.Screen name="celebrate" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
             <Stack.Screen name="alternatives" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="need-or-want" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="need-or-want-flow" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="protection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="checkin" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="log-urge" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
@@ -158,6 +160,7 @@ export default function RootLayout() {
             <Stack.Screen name="online-shopping-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="drug-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="game-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="need-or-want-log" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="reflection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen
               name="share"

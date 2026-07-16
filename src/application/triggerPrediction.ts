@@ -255,7 +255,7 @@ export async function syncPredictionNotifications(urges: UrgeLog[]): Promise<voi
  *   }, []);
  */
 export function registerPredictionNotificationHandler(
-  router: { push: (path: '/sos') => void },
+  router: { push: (path: '/sos' | '/need-or-want') => void },
 ): () => void {
   let sub: { remove: () => void } | undefined;
   let active = true;
@@ -272,16 +272,22 @@ export function registerPredictionNotificationHandler(
           shouldSetBadge: false,
         }),
       });
-      const openSos = (data: Record<string, unknown>) => {
-        if ((data?.tag as string | undefined)?.startsWith(NOTIF_TAG_PREFIX)) router.push('/sos');
+      const handleDeepLink = (data: Record<string, unknown>) => {
+        const deepLink = data?.deepLink as string | undefined;
+        const tag = data?.tag as string | undefined;
+        if (deepLink === 'unchainly://need-or-want' || tag === 'need-or-want-reminder') {
+          router.push('/need-or-want');
+        } else if (tag?.startsWith(NOTIF_TAG_PREFIX)) {
+          router.push('/sos');
+        }
       };
       sub = notifs.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data as Record<string, unknown>;
-        try { openSos(data); } catch { /* Navigation may not be ready. */ }
+        try { handleDeepLink(data); } catch { /* Navigation may not be ready. */ }
       });
       const initial = await notifs.getLastNotificationResponseAsync();
       if (active && initial) {
-        try { openSos(initial.notification.request.content.data as Record<string, unknown>); } catch { /* Ignore. */ }
+        try { handleDeepLink(initial.notification.request.content.data as Record<string, unknown>); } catch { /* Ignore. */ }
       }
     } catch {
       // A missing native implementation must never affect app startup.

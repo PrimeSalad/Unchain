@@ -1514,10 +1514,18 @@ export default function Alternatives() {
   /** Counts including the derived journal total, for progress displays. */
   const counts: AltCounts = { ...altCounts, journal: journalCount };
 
+  const isOnlineShopping = profile?.addictionType === 'online_shopping';
+
+  /** Only show 'need-or-want' if the user selected online shopping addiction. */
+  const needOrWantAlt = isOnlineShopping ? ALTERNATIVES.find((a) => a.id === 'need-or-want') ?? null : null;
+  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want');
+
   const isDone = (id: AlternativeId): boolean =>
     id === 'journal'
       ? todayJournal != null
-      : completions[id] != null && sameDay(completions[id]!, Date.now());
+      : id === 'need-or-want'
+        ? false
+        : completions[id] != null && sameDay(completions[id]!, Date.now());
 
   const doneAt = (id: AlternativeId): number | undefined =>
     id === 'journal' ? todayJournal?.at : completions[id];
@@ -1534,10 +1542,14 @@ export default function Alternatives() {
       else router.push(journalRoute as Parameters<typeof router.push>[0]);
       return;
     }
+    if (id === 'need-or-want') {
+      router.push('/need-or-want');
+      return;
+    }
     setSheet(id);
   };
 
-  const doneCount = ALTERNATIVES.filter((a) => isDone(a.id)).length;
+  const doneCount = visibleAlternatives.filter((a) => isDone(a.id)).length;
 
   return (
     <Screen edges={['top', 'bottom']} scrollRef={scrollRef}>
@@ -1570,11 +1582,53 @@ export default function Alternatives() {
 
       {/* Daily progress */}
       <View style={{ marginTop: spacing.md, marginBottom: spacing.md, gap: spacing.sm }}>
-        <ProgressBar progress={doneCount / ALTERNATIVES.length} height={8} />
+        <ProgressBar progress={doneCount / visibleAlternatives.length} height={8} />
         <Text variant="caption" dim style={{ fontVariant: ['tabular-nums'] }}>
-          {doneCount} of {ALTERNATIVES.length} completed today
+          {doneCount} of {visibleAlternatives.length} completed today
         </Text>
       </View>
+
+      {/* ── Need or Want? — separated from daily alternatives ── */}
+      {needOrWantAlt && (
+        <Pressable
+          onPress={() => router.push('/need-or-want')}
+          accessibilityRole="button"
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            backgroundColor: theme.color.accentSoft,
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: theme.color.accentText + '30',
+            padding: spacing.md,
+            marginBottom: spacing.lg,
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: theme.color.accentText + '20',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="cart" size={22} color={theme.color.accentText} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="callout" color={theme.color.accentText} style={{ fontFamily: 'Nunito_700Bold' }}>
+              Need or Want?
+            </Text>
+            <Text variant="caption" dim style={{ marginTop: 2 }}>
+              Pause before you buy · Open to view history
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.color.accentText} />
+        </Pressable>
+      )}
 
       {/* Health metrics dashboard */}
       <View style={{ marginBottom: spacing.lg }}>
@@ -1583,7 +1637,7 @@ export default function Alternatives() {
 
       {/* Activity cards */}
       <View style={{ gap: spacing.sm }}>
-        {ALTERNATIVES.map((alt, i) => (
+        {visibleAlternatives.map((alt, i) => (
           <ActivityCard
             key={alt.id}
             alt={alt}

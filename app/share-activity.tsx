@@ -55,6 +55,7 @@ const HERO_LABEL: Record<AlternativeId, string> = {
   water: 'Hydration Break',
   music: 'Calming Music',
   journal: 'Journal Entry',
+  'need-or-want': 'Need or Want?',
 };
 
 const TAGLINE: Record<AlternativeId, string> = {
@@ -64,6 +65,7 @@ const TAGLINE: Record<AlternativeId, string> = {
   water: 'Small anchors hold big ships.',
   music: 'A few quiet minutes can outlast the loudest urge.',
   journal: 'Every honest page makes recovery stronger.',
+  'need-or-want': 'Pause before you buy. Intentional decisions are better decisions.',
 };
 
 // Full breathing cycle: inhale 4s + hold 2s + exhale 6s.
