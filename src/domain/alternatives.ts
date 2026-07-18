@@ -12,7 +12,8 @@ export type AlternativeId =
   | 'water'
   | 'journal'
   | 'music'
-  | 'need-or-want';
+  | 'need-or-want'
+  | 'catch-your-breath';
 
 export interface Alternative {
   id: AlternativeId;
@@ -32,6 +33,7 @@ export const ALTERNATIVES: Alternative[] = [
   { id: 'journal', title: "Write Down What You're Feeling", subtitle: "Today's journal entry",               icon: 'create',               tint: 'primary' },
   { id: 'music',   title: 'Listen to Calming Music',        subtitle: 'A few minutes of built-in calm',      icon: 'musical-notes',        tint: 'celebrate' },
   { id: 'need-or-want', title: 'Need or Want?',             subtitle: 'Pause before you buy',                 icon: 'cart',                 tint: 'accent' },
+  { id: 'catch-your-breath', title: 'Catch Your Breath',   subtitle: 'Weekly lung health reflection',        icon: 'fitness',              tint: 'success' },
 ];
 
 export function alternativeById(id: AlternativeId): Alternative {
@@ -128,6 +130,8 @@ export const ALT_ACHIEVEMENTS: AltAchievement[] = [
     desc: 'Complete every healthy alternative in a single day.',
     test: (_c, fullDay) => fullDay,
   },
+  { id: 'alt-catch-breath-5', title: 'Breath Tracker', icon: 'fitness',
+    desc: 'Complete 5 Catch Your Breath reflections.', ...countOf('catch-your-breath', 5) },
 ];
 
 export function altAchievementById(id: string): AltAchievement | undefined {

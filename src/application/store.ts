@@ -37,6 +37,8 @@ import type {
 } from '@/domain/records';
 import { sameDay } from '@/domain/records';
 import type { AltAchievement, AltCounts, AlternativeId, NeedOrWantEntry } from '@/domain/alternatives';
+import type { CatchYourBreathEntry } from '@/domain/catchYourBreath';
+import { catchYourBreathAvailability } from '@/domain/catchYourBreath';
 import {
   ALTERNATIVES,
   altAchievementById,
@@ -160,6 +162,12 @@ interface RecoveryState {
   /** Active need-or-want entry id during cooldown (so follow-up can load it). */
   activeNeedOrWantId: string | null;
 
+  // ── Catch Your Breath (smoking-only weekly reflection) ──────────────────
+  /** All weekly lung health assessment entries, newest first. */
+  catchYourBreathEntries: CatchYourBreathEntry[];
+  /** Timestamp of the last completed assessment. null = never completed. */
+  lastCatchYourBreathAt: number | null;
+
   // ── Porn Recovery Metrics ───────────────────────────────────────────────
   lastCheckedIn: number | null;
   urgesResisted: number;
@@ -253,6 +261,13 @@ interface RecoveryState {
   decideNeedOrWantEntry: (id: string, decision: boolean) => void;
   /** Delete a need-or-want entry from history. */
   deleteNeedOrWantEntry: (id: string) => void;
+  /** Save a Catch Your Breath weekly assessment. Returns any habit achievements
+   *  newly unlocked. Increments healthyHabitsCount and awards points. */
+  addCatchYourBreath: (entry: Omit<CatchYourBreathEntry, 'id' | 'at'>) => AltAchievement[];
+  /** Whether the Catch Your Breath assessment is available now (7-day cooldown). */
+  canCompleteCatchYourBreath: () => { available: boolean; nextAt?: number; daysLeft?: number };
+  /** Delete a Catch Your Breath entry from history. */
+  deleteCatchYourBreathEntry: (id: string) => void;
   /** Add a website to the permanent blocklist. Validates + de-duplicates.
    *  Protection starts immediately and never expires. */
   addBlockedSite: (domainInput: string, nickname?: string) => 'added' | 'duplicate' | 'invalid';
@@ -357,6 +372,8 @@ function altFullDay(
   return ALTERNATIVES.every((a) => {
     // 'need-or-want' only counts for online shopping addiction
     if (a.id === 'need-or-want' && addictionType !== 'online_shopping') return true;
+    // 'catch-your-breath' is weekly, not daily - never counts for full-day
+    if (a.id === 'catch-your-breath') return true;
     return a.id === 'journal'
       ? journal.some((j) => sameDay(j.at, now))
       : alternatives[a.id] != null && sameDay(alternatives[a.id]!, now);
@@ -435,6 +452,8 @@ export const useStore = create<RecoveryState>()(
       needOrWantCooldown: null,
       needOrWantEntries: [],
       activeNeedOrWantId: null,
+      catchYourBreathEntries: [],
+      lastCatchYourBreathAt: null,
       blockedSites: [],
       favoriteQuotes: [],
       dailyMissions: { day: '', completed: [] },
@@ -519,6 +538,62 @@ export const useStore = create<RecoveryState>()(
       deleteNeedOrWantEntry: (id) =>
         set((s) => ({
           needOrWantEntries: s.needOrWantEntries.filter((e) => e.id !== id),
+        })),
+
+      canCompleteCatchYourBreath: () => {
+        const { lastCatchYourBreathAt } = get();
+        const result = catchYourBreathAvailability(lastCatchYourBreathAt);
+        return result.available
+          ? { available: true }
+          : { available: false, nextAt: result.nextAt, daysLeft: result.daysLeft };
+      },
+
+      addCatchYourBreath: (data) => {
+        let unlocked: AltAchievement[] = [];
+        const now = Date.now();
+
+        // Enforce 7-day cooldown - silently no-op if called too early
+        const { lastCatchYourBreathAt } = get();
+        const avail = catchYourBreathAvailability(lastCatchYourBreathAt, now);
+        if (!avail.available) return [];
+
+        const entry: CatchYourBreathEntry = {
+          ...data,
+          id: uid(),
+          at: now,
+        };
+        set((s) => {
+          // Evaluate habit achievements for the new count
+          const altCounts: AltCounts = { ...s.altCounts, 'catch-your-breath': (s.altCounts['catch-your-breath'] ?? 0) + 1 };
+          const counts: AltCounts = { ...altCounts, journal: s.journal.length };
+          unlocked = newAltUnlocks(
+            counts,
+            altFullDay(s.alternatives, s.journal, now, s.profile?.addictionType),
+            s.altAchievements,
+          );
+          return {
+            catchYourBreathEntries: [entry, ...s.catchYourBreathEntries],
+            lastCatchYourBreathAt: now,
+            alternatives: { ...s.alternatives, 'catch-your-breath': now },
+            altCounts,
+            altAchievements: unlocked.length
+              ? { ...s.altAchievements, ...Object.fromEntries(unlocked.map((a) => [a.id, now])) }
+              : s.altAchievements,
+            points: s.points + 5 + unlocked.length * 5,
+            healthyHabitsCount: s.healthyHabitsCount + 1,
+            timeline: [
+              ...unlocked.map((a) => evt('achievement', `Achievement unlocked - ${a.title}`)),
+              evt('activity', 'Recovery activity - Catch Your Breath'),
+              ...s.timeline,
+            ],
+          };
+        });
+        return unlocked;
+      },
+
+      deleteCatchYourBreathEntry: (id) =>
+        set((s) => ({
+          catchYourBreathEntries: s.catchYourBreathEntries.filter((e) => e.id !== id),
         })),
 
       recordWalkMetrics: (steps, meters) =>

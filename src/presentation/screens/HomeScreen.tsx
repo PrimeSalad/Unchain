@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
+import { Button } from '../components/Button';
 import { StatTile } from '../components/StatTile';
 import { Mascot } from '../components/Mascot';
 import { DailyMissions } from '../components/DailyMissions';
@@ -29,6 +30,7 @@ import {
 } from '@/domain/gambling';
 import type { TimelineType } from '@/domain/records';
 import { sameDay } from '@/domain/records';
+import { catchYourBreathAvailability } from '@/domain/catchYourBreath';
 import { QuoteFeed } from '../components/QuoteCards';
 import { CheckInInsightsCard } from '../components/CheckInInsightsCard';
 import { formatLastCheckedIn } from '@/domain/pornRecovery';
@@ -63,6 +65,7 @@ export function HomeScreen() {
   const profile = useProfile();
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [mascotActive, setMascotActive] = useState(true);
+  const [showCatchPopup, setShowCatchPopup] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -82,6 +85,20 @@ export function HomeScreen() {
   const recordedUrges = useStore((s) => s.urges.filter((urge) => urge.resisted).length);
   const healthyHabitsCount = useStore((s) => s.healthyHabitsCount);
   const blockedSites = useStore((s) => s.blockedSites);
+  const lastCatchYourBreathAt = useStore((s) => s.lastCatchYourBreathAt);
+
+  // Show Catch Your Breath popup when weekly assessment is available (smoking only)
+  useFocusEffect(
+    useCallback(() => {
+      if (profile?.addictionType !== 'smoking') return;
+      const avail = catchYourBreathAvailability(lastCatchYourBreathAt);
+      if (avail.available) {
+        // Small delay so it doesn't flash on screen load
+        const timer = setTimeout(() => setShowCatchPopup(true), 800);
+        return () => clearTimeout(timer);
+      }
+    }, [profile?.addictionType, lastCatchYourBreathAt]),
+  );
 
   // Derive the current streak start from the event log - never from startedAt
   // directly - so a relapse only marks today red without wiping history.
@@ -466,6 +483,62 @@ export function HomeScreen() {
           ))
         )}
       </View>
+
+      {/* ── Catch Your Breath weekly reminder popup (smoking only) ── */}
+      {profile?.addictionType === 'smoking' && (
+        <Modal
+          visible={showCatchPopup}
+          transparent
+          statusBarTranslucent
+          animationType="fade"
+          onRequestClose={() => setShowCatchPopup(false)}
+        >
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 32 }}>
+            <View style={{
+              backgroundColor: theme.color.surface,
+              borderRadius: radius.card,
+              padding: spacing.xl,
+              alignItems: 'center',
+              gap: spacing.md,
+              maxWidth: 340,
+              width: '100%',
+            }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 32,
+                backgroundColor: theme.color.successSoft,
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="fitness" size={32} color={theme.color.success} />
+              </View>
+              <Text variant="headline" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+                Catch Your Breath
+              </Text>
+              <Text variant="footnote" dim center style={{ lineHeight: 20 }}>
+                Time for your weekly breathing check-in. Take two minutes to see how your breathing has changed this week.
+              </Text>
+              <Text variant="caption" color={theme.color.textDim} center style={{ lineHeight: 18, fontStyle: 'italic' }}>
+                This is a self-reflection tool, not a medical evaluation.
+              </Text>
+              <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm }}>
+                <Button
+                  label="Start Reflection"
+                  onPress={() => {
+                    setShowCatchPopup(false);
+                    router.push('/catch-your-breath-log');
+                  }}
+                  full
+                />
+                <Button
+                  label="Remind Me Later"
+                  kind="tertiary"
+                  onPress={() => setShowCatchPopup(false)}
+                  full
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
     </Screen>
   );

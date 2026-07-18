@@ -18,6 +18,7 @@ import {
   syncPredictionNotifications,
   registerPredictionNotificationHandler,
 } from '@/application/triggerPrediction';
+import { scheduleCatchYourBreathReminder } from '@/application/catchYourBreathReminder';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -113,6 +114,12 @@ export default function RootLayout() {
     });
     return () => sub.remove();
   }, []);
+
+  // ── Catch Your Breath weekly reminder ────────────────────────────────────
+  const lastCatchYourBreathAt = useStore((s) => s.lastCatchYourBreathAt);
+  useEffect(() => {
+    scheduleCatchYourBreathReminder(lastCatchYourBreathAt).catch(() => {});
+  }, [lastCatchYourBreathAt]);
 
   if (!ready) {
     // iOS keeps the native splash visible. Web has no equivalent guarantee,

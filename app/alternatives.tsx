@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Animated as RNAnimated, Easing, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -1241,6 +1241,13 @@ function JournalDoneSheet({
   );
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catch Your Breath - cooldown sheet (shown when assessment not yet available)
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Health Metrics - the on-device health dashboard. Everything is measured by
 // this phone (pedometer, GPS, session timers, water logs) and never uploaded.
@@ -1515,17 +1522,22 @@ export default function Alternatives() {
   const counts: AltCounts = { ...altCounts, journal: journalCount };
 
   const isOnlineShopping = profile?.addictionType === 'online_shopping';
+  const isSmoking = profile?.addictionType === 'smoking';
 
   /** Only show 'need-or-want' if the user selected online shopping addiction. */
   const needOrWantAlt = isOnlineShopping ? ALTERNATIVES.find((a) => a.id === 'need-or-want') ?? null : null;
-  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want');
+  /** Only show 'catch-your-breath' if the user selected smoking addiction. */
+  const catchYourBreathAlt = isSmoking ? ALTERNATIVES.find((a) => a.id === 'catch-your-breath') ?? null : null;
+  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want' && a.id !== 'catch-your-breath');
 
   const isDone = (id: AlternativeId): boolean =>
     id === 'journal'
       ? todayJournal != null
       : id === 'need-or-want'
         ? false
-        : completions[id] != null && sameDay(completions[id]!, Date.now());
+        : id === 'catch-your-breath'
+          ? false
+          : completions[id] != null && sameDay(completions[id]!, Date.now());
 
   const doneAt = (id: AlternativeId): number | undefined =>
     id === 'journal' ? todayJournal?.at : completions[id];
@@ -1628,6 +1640,18 @@ export default function Alternatives() {
           </View>
           <Ionicons name="chevron-forward" size={18} color={theme.color.accentText} />
         </Pressable>
+      )}
+
+      {/* ── Catch Your Breath — weekly lung health reflection (smoking only) ── */}
+      {catchYourBreathAlt && (
+        <View style={{ marginBottom: spacing.lg }}>
+          <ActivityCard
+            alt={catchYourBreathAlt}
+            index={visibleAlternatives.length}
+            done={false}
+            onPress={() => router.push('/catch-your-breath-log')}
+          />
+        </View>
       )}
 
       {/* Health metrics dashboard */}
