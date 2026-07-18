@@ -340,6 +340,8 @@ export default function JournalEntry() {
   const currency   = profile?.currency ?? DEFAULT_CURRENCY;
   const insets     = useSafeAreaInsets();
   const isGambling = profile?.addictionType === 'gambling';
+  const isOther = profile?.addictionType === 'other';
+  const addictionName = isOther && profile?.addictionDetail ? profile.addictionDetail : null;
 
   // Block entry if user already submitted today
   const todayJournal = useTodayJournal();
@@ -435,7 +437,11 @@ export default function JournalEntry() {
     const whyText = whyOption === 'Other' ? whyOther.trim() : (whyOption ?? undefined);
     addJournal({
       gambled: gambled === true,
-      text: notes.trim() || (gambled === true ? 'Gambling relapse recorded.' : 'Clean day recorded.'),
+      text: notes.trim() || (gambled === true
+        ? 'Gambling relapse recorded.'
+        : addictionName
+          ? `${addictionName} - clean day recorded.`
+          : 'Clean day recorded.'),
       mood,
       amountWagered: gambled === true && amountWagered ? parseFloat(amountWagered.replace(/,/g, '')) || undefined : undefined,
       lost: gambled === true ? lost === true : undefined,
@@ -662,8 +668,10 @@ export default function JournalEntry() {
               value={notes}
               onChangeText={setNotes}
               placeholder={gambled === true
-                ? 'What happened? How are you feeling? What will you do differently…'
-                : "What's on your mind? Wins, challenges, things you're proud of…"}
+                ? 'What happened? How are you feeling? What will you do differently...'
+                : addictionName
+                  ? `How did your day go? Any thoughts about ${addictionName}...`
+                  : "What's on your mind? Wins, challenges, things you're proud of..."}
               placeholderTextColor={theme.color.textDim}
               multiline
               underlineColorAndroid="transparent"

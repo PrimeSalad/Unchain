@@ -41,6 +41,8 @@ import type { CatchYourBreathEntry } from '@/domain/catchYourBreath';
 import { catchYourBreathAvailability } from '@/domain/catchYourBreath';
 import type { CheersToChangeEntry } from '@/domain/cheersToChange';
 import { cheersToChangeAvailability } from '@/domain/cheersToChange';
+import type { OneMoreMinuteSession } from '@/domain/oneMoreMinute';
+import { computeStats as computeOmmStats, evaluateOmmAchievements } from '@/domain/oneMoreMinute';
 import {
   ALTERNATIVES,
   altAchievementById,
@@ -120,6 +122,7 @@ export const initialGames: GamesState = {
 
 interface RecoveryState {
   onboarded: boolean;
+  disclaimerAccepted: boolean;
   profile: RecoveryProfile | null;
   checkIns: DailyCheckIn[];
   urges: UrgeLog[];
@@ -175,6 +178,12 @@ interface RecoveryState {
   cheersToChangeEntries: CheersToChangeEntry[];
   /** Timestamp of the last completed assessment. null = never completed. */
   lastCheersToChangeAt: number | null;
+
+  // ── One More Minute (universal recovery timer) ──────────────────────────
+  /** All timer sessions (history). */
+  ommSessions: OneMoreMinuteSession[];
+  /** Permanently unlocked OMM achievements: id → unlockedAt (ms). */
+  ommAchievements: Record<string, number>;
 
   // ── Porn Recovery Metrics ───────────────────────────────────────────────
   lastCheckedIn: number | null;
@@ -283,6 +292,8 @@ interface RecoveryState {
   canCompleteCheersToChange: () => { available: boolean; nextAt?: number; daysLeft?: number };
   /** Delete a Cheers to Change entry from history. */
   deleteCheersToChangeEntry: (id: string) => void;
+  /** Complete a One More Minute session. Awards points, achievements, and timeline events. */
+  completeOmmSession: (session: Omit<OneMoreMinuteSession, 'id'>) => void;
   /** Add a website to the permanent blocklist. Validates + de-duplicates.
    *  Protection starts immediately and never expires. */
   addBlockedSite: (domainInput: string, nickname?: string) => 'added' | 'duplicate' | 'invalid';
@@ -308,6 +319,7 @@ interface RecoveryState {
   ensureDailyQuote: () => number;
 
   completeSetup: (profile: RecoveryProfile) => void;
+  acceptDisclaimer: () => void;
   addGoal: (kind: GoalKind, target: number) => void;
   removeGoal: (id: string) => void;
   /** Recompute earned badges + goal completions; returns badges newly earned
@@ -442,6 +454,7 @@ export const useStore = create<RecoveryState>()(
   persist(
     (set, get) => ({
       onboarded: false,
+      disclaimerAccepted: false,
       profile: null,
       checkIns: [],
       urges: [],
@@ -471,6 +484,8 @@ export const useStore = create<RecoveryState>()(
       lastCatchYourBreathAt: null,
       cheersToChangeEntries: [],
       lastCheersToChangeAt: null,
+      ommSessions: [],
+      ommAchievements: {},
       blockedSites: [],
       favoriteQuotes: [],
       dailyMissions: { day: '', completed: [] },
@@ -666,6 +681,37 @@ export const useStore = create<RecoveryState>()(
         set((s) => ({
           cheersToChangeEntries: s.cheersToChangeEntries.filter((e) => e.id !== id),
         })),
+
+      completeOmmSession: (sessionData) => {
+        const session: OneMoreMinuteSession = {
+          ...sessionData,
+          id: uid(),
+        };
+        set((s) => {
+          const sessions = [session, ...s.ommSessions];
+          const stats = computeOmmStats(sessions);
+          const newIds = evaluateOmmAchievements(stats).filter((id) => !s.ommAchievements[id]);
+          const now = Date.now();
+          const newAchievements = newIds.length
+            ? { ...s.ommAchievements, ...Object.fromEntries(newIds.map((id) => [id, now])) }
+            : s.ommAchievements;
+          const pointsEarned = 10 + newIds.length * 5;
+          return {
+            ommSessions: sessions,
+            ommAchievements: newAchievements,
+            points: s.points + pointsEarned,
+            healthyHabitsCount: s.healthyHabitsCount + 1,
+            timeline: [
+              ...newIds.map((id) => {
+                const a = require('@/domain/oneMoreMinute').ommAchievementById(id);
+                return evt('achievement', `Achievement unlocked - ${a?.title ?? id}`);
+              }),
+              evt('activity', `One More Minute - ${Math.round(session.actualSeconds / 60)} min focused`),
+              ...s.timeline,
+            ],
+          };
+        });
+      },
 
       recordWalkMetrics: (steps, meters) =>
         set((s) => ({
@@ -1071,6 +1117,8 @@ export const useStore = create<RecoveryState>()(
           timeline: [evt('start', 'Recovery started')],
         });
       },
+
+      acceptDisclaimer: () => set({ disclaimerAccepted: true }),
 
       addGoal: (kind, target) =>
         set((s) => ({

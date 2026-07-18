@@ -103,10 +103,10 @@ export function OnboardingScreen() {
       triggers,
       reason: reason.trim(),
     });
-    router.replace('/(tabs)/home');
+    router.replace('/disclaimer');
   };
 
-  const specificDone = meta ? (meta.specificOptions ? detail.length > 0 : true) : false;
+  const specificDone = meta ? (meta.specificOptions ? detail.length > 0 : atype === 'other' ? detail.trim().length > 0 : true) : false;
 
   const inputStyle = {
     borderRadius: radius.input,
@@ -236,7 +236,12 @@ export function OnboardingScreen() {
       {step === 'specific' && meta && (
         <View>
           <Text variant="title1">{meta.specificQuestion}</Text>
-          <View style={{ height: spacing.lg }} />
+          {atype === 'other' && (
+            <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.lg }}>
+              This will be used throughout the app to personalize your experience.
+            </Text>
+          )}
+          {atype !== 'other' && <View style={{ height: spacing.lg }} />}
           {meta.specificOptions ? (
             <Card padding={0}>
               {meta.specificOptions.map((opt, i) => {
@@ -264,7 +269,7 @@ export function OnboardingScreen() {
             <TextInput
               value={detail}
               onChangeText={setDetail}
-              placeholder="Type here…"
+              placeholder={atype === 'other' ? 'e.g. Nail biting, junk food, doom scrolling...' : 'Type here...'}
               placeholderTextColor={theme.color.textDim}
               multiline
               style={[inputStyle, { minHeight: 90, textAlignVertical: 'top' }]}
