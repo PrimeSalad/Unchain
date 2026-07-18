@@ -19,6 +19,7 @@ import {
   registerPredictionNotificationHandler,
 } from '@/application/triggerPrediction';
 import { scheduleCatchYourBreathReminder } from '@/application/catchYourBreathReminder';
+import { scheduleCheersToChangeReminder } from '@/application/cheersToChangeReminder';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -120,6 +121,12 @@ export default function RootLayout() {
   useEffect(() => {
     scheduleCatchYourBreathReminder(lastCatchYourBreathAt).catch(() => {});
   }, [lastCatchYourBreathAt]);
+
+  // ── Cheers to Change weekly reminder ─────────────────────────────────────
+  const lastCheersToChangeAt = useStore((s) => s.lastCheersToChangeAt);
+  useEffect(() => {
+    scheduleCheersToChangeReminder(lastCheersToChangeAt).catch(() => {});
+  }, [lastCheersToChangeAt]);
 
   if (!ready) {
     // iOS keeps the native splash visible. Web has no equivalent guarantee,

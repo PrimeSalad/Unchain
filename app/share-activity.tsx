@@ -57,6 +57,7 @@ const HERO_LABEL: Record<AlternativeId, string> = {
   journal: 'Journal Entry',
   'need-or-want': 'Need or Want?',
   'catch-your-breath': 'Catch Your Breath',
+  'cheers-to-change': 'Cheers to Change',
 };
 
 const TAGLINE: Record<AlternativeId, string> = {
@@ -68,6 +69,7 @@ const TAGLINE: Record<AlternativeId, string> = {
   journal: 'Every honest page makes recovery stronger.',
   'need-or-want': 'Pause before you buy. Intentional decisions are better decisions.',
   'catch-your-breath': 'Tracking your breathing is tracking your recovery.',
+  'cheers-to-change': 'Every step forward in recovery matters.',
 };
 
 // Full breathing cycle: inhale 4s + hold 2s + exhale 6s.

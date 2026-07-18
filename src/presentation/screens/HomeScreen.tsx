@@ -31,6 +31,7 @@ import {
 import type { TimelineType } from '@/domain/records';
 import { sameDay } from '@/domain/records';
 import { catchYourBreathAvailability } from '@/domain/catchYourBreath';
+import { cheersToChangeAvailability } from '@/domain/cheersToChange';
 import { QuoteFeed } from '../components/QuoteCards';
 import { CheckInInsightsCard } from '../components/CheckInInsightsCard';
 import { formatLastCheckedIn } from '@/domain/pornRecovery';
@@ -66,6 +67,7 @@ export function HomeScreen() {
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [mascotActive, setMascotActive] = useState(true);
   const [showCatchPopup, setShowCatchPopup] = useState(false);
+  const [showCheersPopup, setShowCheersPopup] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -86,6 +88,7 @@ export function HomeScreen() {
   const healthyHabitsCount = useStore((s) => s.healthyHabitsCount);
   const blockedSites = useStore((s) => s.blockedSites);
   const lastCatchYourBreathAt = useStore((s) => s.lastCatchYourBreathAt);
+  const lastCheersToChangeAt = useStore((s) => s.lastCheersToChangeAt);
 
   // Show Catch Your Breath popup when weekly assessment is available (smoking only)
   useFocusEffect(
@@ -93,11 +96,22 @@ export function HomeScreen() {
       if (profile?.addictionType !== 'smoking') return;
       const avail = catchYourBreathAvailability(lastCatchYourBreathAt);
       if (avail.available) {
-        // Small delay so it doesn't flash on screen load
         const timer = setTimeout(() => setShowCatchPopup(true), 800);
         return () => clearTimeout(timer);
       }
     }, [profile?.addictionType, lastCatchYourBreathAt]),
+  );
+
+  // Show Cheers to Change popup when weekly assessment is available (alcohol only)
+  useFocusEffect(
+    useCallback(() => {
+      if (profile?.addictionType !== 'alcohol') return;
+      const avail = cheersToChangeAvailability(lastCheersToChangeAt);
+      if (avail.available) {
+        const timer = setTimeout(() => setShowCheersPopup(true), 800);
+        return () => clearTimeout(timer);
+      }
+    }, [profile?.addictionType, lastCheersToChangeAt]),
   );
 
   // Derive the current streak start from the event log - never from startedAt
@@ -532,6 +546,62 @@ export function HomeScreen() {
                   label="Remind Me Later"
                   kind="tertiary"
                   onPress={() => setShowCatchPopup(false)}
+                  full
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* ── Cheers to Change weekly reminder popup (alcohol only) ── */}
+      {profile?.addictionType === 'alcohol' && (
+        <Modal
+          visible={showCheersPopup}
+          transparent
+          statusBarTranslucent
+          animationType="fade"
+          onRequestClose={() => setShowCheersPopup(false)}
+        >
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 32 }}>
+            <View style={{
+              backgroundColor: theme.color.surface,
+              borderRadius: radius.card,
+              padding: spacing.xl,
+              alignItems: 'center',
+              gap: spacing.md,
+              maxWidth: 340,
+              width: '100%',
+            }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 32,
+                backgroundColor: theme.color.successSoft,
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="wine" size={32} color={theme.color.success} />
+              </View>
+              <Text variant="headline" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+                Cheers to Change
+              </Text>
+              <Text variant="footnote" dim center style={{ lineHeight: 20 }}>
+                Time for your weekly body wellness check-in. Take a couple of minutes to reflect on how your body has been feeling this week.
+              </Text>
+              <Text variant="caption" color={theme.color.textDim} center style={{ lineHeight: 18, fontStyle: 'italic' }}>
+                This is a self-reflection tool, not a medical evaluation.
+              </Text>
+              <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm }}>
+                <Button
+                  label="Start Reflection"
+                  onPress={() => {
+                    setShowCheersPopup(false);
+                    router.push('/cheers-to-change-log');
+                  }}
+                  full
+                />
+                <Button
+                  label="Remind Me Later"
+                  kind="tertiary"
+                  onPress={() => setShowCheersPopup(false)}
                   full
                 />
               </View>

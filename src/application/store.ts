@@ -39,6 +39,8 @@ import { sameDay } from '@/domain/records';
 import type { AltAchievement, AltCounts, AlternativeId, NeedOrWantEntry } from '@/domain/alternatives';
 import type { CatchYourBreathEntry } from '@/domain/catchYourBreath';
 import { catchYourBreathAvailability } from '@/domain/catchYourBreath';
+import type { CheersToChangeEntry } from '@/domain/cheersToChange';
+import { cheersToChangeAvailability } from '@/domain/cheersToChange';
 import {
   ALTERNATIVES,
   altAchievementById,
@@ -168,6 +170,12 @@ interface RecoveryState {
   /** Timestamp of the last completed assessment. null = never completed. */
   lastCatchYourBreathAt: number | null;
 
+  // ── Cheers to Change (alcohol-only weekly reflection) ───────────────────
+  /** All weekly wellness assessment entries, newest first. */
+  cheersToChangeEntries: CheersToChangeEntry[];
+  /** Timestamp of the last completed assessment. null = never completed. */
+  lastCheersToChangeAt: number | null;
+
   // ── Porn Recovery Metrics ───────────────────────────────────────────────
   lastCheckedIn: number | null;
   urgesResisted: number;
@@ -268,6 +276,13 @@ interface RecoveryState {
   canCompleteCatchYourBreath: () => { available: boolean; nextAt?: number; daysLeft?: number };
   /** Delete a Catch Your Breath entry from history. */
   deleteCatchYourBreathEntry: (id: string) => void;
+  /** Save a Cheers to Change weekly assessment. Returns any habit achievements
+   *  newly unlocked. Increments healthyHabitsCount and awards points. */
+  addCheersToChange: (entry: Omit<CheersToChangeEntry, 'id' | 'at'>) => AltAchievement[];
+  /** Whether the Cheers to Change assessment is available now (7-day cooldown). */
+  canCompleteCheersToChange: () => { available: boolean; nextAt?: number; daysLeft?: number };
+  /** Delete a Cheers to Change entry from history. */
+  deleteCheersToChangeEntry: (id: string) => void;
   /** Add a website to the permanent blocklist. Validates + de-duplicates.
    *  Protection starts immediately and never expires. */
   addBlockedSite: (domainInput: string, nickname?: string) => 'added' | 'duplicate' | 'invalid';
@@ -372,8 +387,8 @@ function altFullDay(
   return ALTERNATIVES.every((a) => {
     // 'need-or-want' only counts for online shopping addiction
     if (a.id === 'need-or-want' && addictionType !== 'online_shopping') return true;
-    // 'catch-your-breath' is weekly, not daily - never counts for full-day
-    if (a.id === 'catch-your-breath') return true;
+    // 'catch-your-breath' and 'cheers-to-change' are weekly, not daily
+    if (a.id === 'catch-your-breath' || a.id === 'cheers-to-change') return true;
     return a.id === 'journal'
       ? journal.some((j) => sameDay(j.at, now))
       : alternatives[a.id] != null && sameDay(alternatives[a.id]!, now);
@@ -454,6 +469,8 @@ export const useStore = create<RecoveryState>()(
       activeNeedOrWantId: null,
       catchYourBreathEntries: [],
       lastCatchYourBreathAt: null,
+      cheersToChangeEntries: [],
+      lastCheersToChangeAt: null,
       blockedSites: [],
       favoriteQuotes: [],
       dailyMissions: { day: '', completed: [] },
@@ -594,6 +611,60 @@ export const useStore = create<RecoveryState>()(
       deleteCatchYourBreathEntry: (id) =>
         set((s) => ({
           catchYourBreathEntries: s.catchYourBreathEntries.filter((e) => e.id !== id),
+        })),
+
+      canCompleteCheersToChange: () => {
+        const { lastCheersToChangeAt } = get();
+        const result = cheersToChangeAvailability(lastCheersToChangeAt);
+        return result.available
+          ? { available: true }
+          : { available: false, nextAt: result.nextAt, daysLeft: result.daysLeft };
+      },
+
+      addCheersToChange: (data) => {
+        let unlocked: AltAchievement[] = [];
+        const now = Date.now();
+
+        const { lastCheersToChangeAt } = get();
+        const avail = cheersToChangeAvailability(lastCheersToChangeAt, now);
+        if (!avail.available) return [];
+
+        const entry: CheersToChangeEntry = {
+          ...data,
+          id: uid(),
+          at: now,
+        };
+        set((s) => {
+          const altCounts: AltCounts = { ...s.altCounts, 'cheers-to-change': (s.altCounts['cheers-to-change'] ?? 0) + 1 };
+          const counts: AltCounts = { ...altCounts, journal: s.journal.length };
+          unlocked = newAltUnlocks(
+            counts,
+            altFullDay(s.alternatives, s.journal, now, s.profile?.addictionType),
+            s.altAchievements,
+          );
+          return {
+            cheersToChangeEntries: [entry, ...s.cheersToChangeEntries],
+            lastCheersToChangeAt: now,
+            alternatives: { ...s.alternatives, 'cheers-to-change': now },
+            altCounts,
+            altAchievements: unlocked.length
+              ? { ...s.altAchievements, ...Object.fromEntries(unlocked.map((a) => [a.id, now])) }
+              : s.altAchievements,
+            points: s.points + 5 + unlocked.length * 5,
+            healthyHabitsCount: s.healthyHabitsCount + 1,
+            timeline: [
+              ...unlocked.map((a) => evt('achievement', `Achievement unlocked - ${a.title}`)),
+              evt('activity', 'Recovery activity - Cheers to Change'),
+              ...s.timeline,
+            ],
+          };
+        });
+        return unlocked;
+      },
+
+      deleteCheersToChangeEntry: (id) =>
+        set((s) => ({
+          cheersToChangeEntries: s.cheersToChangeEntries.filter((e) => e.id !== id),
         })),
 
       recordWalkMetrics: (steps, meters) =>
