@@ -1,6 +1,5 @@
 /**
- * Disclaimer & Terms of Use screen.
- * Shown after onboarding completes, before the user enters the app.
+ * Disclaimer & Terms of Use - proper legal text with modern design.
  */
 
 import { useState } from 'react';
@@ -15,6 +14,7 @@ import { Button } from '@/presentation/components/Button';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
+import { addictionMeta } from '@/domain/gambling';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
 
@@ -22,7 +22,14 @@ export default function Disclaimer() {
   const theme = useTheme();
   const router = useRouter();
   const acceptDisclaimer = useStore((s) => s.acceptDisclaimer);
+  const profile = useStore((s) => s.profile);
   const [agreed, setAgreed] = useState(false);
+
+  const addictionName = profile
+    ? (profile.addictionType === 'other' && profile.addictionDetail
+        ? profile.addictionDetail
+        : addictionMeta(profile.addictionType).label)
+    : 'recovery';
 
   const handleAccept = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -30,126 +37,126 @@ export default function Disclaimer() {
     router.replace('/(tabs)/home');
   };
 
-  const toggleAgree = () => {
-    Haptics.selectionAsync().catch(() => {});
-    setAgreed((v) => !v);
-  };
-
   return (
-    <Screen edges={['top', 'bottom']}>
-      {/* Header */}
-      <View style={{ marginTop: spacing.sm, marginBottom: spacing.lg }}>
-        <Text variant="title1" style={{ fontFamily: 'Nunito_900Black' }}>Welcome</Text>
-        <Text variant="footnote" dim style={{ marginTop: spacing.xs }}>
-          Please review and accept our terms before continuing.
-        </Text>
-      </View>
-
+    <Screen edges={['top', 'bottom']} scroll={false}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: spacing.md }}
+        contentContainerStyle={{ paddingTop: spacing.xl, paddingBottom: spacing.md }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Disclaimer Banner ──────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(100).springify().damping(18)}>
+        {/* ── Title ────────────────────────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(50).springify().damping(18)} style={{ marginBottom: spacing.xl }}>
+          <Text variant="title1" style={{ fontFamily: 'Nunito_900Black', marginBottom: spacing.xs }}>
+            Terms of Use & Disclaimer
+          </Text>
+          <Text variant="footnote" dim style={{ lineHeight: 20 }}>
+            Please read carefully before using this application.
+          </Text>
+        </Animated.View>
+
+        {/* ── Disclaimer ───────────────────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(100).springify().damping(18)} style={{ marginBottom: spacing.xl }}>
           <View style={{
-            backgroundColor: theme.color.surface,
+            backgroundColor: theme.color.danger + '08',
             borderRadius: radius.card,
             borderWidth: 1,
-            borderColor: theme.color.hairline,
+            borderColor: theme.color.danger + '25',
             padding: spacing.lg,
-            marginBottom: spacing.lg,
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-              <View style={{
-                width: 32, height: 32, borderRadius: 16,
-                backgroundColor: theme.color.danger + '15',
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Ionicons name="alert-circle" size={18} color={theme.color.danger} />
-              </View>
-              <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>
+              <Ionicons name="alert-circle" size={20} color={theme.color.danger} />
+              <Text variant="callout" style={{ fontFamily: 'Nunito_800ExtraBold', color: theme.color.danger }}>
                 Medical Disclaimer
               </Text>
             </View>
-            <Text variant="caption" style={{ lineHeight: 20 }}>
-              This app is a self-help tool for personal recovery support. It is{' '}
-              <Text style={{ fontFamily: 'Nunito_700Bold' }}>not a medical device</Text> and does not
-              provide medical advice, diagnosis, or treatment. It is not a substitute for
-              professional healthcare, therapy, or emergency services.
+            <Text variant="footnote" style={{ lineHeight: 22, marginBottom: spacing.sm }}>
+              Unchainly is a self-help tool designed to support personal {addictionName} recovery. It is not intended to diagnose, treat, cure, or prevent any disease or medical condition.
+            </Text>
+            <Text variant="footnote" style={{ lineHeight: 22, marginBottom: spacing.sm }}>
+              This application is not a medical device as defined by the FDA or any other regulatory body. It does not provide medical advice, diagnosis, or treatment of any kind.
+            </Text>
+            <Text variant="footnote" style={{ lineHeight: 22, marginBottom: spacing.sm }}>
+              The content, features, and tools within this application are for informational and self-reflection purposes only. They should not be used as a substitute for professional medical advice, diagnosis, or treatment.
+            </Text>
+            <Text variant="footnote" style={{ lineHeight: 22 }}>
+              Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition. Never disregard professional medical advice or delay in seeking it because of something you have read or done in this application.
             </Text>
           </View>
         </Animated.View>
 
-        {/* ── Terms of Use ───────────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(200).springify().damping(18)}>
+        {/* ── Terms of Use ─────────────────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(150).springify().damping(18)} style={{ marginBottom: spacing.xl }}>
+          <Text variant="callout" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.md }}>
+            Terms of Use
+          </Text>
+
+          <TermSection num="1" title="Acceptance of Terms">
+            By downloading, installing, or using Unchainly, you agree to be bound by these Terms of Use. If you do not agree to these terms, do not use this application.
+          </TermSection>
+
+          <TermSection num="2" title="Description of Service">
+            Unchainly is a mobile application that provides self-help tools for personal {addictionName} recovery, including journaling, progress tracking, habit logging, urge management, and educational resources. All data is stored locally on the user's device.
+          </TermSection>
+
+          <TermSection num="3" title="No Professional Advice">
+            All content, features, and tools within this application are for self-reflection and informational purposes only. They do not constitute medical, psychological, financial, or professional advice. The application is not a replacement for professional treatment, therapy, counseling, or medical care.
+          </TermSection>
+
+          <TermSection num="4" title="Emergency Situations">
+            This application is not designed for crisis intervention. If you or someone you know is experiencing a mental health crisis, suicidal thoughts, or substance withdrawal symptoms, please contact emergency services (911), the National Suicide Prevention Lifeline (988), or SAMHSA's National Helpline (1-800-662-4357) immediately.
+          </TermSection>
+
+          <TermSection num="5" title="User Responsibility">
+            You are solely responsible for your use of this application and any decisions you make based on its content. Your use of this application is entirely at your own risk. Recovery is a personal journey, and individual results vary.
+          </TermSection>
+
+          <TermSection num="6" title="Data Privacy">
+            All data entered into this application is stored locally on your device. We do not collect, store, transmit, or have access to any of your personal information, journal entries, or recovery data. You are responsible for the security and backup of your device.
+          </TermSection>
+
+          <TermSection num="7" title="No Guarantees">
+            This application is provided "as is" and "as available" without warranties of any kind, either express or implied. We do not guarantee that the application will be error-free, uninterrupted, or that it will produce specific results.
+          </TermSection>
+
+          <TermSection num="8" title="Limitation of Liability">
+            In no event shall the developers, creators, or distributors of this application be liable for any indirect, incidental, special, consequential, or punitive damages arising out of your use of or inability to use this application.
+          </TermSection>
+
+          <TermSection num="9" title="Modifications">
+            We reserve the right to modify these terms at any time. Continued use of the application after changes constitutes acceptance of the updated terms. We encourage you to review these terms periodically.
+          </TermSection>
+
+          <TermSection num="10" title="Contact">
+            If you have questions about these terms, please contact us through the application's support channels.
+          </TermSection>
+        </Animated.View>
+
+        {/* ── Privacy ──────────────────────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(200).springify().damping(18)} style={{ marginBottom: spacing.xl }}>
           <View style={{
-            backgroundColor: theme.color.surface,
+            backgroundColor: theme.color.success + '08',
             borderRadius: radius.card,
             borderWidth: 1,
-            borderColor: theme.color.hairline,
+            borderColor: theme.color.success + '25',
             padding: spacing.lg,
-            marginBottom: spacing.lg,
           }}>
-            <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold', marginBottom: spacing.md }}>
-              Terms of Use
-            </Text>
-
-            <View style={{ gap: spacing.md }}>
-              <Section title="Use at Your Own Risk" theme={theme}>
-                Your use of this app is entirely at your own risk. The app is provided as-is
-                without warranties. We do not guarantee it will be error-free or produce specific results.
-              </Section>
-
-              <Section title="No Professional Advice" theme={theme}>
-                All content, tracking tools, journal prompts, and reflections are for
-                self-reflection only. They do not constitute medical, psychological, or
-                professional advice. Always consult qualified professionals.
-              </Section>
-
-              <Section title="Emergency Situations" theme={theme}>
-                This app is not designed for crisis intervention. If you or someone you know
-                is in immediate danger, contact emergency services or go to the nearest
-                emergency room.
-              </Section>
-
-              <Section title="Your Data Stays Private" theme={theme}>
-                All data is stored locally on your device. Nothing is uploaded to servers.
-                We have no access to your information. You are responsible for your device security.
-              </Section>
-
-              <Section title="Results Vary" theme={theme}>
-                Recovery is deeply personal. Progress indicators and insights are based on
-                your own self-reported data. Results vary between individuals and should
-                not be compared to clinical outcomes.
-              </Section>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+              <Ionicons name="shield-checkmark" size={20} color={theme.color.success} />
+              <Text variant="callout" style={{ fontFamily: 'Nunito_800ExtraBold', color: theme.color.success }}>
+                Privacy Policy
+              </Text>
             </View>
-          </View>
-        </Animated.View>
-
-        {/* ── Privacy Note ───────────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(300).springify().damping(18)}>
-          <View style={{
-            flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
-            backgroundColor: theme.color.successSoft,
-            borderRadius: radius.card,
-            padding: spacing.md,
-            marginBottom: spacing.xl,
-          }}>
-            <Ionicons name="shield-checkmark" size={18} color={theme.color.success} style={{ marginTop: 2 }} />
-            <Text variant="caption" style={{ flex: 1, lineHeight: 19 }}>
-              <Text style={{ fontFamily: 'Nunito_700Bold', color: theme.color.success }}>Privacy First.</Text>{' '}
-              No accounts, no cloud sync, no tracking. Everything stays on your device.
+            <Text variant="footnote" style={{ lineHeight: 22 }}>
+              Unchainly is designed with privacy as a core principle. All data is stored exclusively on your device. We do not collect, transmit, or have access to any personal information, journal entries, recovery data, or usage statistics. There are no accounts, no cloud sync, and no analytics tracking. Your recovery journey belongs to you alone.
             </Text>
           </View>
         </Animated.View>
       </ScrollView>
 
-      {/* ── Bottom: Checkbox + Button ──────────────────────────────────────── */}
-      <View style={{ paddingBottom: spacing.xl }}>
-        {/* Checkbox row */}
+      {/* ── Bottom (fixed) ────────────────────────────────────────────── */}
+      <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xl }}>
         <Pressable
-          onPress={toggleAgree}
+          onPress={() => { Haptics.selectionAsync().catch(() => {}); setAgreed((v) => !v); }}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: agreed }}
           style={({ pressed }) => ({
@@ -161,7 +168,7 @@ export default function Disclaimer() {
           })}
         >
           <View style={{
-            width: 22, height: 22, borderRadius: 6,
+            width: 24, height: 24, borderRadius: 6,
             borderWidth: 2,
             borderColor: agreed ? theme.color.primary : theme.color.hairline,
             backgroundColor: agreed ? theme.color.primary : 'transparent',
@@ -170,14 +177,13 @@ export default function Disclaimer() {
           }}>
             {agreed && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
           </View>
-          <Text variant="footnote" style={{ flex: 1, lineHeight: 20, color: theme.color.text }}>
-            I have read and agree to the Terms of Use and understand this app is not a substitute for professional medical advice.
+          <Text variant="footnote" style={{ flex: 1, lineHeight: 20 }}>
+            I have read and agree to the Terms of Use, Medical Disclaimer, and Privacy Policy.
           </Text>
         </Pressable>
 
-        {/* Action button */}
         <Button
-          label={agreed ? 'Get Started' : 'Accept Terms to Continue'}
+          label={agreed ? 'Get Started' : 'Accept & Continue'}
           onPress={handleAccept}
           disabled={!agreed}
           full
@@ -187,15 +193,27 @@ export default function Disclaimer() {
   );
 }
 
-// ── Section sub-component ─────────────────────────────────────────────────
+// ── Term section component ──────────────────────────────────────────────
 
-function Section({ title, children, theme }: { title: string; children: React.ReactNode; theme: any }) {
+function TermSection({ num, title, children }: { num: string; title: string; children: React.ReactNode }) {
+  const theme = useTheme();
   return (
-    <View>
-      <Text variant="caption" style={{ fontFamily: 'Nunito_700Bold', marginBottom: spacing.xs }}>
-        {title}
-      </Text>
-      <Text variant="caption" dim style={{ lineHeight: 19 }}>
+    <View style={{ marginBottom: spacing.lg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
+        <View style={{
+          width: 24, height: 24, borderRadius: 12,
+          backgroundColor: theme.color.primarySoft,
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Text variant="caption" color={theme.color.primary} style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+            {num}
+          </Text>
+        </View>
+        <Text variant="footnote" style={{ fontFamily: 'Nunito_700Bold' }}>
+          {title}
+        </Text>
+      </View>
+      <Text variant="caption" dim style={{ lineHeight: 20, paddingLeft: 32 }}>
         {children}
       </Text>
     </View>

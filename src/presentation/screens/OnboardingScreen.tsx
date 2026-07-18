@@ -188,7 +188,11 @@ export function OnboardingScreen() {
           <Text variant="footnote" dim style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>Age</Text>
           <TextInput
             value={age}
-            onChangeText={(t) => setAge(t.replace(/[^0-9]/g, '').slice(0, 3))}
+            onChangeText={(t) => {
+              const cleaned = t.replace(/[^0-9]/g, '').slice(0, 3);
+              const num = parseInt(cleaned) || 0;
+              if (num <= 100) setAge(cleaned);
+            }}
             placeholder="Your age"
             placeholderTextColor={theme.color.textDim}
             keyboardType="number-pad"

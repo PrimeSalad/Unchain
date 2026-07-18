@@ -43,6 +43,8 @@ import type { CheersToChangeEntry } from '@/domain/cheersToChange';
 import { cheersToChangeAvailability } from '@/domain/cheersToChange';
 import type { OneMoreMinuteSession } from '@/domain/oneMoreMinute';
 import { computeStats as computeOmmStats, evaluateOmmAchievements } from '@/domain/oneMoreMinute';
+import type { FoodEntry, WaterEntry, FastingSession, NutritionGoals } from '@/domain/fuelYourRecovery';
+import { dailyFoodSummary, dailyWaterTotal, mealStreak, waterStreak, evaluateFuelAchievements, dayKey } from '@/domain/fuelYourRecovery';
 import {
   ALTERNATIVES,
   altAchievementById,
@@ -185,6 +187,20 @@ interface RecoveryState {
   /** Permanently unlocked OMM achievements: id → unlockedAt (ms). */
   ommAchievements: Record<string, number>;
 
+  // ── Fuel Your Recovery (universal nutrition companion) ──────────────────
+  /** All food entries (history). */
+  fuelFoodEntries: FoodEntry[];
+  /** All water entries (history). */
+  fuelWaterEntries: WaterEntry[];
+  /** All fasting sessions (history). */
+  fuelFastingSessions: FastingSession[];
+  /** User's nutrition goals. */
+  fuelGoals: NutritionGoals;
+  /** Whether the user has completed the body info setup (BMI, lifestyle). */
+  fuelBodyInfoSet: boolean;
+  /** Permanently unlocked Fuel achievements: id → unlockedAt (ms). */
+  fuelAchievements: Record<string, number>;
+
   // ── Porn Recovery Metrics ───────────────────────────────────────────────
   lastCheckedIn: number | null;
   urgesResisted: number;
@@ -294,6 +310,22 @@ interface RecoveryState {
   deleteCheersToChangeEntry: (id: string) => void;
   /** Complete a One More Minute session. Awards points, achievements, and timeline events. */
   completeOmmSession: (session: Omit<OneMoreMinuteSession, 'id'>) => void;
+  /** Log a food entry. */
+  addFuelFoodEntry: (entry: Omit<FoodEntry, 'id' | 'at'>) => void;
+  /** Delete a food entry. */
+  deleteFuelFoodEntry: (id: string) => void;
+  /** Toggle a food as favorite. */
+  toggleFuelFavorite: (id: string) => void;
+  /** Log water intake. */
+  addFuelWater: (amountMl: number) => void;
+  /** Start a fasting session. */
+  startFuelFast: (targetMinutes: number) => void;
+  /** End the current fasting session. */
+  endFuelFast: () => void;
+  /** Update nutrition goals. */
+  updateFuelGoals: (patch: Partial<NutritionGoals>) => void;
+  /** Mark body info setup as complete. */
+  setFuelBodyInfo: (patch: Partial<NutritionGoals>) => void;
   /** Add a website to the permanent blocklist. Validates + de-duplicates.
    *  Protection starts immediately and never expires. */
   addBlockedSite: (domainInput: string, nickname?: string) => 'added' | 'duplicate' | 'invalid';
@@ -486,6 +518,12 @@ export const useStore = create<RecoveryState>()(
       lastCheersToChangeAt: null,
       ommSessions: [],
       ommAchievements: {},
+      fuelFoodEntries: [],
+      fuelWaterEntries: [],
+      fuelFastingSessions: [],
+      fuelGoals: { dailyCalories: 2000, dailyWaterMl: 2500, dailyProtein: 50, dailyCarbs: 250, dailyFat: 65, dailyFiber: 25, fastingGoal: null },
+      fuelBodyInfoSet: false,
+      fuelAchievements: {},
       blockedSites: [],
       favoriteQuotes: [],
       dailyMissions: { day: '', completed: [] },
@@ -712,6 +750,110 @@ export const useStore = create<RecoveryState>()(
           };
         });
       },
+
+      addFuelFoodEntry: (data) => {
+        const entry: FoodEntry = { ...data, id: uid(), at: Date.now() };
+        set((s) => {
+          const meals = s.fuelFoodEntries.length + 1;
+          const waterDays = new Set(s.fuelWaterEntries.filter((w) => w.at >= Date.now() - 7 * 86_400_000).map((w) => dayKey(w.at))).size;
+          const fasts = s.fuelFastingSessions.filter((f) => f.completed).length;
+          const mStreak = mealStreak([...s.fuelFoodEntries, entry]);
+          const wStreak = waterStreak(s.fuelWaterEntries, s.fuelGoals.dailyWaterMl);
+          const fuelData = { meals, waterDays, fasts, mealStreak: mStreak, waterStreak: wStreak };
+          const newIds = evaluateFuelAchievements(fuelData).filter((id) => !s.fuelAchievements[id]);
+          const now = Date.now();
+          return {
+            fuelFoodEntries: [entry, ...s.fuelFoodEntries],
+            fuelAchievements: newIds.length ? { ...s.fuelAchievements, ...Object.fromEntries(newIds.map((id) => [id, now])) } : s.fuelAchievements,
+            points: s.points + 5 + newIds.length * 5,
+            healthyHabitsCount: s.healthyHabitsCount + 1,
+            timeline: [
+              ...newIds.map((id) => {
+                const a = require('@/domain/fuelYourRecovery').fuelAchievementById(id);
+                return evt('achievement', `Achievement unlocked - ${a?.title ?? id}`);
+              }),
+              evt('activity', `Fuel - logged ${entry.name}`),
+              ...s.timeline,
+            ],
+          };
+        });
+      },
+
+      deleteFuelFoodEntry: (id) =>
+        set((s) => ({ fuelFoodEntries: s.fuelFoodEntries.filter((e) => e.id !== id) })),
+
+      toggleFuelFavorite: (id) =>
+        set((s) => ({
+          fuelFoodEntries: s.fuelFoodEntries.map((e) => e.id === id ? { ...e, isFavorite: !e.isFavorite } : e),
+        })),
+
+      addFuelWater: (amountMl) => {
+        const entry: WaterEntry = { id: uid(), at: Date.now(), amountMl };
+        set((s) => {
+          const newWater = [...s.fuelWaterEntries, entry];
+          const waterDays = new Set(newWater.filter((w) => w.at >= Date.now() - 7 * 86_400_000).map((w) => dayKey(w.at))).size;
+          const meals = s.fuelFoodEntries.length;
+          const fasts = s.fuelFastingSessions.filter((f) => f.completed).length;
+          const wStreak = waterStreak(newWater, s.fuelGoals.dailyWaterMl);
+          const mStreak = mealStreak(s.fuelFoodEntries);
+          const fuelData = { meals, waterDays, fasts, mealStreak: mStreak, waterStreak: wStreak };
+          const newIds = evaluateFuelAchievements(fuelData).filter((id) => !s.fuelAchievements[id]);
+          const now = Date.now();
+          return {
+            fuelWaterEntries: newWater,
+            fuelAchievements: newIds.length ? { ...s.fuelAchievements, ...Object.fromEntries(newIds.map((id) => [id, now])) } : s.fuelAchievements,
+            points: s.points + newIds.length * 5,
+            timeline: newIds.map((id) => {
+              const a = require('@/domain/fuelYourRecovery').fuelAchievementById(id);
+              return evt('achievement', `Achievement unlocked - ${a?.title ?? id}`);
+            }).concat(s.timeline),
+          };
+        });
+      },
+
+      startFuelFast: (targetMinutes) => {
+        const session: FastingSession = { id: uid(), startedAt: Date.now(), endedAt: null, targetMinutes, completed: false };
+        set((s) => ({ fuelFastingSessions: [session, ...s.fuelFastingSessions] }));
+      },
+
+      endFuelFast: () => {
+        set((s) => {
+          const now = Date.now();
+          const updated = s.fuelFastingSessions.map((f) => {
+            if (f.endedAt != null) return f;
+            const actualMinutes = Math.round((now - f.startedAt) / 60_000);
+            const completed = actualMinutes >= f.targetMinutes * 0.9;
+            return { ...f, endedAt: now, completed };
+          });
+          const completedFasts = updated.filter((f) => f.completed).length;
+          const meals = s.fuelFoodEntries.length;
+          const waterDays = new Set(s.fuelWaterEntries.filter((w) => w.at >= now - 7 * 86_400_000).map((w) => dayKey(w.at))).size;
+          const mStreak = mealStreak(s.fuelFoodEntries);
+          const wStreak = waterStreak(s.fuelWaterEntries, s.fuelGoals.dailyWaterMl);
+          const fuelData = { meals, waterDays, fasts: completedFasts, mealStreak: mStreak, waterStreak: wStreak };
+          const newIds = evaluateFuelAchievements(fuelData).filter((id) => !s.fuelAchievements[id]);
+          return {
+            fuelFastingSessions: updated,
+            fuelAchievements: newIds.length ? { ...s.fuelAchievements, ...Object.fromEntries(newIds.map((id) => [id, now])) } : s.fuelAchievements,
+            points: s.points + 5 + newIds.length * 5,
+            healthyHabitsCount: s.healthyHabitsCount + 1,
+            timeline: [
+              ...newIds.map((id) => {
+                const a = require('@/domain/fuelYourRecovery').fuelAchievementById(id);
+                return evt('achievement', `Achievement unlocked - ${a?.title ?? id}`);
+              }),
+              evt('activity', 'Fuel - completed fast'),
+              ...s.timeline,
+            ],
+          };
+        });
+      },
+
+      updateFuelGoals: (patch) =>
+        set((s) => ({ fuelGoals: { ...s.fuelGoals, ...patch } })),
+
+      setFuelBodyInfo: (patch) =>
+        set((s) => ({ fuelGoals: { ...s.fuelGoals, ...patch }, fuelBodyInfoSet: true })),
 
       recordWalkMetrics: (steps, meters) =>
         set((s) => ({
@@ -1794,6 +1936,22 @@ export const useStore = create<RecoveryState>()(
           recentQuotes: [],
           dailyMissions: { day: '', completed: [] },
           missionXp: 0,
+          // Fuel Your Recovery
+          fuelFoodEntries: [],
+          fuelWaterEntries: [],
+          fuelFastingSessions: [],
+          fuelGoals: { dailyCalories: 2000, dailyWaterMl: 2500, dailyProtein: 50, dailyCarbs: 250, dailyFat: 65, dailyFiber: 25, fastingGoal: null },
+          fuelBodyInfoSet: false,
+          fuelAchievements: {},
+          // Catch Your Breath
+          catchYourBreathEntries: [],
+          lastCatchYourBreathAt: null,
+          // Cheers to Change
+          cheersToChangeEntries: [],
+          lastCheersToChangeAt: null,
+          // One More Minute
+          ommSessions: [],
+          ommAchievements: {},
         });
       },
     }),

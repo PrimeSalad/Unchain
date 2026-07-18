@@ -68,6 +68,8 @@ export function HomeScreen() {
   const [mascotActive, setMascotActive] = useState(true);
   const [showCatchPopup, setShowCatchPopup] = useState(false);
   const [showCheersPopup, setShowCheersPopup] = useState(false);
+  const [catchDismissed, setCatchDismissed] = useState(false);
+  const [cheersDismissed, setCheersDismissed] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -93,25 +95,25 @@ export function HomeScreen() {
   // Show Catch Your Breath popup when weekly assessment is available (smoking only)
   useFocusEffect(
     useCallback(() => {
-      if (profile?.addictionType !== 'smoking') return;
+      if (profile?.addictionType !== 'smoking' || catchDismissed) return;
       const avail = catchYourBreathAvailability(lastCatchYourBreathAt);
       if (avail.available) {
         const timer = setTimeout(() => setShowCatchPopup(true), 800);
         return () => clearTimeout(timer);
       }
-    }, [profile?.addictionType, lastCatchYourBreathAt]),
+    }, [profile?.addictionType, lastCatchYourBreathAt, catchDismissed]),
   );
 
   // Show Cheers to Change popup when weekly assessment is available (alcohol only)
   useFocusEffect(
     useCallback(() => {
-      if (profile?.addictionType !== 'alcohol') return;
+      if (profile?.addictionType !== 'alcohol' || cheersDismissed) return;
       const avail = cheersToChangeAvailability(lastCheersToChangeAt);
       if (avail.available) {
         const timer = setTimeout(() => setShowCheersPopup(true), 800);
         return () => clearTimeout(timer);
       }
-    }, [profile?.addictionType, lastCheersToChangeAt]),
+    }, [profile?.addictionType, lastCheersToChangeAt, cheersDismissed]),
   );
 
   // Derive the current streak start from the event log - never from startedAt
@@ -545,7 +547,7 @@ export function HomeScreen() {
                 <Button
                   label="Remind Me Later"
                   kind="tertiary"
-                  onPress={() => setShowCatchPopup(false)}
+                  onPress={() => { setShowCatchPopup(false); setCatchDismissed(true); }}
                   full
                 />
               </View>
@@ -601,7 +603,7 @@ export function HomeScreen() {
                 <Button
                   label="Remind Me Later"
                   kind="tertiary"
-                  onPress={() => setShowCheersPopup(false)}
+                  onPress={() => { setShowCheersPopup(false); setCheersDismissed(true); }}
                   full
                 />
               </View>
