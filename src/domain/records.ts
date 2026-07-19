@@ -263,6 +263,10 @@ export interface JournalEntry {
   shopUrgeIntensity?: number;
   /** What helped the user stay shop-free on a clean day. */
   shopWhatHelped?: string;
+
+  // ── Custom / Other habit fields ────────────────────────────────────────
+  /** Whether the user returned to their custom habit today. */
+  otherActed?: boolean;
 }
 
 /** Emergency Reflection - captured during a crisis (SOS). Stored separately

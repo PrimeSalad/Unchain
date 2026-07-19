@@ -9,7 +9,7 @@
  * Never imports from or modifies any other journal entry file.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -34,7 +34,8 @@ import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useTodayAlcoholJournal, useProfile } from '@/application/store';
+import { useStore } from '@/application/store';
+import { JournalSequenceBanner, useJournalSequence } from '@/presentation/hooks/useJournalSequence';
 import { ALCOHOL_TRIGGERS, formatMoneyInput, parseMoneyInput, formatMoney, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
@@ -204,38 +205,50 @@ function ConfirmModal({ visible, onConfirm, onCancel }: { visible: boolean; onCo
 export default function AlcoholJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
-  const addJournal = useStore((s) => s.addJournal);
-  const profile = useProfile();
+  const journalSequence = useJournalSequence('alcohol', safeBack);
+  const { sequence, profile, todayJournal, submitJournal, finishSection, clearDraft } = journalSequence;
+  const draft = sequence ? journalSequence.draft ?? {} : {};
   const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const insets   = useSafeAreaInsets();
 
-  const todayJournal     = useTodayAlcoholJournal();
   const alreadySubmitted = todayJournal != null;
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const submitting = useRef(false);
 
   // ── Form state ─────────────────────────────────────────────────────────
-  const [drank,          setDrank]          = useState<boolean | null>(null);
-  const [moneyBalance,   setMoneyBalance]   = useState('');
-  const [didDrinkSpend,  setDidDrinkSpend]  = useState<boolean | null>(null);
-  const [drinkSpendAmount, setDrinkSpendAmount] = useState('');
-  const [mood,           setMood]           = useState(5);
-  const [reflection,     setReflection]     = useState('');
-  const [urgeIntensity,  setUrgeIntensity]  = useState(3);
-  const [drinkCount,     setDrinkCount]     = useState<DrinkCountOption | null>(null);
-  const [drinkType,      setDrinkType]      = useState<DrinkTypeOption | null>(null);
-  const [emotions,       setEmotions]       = useState<EmotionOption[]>([]);
-  const [triggerRelapse, setTriggerRelapse] = useState<string | null>(null);
-  const [nextTimePlan,   setNextTimePlan]   = useState('');
+  const [drank,          setDrank]          = useState<boolean | null>(() => typeof draft.drank === 'boolean' ? draft.drank : null);
+  const [moneyBalance,   setMoneyBalance]   = useState(() => typeof draft.moneyBalance === 'string' ? draft.moneyBalance : '');
+  const [didDrinkSpend,  setDidDrinkSpend]  = useState<boolean | null>(() => typeof draft.didDrinkSpend === 'boolean' ? draft.didDrinkSpend : null);
+  const [drinkSpendAmount, setDrinkSpendAmount] = useState(() => typeof draft.drinkSpendAmount === 'string' ? draft.drinkSpendAmount : '');
+  const [mood,           setMood]           = useState(() => typeof draft.mood === 'number' ? draft.mood : 5);
+  const [reflection,     setReflection]     = useState(() => typeof draft.reflection === 'string' ? draft.reflection : '');
+  const [urgeIntensity,  setUrgeIntensity]  = useState(() => typeof draft.urgeIntensity === 'number' ? draft.urgeIntensity : 3);
+  const [drinkCount,     setDrinkCount]     = useState<DrinkCountOption | null>(() => typeof draft.drinkCount === 'string' ? draft.drinkCount as DrinkCountOption : null);
+  const [drinkType,      setDrinkType]      = useState<DrinkTypeOption | null>(() => typeof draft.drinkType === 'string' ? draft.drinkType as DrinkTypeOption : null);
+  const [emotions,       setEmotions]       = useState<EmotionOption[]>(() => Array.isArray(draft.emotions) ? draft.emotions as EmotionOption[] : []);
+  const [triggerRelapse, setTriggerRelapse] = useState<string | null>(() => typeof draft.triggerRelapse === 'string' ? draft.triggerRelapse : null);
+  const [nextTimePlan,   setNextTimePlan]   = useState(() => typeof draft.nextTimePlan === 'string' ? draft.nextTimePlan : '');
 
   // ── Step management ────────────────────────────────────────────────────
-  const [stepIdx, setStepIdx]     = useState(0);
-  const frozenSteps               = useRef<StepId[] | null>(null);
+  const [stepIdx, setStepIdx]     = useState(() => typeof draft.stepIdx === 'number' ? draft.stepIdx : 0);
+  const frozenSteps               = useRef<StepId[] | null>(drank !== null ? buildSteps(drank, didDrinkSpend) : null);
   const steps                     = frozenSteps.current ?? buildSteps(null);
-  const currentStep               = steps[stepIdx];
+  const safeStepIdx               = Math.min(stepIdx, Math.max(0, steps.length - 1));
+  const currentStep               = steps[safeStepIdx];
   const totalSteps                = steps.length;
-  const isLastStep                = stepIdx === (frozenSteps.current ?? steps).length - 1;
+  const isLastStep                = safeStepIdx === (frozenSteps.current ?? steps).length - 1;
+
+  useEffect(() => {
+    if (!sequence) return;
+    journalSequence.saveDraft({
+      drank, moneyBalance, didDrinkSpend, drinkSpendAmount, mood, reflection,
+      urgeIntensity, drinkCount, drinkType, emotions, triggerRelapse,
+      nextTimePlan, stepIdx: safeStepIdx,
+    });
+  }, [sequence, drank, moneyBalance, didDrinkSpend, drinkSpendAmount, mood,
+    reflection, urgeIntensity, drinkCount, drinkType, emotions, triggerRelapse,
+    nextTimePlan, safeStepIdx]);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   function slide(dir: 'forward' | 'back', cb: () => void) {
@@ -294,7 +307,7 @@ export default function AlcoholJournalEntry() {
     const drinkSpend = drank === true && didDrinkSpend === true ? parseFloat(drinkSpendAmount.replace(/,/g, '')) || 0 : 0;
     const remainingMoney = Math.max(0, balance - drinkSpend);
 
-    addJournal({
+    submitJournal({
       drank: drank === true,
       gambled: undefined,
       watched: undefined,
@@ -313,8 +326,9 @@ export default function AlcoholJournalEntry() {
       drankNextTimePlan: drank === true && nextTimePlan.trim() ? nextTimePlan.trim() : undefined,
     });
 
+    clearDraft();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    safeBack();
+    finishSection();
   }
 
   // ── Already submitted gate ─────────────────────────────────────────────
@@ -656,6 +670,8 @@ export default function AlcoholJournalEntry() {
           {stepIdx + 1} of {totalSteps}
         </Text>
       </View>
+
+      {sequence ? <JournalSequenceBanner addiction="alcohol" /> : null}
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={insets.top + 16}>
         <ScrollView contentContainerStyle={{ paddingBottom: spacing.lg }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

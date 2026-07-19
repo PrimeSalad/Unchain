@@ -24,7 +24,7 @@ import { StretchFigure } from '@/presentation/components/StretchFigure';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useProfile, useStore, useTodayAnyJournal } from '@/application/store';
+import { useDailyJournalProgress, useProfile, useStore, useTodayAnyJournal } from '@/application/store';
 import { startCalmMusic, stopCalmMusic } from '@/application/sound';
 import { isExpoGo } from '@/application/expoGo';
 import {
@@ -1468,7 +1468,8 @@ export default function Alternatives() {
   // Any addiction type's entry counts as "journaled today" here; the wizard
   // route below still picks the correct addiction-specific flow.
   const todayJournal = useTodayAnyJournal();
-  const journalRoute = profile?.addictionType === 'pornography' ? '/porn-journal-entry' : profile?.addictionType === 'drugs' ? '/drug-journal-entry' : profile?.addictionType === 'alcohol' ? '/alcohol-journal-entry' : profile?.addictionType === 'smoking' ? '/smoke-journal-entry' : profile?.addictionType === 'social_media' ? '/social-journal-entry' : profile?.addictionType === 'online_shopping' ? '/online-shopping-journal-entry' : profile?.addictionType === 'gaming' ? '/game-journal-entry' : '/journal-entry';
+  const journalProgress = useDailyJournalProgress();
+  const journalRoute = '/journal-sequence';
   const scrollRef = useRef<ScrollView>(null);
   const cardYRef = useRef<Record<string, number>>({});
 
@@ -1538,7 +1539,7 @@ export default function Alternatives() {
 
   const isDone = (id: AlternativeId): boolean =>
     id === 'journal'
-      ? todayJournal != null
+      ? journalProgress.complete
       : id === 'need-or-want'
         ? false
         : id === 'catch-your-breath'
@@ -1560,7 +1561,7 @@ export default function Alternatives() {
       });
     }
     if (id === 'journal') {
-      if (todayJournal) setSheet('journal');
+      if (journalProgress.complete) setSheet('journal');
       else router.push(journalRoute as Parameters<typeof router.push>[0]);
       return;
     }

@@ -9,7 +9,7 @@
  * Never imports from or modifies any other journal entry file.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -34,7 +34,8 @@ import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useTodaySmokeJournal, useProfile } from '@/application/store';
+import { useStore } from '@/application/store';
+import { JournalSequenceBanner, useJournalSequence } from '@/presentation/hooks/useJournalSequence';
 import { SMOKING_TRIGGERS, formatMoneyInput, parseMoneyInput, formatMoney, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
@@ -244,39 +245,51 @@ function ConfirmModal({ visible, onConfirm, onCancel }: {
 export default function SmokeJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
-  const addJournal = useStore((s) => s.addJournal);
-  const profile = useProfile();
+  const journalSequence = useJournalSequence('smoking', safeBack);
+  const { sequence, profile, todayJournal, submitJournal, finishSection, clearDraft } = journalSequence;
+  const draft = sequence ? journalSequence.draft ?? {} : {};
   const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const insets   = useSafeAreaInsets();
 
-  const todayJournal     = useTodaySmokeJournal();
   const alreadySubmitted = todayJournal != null;
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const submitting = useRef(false);
 
   // ── Form state ──────────────────────────────────────────────────────────
-  const [smoked,        setSmoked]        = useState<boolean | null>(null);
-  const [moneyBalance,  setMoneyBalance]  = useState('');
-  const [didSmokeSpend, setDidSmokeSpend] = useState<boolean | null>(null);
-  const [smokeSpendAmount, setSmokeSpendAmount] = useState('');
-  const [mood,          setMood]          = useState(5);
-  const [urgeIntensity, setUrgeIntensity] = useState(3);
-  const [whatHelped,    setWhatHelped]    = useState('');
-  const [reflection,    setReflection]    = useState('');
-  const [smokedCount,   setSmokedCount]   = useState('');
-  const [smokedType,    setSmokedType]    = useState<SmokeTypeOption | null>(null);
-  const [emotions,      setEmotions]      = useState<EmotionOption[]>([]);
-  const [triggerRelapse, setTriggerRelapse] = useState<string | null>(null);
-  const [nextTimePlan,  setNextTimePlan]  = useState('');
+  const [smoked,        setSmoked]        = useState<boolean | null>(() => typeof draft.smoked === 'boolean' ? draft.smoked : null);
+  const [moneyBalance,  setMoneyBalance]  = useState(() => typeof draft.moneyBalance === 'string' ? draft.moneyBalance : '');
+  const [didSmokeSpend, setDidSmokeSpend] = useState<boolean | null>(() => typeof draft.didSmokeSpend === 'boolean' ? draft.didSmokeSpend : null);
+  const [smokeSpendAmount, setSmokeSpendAmount] = useState(() => typeof draft.smokeSpendAmount === 'string' ? draft.smokeSpendAmount : '');
+  const [mood,          setMood]          = useState(() => typeof draft.mood === 'number' ? draft.mood : 5);
+  const [urgeIntensity, setUrgeIntensity] = useState(() => typeof draft.urgeIntensity === 'number' ? draft.urgeIntensity : 3);
+  const [whatHelped,    setWhatHelped]    = useState(() => typeof draft.whatHelped === 'string' ? draft.whatHelped : '');
+  const [reflection,    setReflection]    = useState(() => typeof draft.reflection === 'string' ? draft.reflection : '');
+  const [smokedCount,   setSmokedCount]   = useState(() => typeof draft.smokedCount === 'string' ? draft.smokedCount : '');
+  const [smokedType,    setSmokedType]    = useState<SmokeTypeOption | null>(() => typeof draft.smokedType === 'string' ? draft.smokedType as SmokeTypeOption : null);
+  const [emotions,      setEmotions]      = useState<EmotionOption[]>(() => Array.isArray(draft.emotions) ? draft.emotions as EmotionOption[] : []);
+  const [triggerRelapse, setTriggerRelapse] = useState<string | null>(() => typeof draft.triggerRelapse === 'string' ? draft.triggerRelapse : null);
+  const [nextTimePlan,  setNextTimePlan]  = useState(() => typeof draft.nextTimePlan === 'string' ? draft.nextTimePlan : '');
 
   // ── Step management ─────────────────────────────────────────────────────
-  const [stepIdx, setStepIdx] = useState(0);
-  const frozenSteps = useRef<StepId[] | null>(null);
+  const [stepIdx, setStepIdx] = useState(() => typeof draft.stepIdx === 'number' ? draft.stepIdx : 0);
+  const frozenSteps = useRef<StepId[] | null>(smoked !== null ? buildSteps(smoked, didSmokeSpend) : null);
   const steps       = frozenSteps.current ?? buildSteps(null);
-  const currentStep = steps[stepIdx];
+  const safeStepIdx = Math.min(stepIdx, Math.max(0, steps.length - 1));
+  const currentStep = steps[safeStepIdx];
   const totalSteps  = steps.length;
-  const isLastStep  = stepIdx === (frozenSteps.current ?? steps).length - 1;
+  const isLastStep  = safeStepIdx === (frozenSteps.current ?? steps).length - 1;
+
+  useEffect(() => {
+    if (!sequence) return;
+    journalSequence.saveDraft({
+      smoked, moneyBalance, didSmokeSpend, smokeSpendAmount, mood, urgeIntensity,
+      whatHelped, reflection, smokedCount, smokedType, emotions, triggerRelapse,
+      nextTimePlan, stepIdx: safeStepIdx,
+    });
+  }, [sequence, smoked, moneyBalance, didSmokeSpend, smokeSpendAmount, mood,
+    urgeIntensity, whatHelped, reflection, smokedCount, smokedType, emotions,
+    triggerRelapse, nextTimePlan, safeStepIdx]);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   function slide(dir: 'forward' | 'back', cb: () => void) {
@@ -336,7 +349,7 @@ export default function SmokeJournalEntry() {
     const smokeSpend = smoked === true && didSmokeSpend === true ? parseFloat(smokeSpendAmount.replace(/,/g, '')) || 0 : 0;
     const remainingMoney = Math.max(0, balance - smokeSpend);
 
-    addJournal({
+    submitJournal({
       smoked: smoked === true,
       text: reflection.trim() || (smoked === true ? 'Smoking relapse recorded.' : 'Clean day recorded.'),
       mood,
@@ -353,8 +366,9 @@ export default function SmokeJournalEntry() {
       smokeNextTimePlan: smoked === true && nextTimePlan.trim() ? nextTimePlan.trim() : undefined,
     });
 
+    clearDraft();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    safeBack();
+    finishSection();
   }
 
   // ── Already-submitted gate ───────────────────────────────────────────────
@@ -738,6 +752,8 @@ export default function SmokeJournalEntry() {
           {stepIdx + 1} of {totalSteps}
         </Text>
       </View>
+
+      {sequence ? <JournalSequenceBanner addiction="smoking" /> : null}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

@@ -9,7 +9,7 @@
  * Never imports from or modifies any other journal entry file.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -34,7 +34,8 @@ import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation, fonts } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useProfile, useTodayGamingJournal } from '@/application/store';
+import { useStore } from '@/application/store';
+import { JournalSequenceBanner, useJournalSequence } from '@/presentation/hooks/useJournalSequence';
 import { GAMING_TRIGGERS, DEFAULT_CURRENCY, formatMoneyInput, parseMoneyInput, formatMoney, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
@@ -276,40 +277,52 @@ function ConfirmModal({ visible, onConfirm, onCancel }: {
 export default function GameJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
-  const profile  = useProfile();
-  const addJournal = useStore((s) => s.addJournal);
+  const journalSequence = useJournalSequence('gaming', safeBack);
+  const { sequence, profile, todayJournal, submitJournal, finishSection, clearDraft } = journalSequence;
+  const draft = sequence ? journalSequence.draft ?? {} : {};
   const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const insets   = useSafeAreaInsets();
 
-  const todayJournal     = useTodayGamingJournal();
   const alreadySubmitted = todayJournal != null;
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const submitting = useRef(false);
 
   // ── Form state ──────────────────────────────────────────────────────────
-  const [played,         setPlayed]         = useState<boolean | null>(null);
-  const [moneyBalance,   setMoneyBalance]   = useState('');
-  const [didGamingSpend, setDidGamingSpend] = useState<boolean | null>(null);
-  const [gamingSpendAmount, setGamingSpendAmount] = useState('');
-  const [mood,           setMood]           = useState(5);
-  const [urgeIntensity,  setUrgeIntensity]  = useState(3);
-  const [whatHelped,     setWhatHelped]     = useState('');
-  const [reflection,     setReflection]     = useState('');
-  const [gamingHours,    setGamingHours]    = useState<HoursOption | null>(null);
-  const [gamingType,     setGamingType]     = useState<GamingTypeOption | null>(null);
-  const [emotions,       setEmotions]       = useState<EmotionOption[]>([]);
-  const [triggerRelapse, setTriggerRelapse] = useState<string | null>(null);
-  const [nextTimePlan,   setNextTimePlan]   = useState('');
-  const [feelingNow,     setFeelingNow]     = useState<FeelingNowOption | null>(null);
+  const [played,         setPlayed]         = useState<boolean | null>(() => typeof draft.played === 'boolean' ? draft.played : null);
+  const [moneyBalance,   setMoneyBalance]   = useState(() => typeof draft.moneyBalance === 'string' ? draft.moneyBalance : '');
+  const [didGamingSpend, setDidGamingSpend] = useState<boolean | null>(() => typeof draft.didGamingSpend === 'boolean' ? draft.didGamingSpend : null);
+  const [gamingSpendAmount, setGamingSpendAmount] = useState(() => typeof draft.gamingSpendAmount === 'string' ? draft.gamingSpendAmount : '');
+  const [mood,           setMood]           = useState(() => typeof draft.mood === 'number' ? draft.mood : 5);
+  const [urgeIntensity,  setUrgeIntensity]  = useState(() => typeof draft.urgeIntensity === 'number' ? draft.urgeIntensity : 3);
+  const [whatHelped,     setWhatHelped]     = useState(() => typeof draft.whatHelped === 'string' ? draft.whatHelped : '');
+  const [reflection,     setReflection]     = useState(() => typeof draft.reflection === 'string' ? draft.reflection : '');
+  const [gamingHours,    setGamingHours]    = useState<HoursOption | null>(() => typeof draft.gamingHours === 'string' ? draft.gamingHours as HoursOption : null);
+  const [gamingType,     setGamingType]     = useState<GamingTypeOption | null>(() => typeof draft.gamingType === 'string' ? draft.gamingType as GamingTypeOption : null);
+  const [emotions,       setEmotions]       = useState<EmotionOption[]>(() => Array.isArray(draft.emotions) ? draft.emotions as EmotionOption[] : []);
+  const [triggerRelapse, setTriggerRelapse] = useState<string | null>(() => typeof draft.triggerRelapse === 'string' ? draft.triggerRelapse : null);
+  const [nextTimePlan,   setNextTimePlan]   = useState(() => typeof draft.nextTimePlan === 'string' ? draft.nextTimePlan : '');
+  const [feelingNow,     setFeelingNow]     = useState<FeelingNowOption | null>(() => typeof draft.feelingNow === 'string' ? draft.feelingNow as FeelingNowOption : null);
 
   // ── Step management ─────────────────────────────────────────────────────
-  const [stepIdx, setStepIdx] = useState(0);
-  const frozenSteps = useRef<StepId[] | null>(null);
+  const [stepIdx, setStepIdx] = useState(() => typeof draft.stepIdx === 'number' ? draft.stepIdx : 0);
+  const frozenSteps = useRef<StepId[] | null>(played !== null ? buildSteps(played, didGamingSpend) : null);
   const steps       = frozenSteps.current ?? buildSteps(null);
-  const currentStep = steps[stepIdx];
+  const safeStepIdx = Math.min(stepIdx, Math.max(0, steps.length - 1));
+  const currentStep = steps[safeStepIdx];
   const totalSteps  = steps.length;
-  const isLastStep  = stepIdx === (frozenSteps.current ?? steps).length - 1;
+  const isLastStep  = safeStepIdx === (frozenSteps.current ?? steps).length - 1;
+
+  useEffect(() => {
+    if (!sequence) return;
+    journalSequence.saveDraft({
+      played, moneyBalance, didGamingSpend, gamingSpendAmount, mood,
+      urgeIntensity, whatHelped, reflection, gamingHours, gamingType, emotions,
+      triggerRelapse, nextTimePlan, feelingNow, stepIdx: safeStepIdx,
+    });
+  }, [sequence, played, moneyBalance, didGamingSpend, gamingSpendAmount, mood,
+    urgeIntensity, whatHelped, reflection, gamingHours, gamingType, emotions,
+    triggerRelapse, nextTimePlan, feelingNow, safeStepIdx]);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   function slide(dir: 'forward' | 'back', cb: () => void) {
@@ -369,7 +382,7 @@ export default function GameJournalEntry() {
     const gamingSpend = played === true && didGamingSpend === true ? parseFloat(gamingSpendAmount.replace(/,/g, '')) || 0 : 0;
     const remainingMoney = Math.max(0, balance - gamingSpend);
 
-    addJournal({
+    submitJournal({
       played: played === true,
       text: reflection.trim() || (played === true ? 'Gaming relapse recorded.' : 'Clean day recorded.'),
       mood,
@@ -387,8 +400,9 @@ export default function GameJournalEntry() {
       gamingFeelingNow: played === true && feelingNow ? feelingNow : undefined,
     });
 
+    clearDraft();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    safeBack();
+    finishSection();
   }
 
   // ── Already-submitted gate ───────────────────────────────────────────────
@@ -799,6 +813,8 @@ export default function GameJournalEntry() {
           {stepIdx + 1} of {totalSteps}
         </Text>
       </View>
+
+      {sequence ? <JournalSequenceBanner addiction="gaming" /> : null}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

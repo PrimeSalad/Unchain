@@ -61,7 +61,7 @@ export function OnboardingScreen() {
   const [index, setIndex] = useState(0);
   const [nickname, setNickname] = useState('');
   const [age, setAge] = useState('');
-  const [atype, setAType] = useState<AddictionType | null>(null);
+  const [atypes, setATypes] = useState<AddictionType[]>([]);
   const [detail, setDetail] = useState('');
   const [daysAgo, setDaysAgo] = useState(0);
   const [amount, setAmount] = useState('');
@@ -70,7 +70,15 @@ export function OnboardingScreen() {
   const [triggers, setTriggers] = useState<string[]>([]);
   const [reason, setReason] = useState('');
 
+  const atype = atypes[0] ?? null;
   const meta = atype ? addictionMeta(atype) : null;
+
+  const toggleAddiction = (addiction: AddictionType) => {
+    setATypes((current) => current.includes(addiction)
+      ? current.filter((item) => item !== addiction)
+      : [...current, addiction]);
+    setDetail('');
+  };
 
   const steps = useMemo<StepKey[]>(() => {
     const s: StepKey[] = ['welcome', 'identity', 'type', 'specific', 'lastUsed'];
@@ -92,6 +100,7 @@ export function OnboardingScreen() {
       name: nickname.trim() || 'Friend',
       age: age ? parseInt(age, 10) : undefined,
       addictionType: atype ?? 'other',
+      selectedAddictions: atypes.length ? atypes : ['other'],
       addictionDetail: detail.trim() || undefined,
       // Store as the LOCAL midnight of the day they last used.
       // e.g. daysAgo=6, today=July 7  →  startedAt = July 1 @ 00:00 local.
@@ -208,15 +217,15 @@ export function OnboardingScreen() {
         <View>
           <Text variant="title1">What are you overcoming?</Text>
           <Text variant="body" dim style={{ marginTop: spacing.sm, marginBottom: spacing.lg }}>
-            Choose the addiction you want to recover from.
+            Choose one or more. Each will keep its own recovery history.
           </Text>
           <Card padding={0}>
             {ADDICTIONS.map((a, i) => {
-              const active = atype === a.key;
+              const active = atypes.includes(a.key);
               return (
                 <Pressable
                   key={a.key}
-                  onPress={() => { setAType(a.key); setDetail(''); }}
+                  onPress={() => toggleAddiction(a.key)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   style={{
@@ -232,7 +241,12 @@ export function OnboardingScreen() {
               );
             })}
           </Card>
-          <Button label="Continue" onPress={next} disabled={!atype} full style={{ marginTop: spacing.xl }} />
+          <Text variant="footnote" dim style={{ marginTop: spacing.md }}>
+            {atypes.length === 0
+              ? 'Select at least one addiction to continue.'
+              : `${atypes.length} selected · ${addictionMeta(atypes[0]).label} will be active first.`}
+          </Text>
+          <Button label="Continue" onPress={next} disabled={atypes.length === 0} full style={{ marginTop: spacing.xl }} />
         </View>
       )}
 

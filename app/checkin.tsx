@@ -2,8 +2,8 @@
  * Daily Check-in gate.
  *
  * The journal IS the check-in. This screen either:
- *   1. Shows "already done today" if a journal entry exists for today, or
- *   2. Immediately redirects to the correct journal wizard for the user's
+ *   1. Shows "already done today" after all selected entries are complete, or
+ *   2. Immediately redirects to the multi-addiction journal sequence.
  *      addiction type (gambling → /journal-entry, porn → /porn-journal-entry,
  *      social_media → /social-journal-entry).
  *
@@ -23,47 +23,11 @@ import { Mascot } from '@/presentation/components/Mascot';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useProfile } from '@/application/store';
 import {
-  useTodayJournal,
-  useTodayPornJournal,
-  useTodaySocialJournal,
-  useTodaySmokeJournal,
-  useTodayAlcoholJournal,
-  useTodayDrugJournal,
-  useTodayGamingJournal,
+  useDailyJournalProgress,
+  useProfile,
+  useTodayJournalForAddiction,
 } from '@/application/store';
-import { addictionMeta } from '@/domain/gambling';
-
-/** Pick the right journal route for the user's addiction type. */
-function journalRoute(addictionType: string): string {
-  if (addictionType === 'pornography') return '/porn-journal-entry';
-  if (addictionType === 'social_media') return '/social-journal-entry';
-  if (addictionType === 'online_shopping') return '/online-shopping-journal-entry';
-  if (addictionType === 'smoking') return '/smoke-journal-entry';
-  if (addictionType === 'alcohol') return '/alcohol-journal-entry';
-  if (addictionType === 'drugs') return '/drug-journal-entry';
-  if (addictionType === 'gaming') return '/game-journal-entry';
-  return '/journal-entry';
-}
-
-/** Return today's journal entry for whichever addiction type is active. */
-function useTodayEntry(addictionType: string | undefined) {
-  const gambling = useTodayJournal();
-  const porn     = useTodayPornJournal();
-  const social   = useTodaySocialJournal();
-  const smoke    = useTodaySmokeJournal();
-  const alcohol  = useTodayAlcoholJournal();
-  const drugs    = useTodayDrugJournal();
-  const gaming   = useTodayGamingJournal();
-  if (addictionType === 'pornography') return porn;
-  if (addictionType === 'social_media') return social;
-  if (addictionType === 'smoking') return smoke;
-  if (addictionType === 'alcohol') return alcohol;
-  if (addictionType === 'drugs') return drugs;
-  if (addictionType === 'gaming') return gaming;
-  return gambling;
-}
 
 export default function CheckIn() {
   const theme    = useTheme();
@@ -72,16 +36,16 @@ export default function CheckIn() {
   const profile  = useProfile();
 
   const addictionType = profile?.addictionType ?? 'gambling';
-  const meta          = addictionMeta(addictionType as any);
-  const todayEntry    = useTodayEntry(addictionType);
-  const alreadyDone   = todayEntry != null;
+  const todayEntry    = useTodayJournalForAddiction(addictionType);
+  const journalProgress = useDailyJournalProgress();
+  const alreadyDone   = journalProgress.complete;
 
   // Redirect immediately when there is no entry yet.
   // useEffect so the component mounts first (router needs to be ready).
   useEffect(() => {
     if (!alreadyDone) {
       Haptics.selectionAsync().catch(() => {});
-      router.replace(journalRoute(addictionType) as any);
+      router.replace('/journal-sequence' as any);
     }
   }, [alreadyDone, addictionType, router]);
 
@@ -91,14 +55,19 @@ export default function CheckIn() {
       todayEntry?.gambled === true ||
       todayEntry?.watched === true ||
       todayEntry?.binged  === true ||
+      todayEntry?.smoked  === true ||
       todayEntry?.drank   === true ||
-      todayEntry?.played  === true;
+      todayEntry?.used    === true ||
+      todayEntry?.played  === true ||
+      todayEntry?.shopped === true ||
+      todayEntry?.otherActed === true;
 
     const accent  = isRelapse ? theme.color.danger : theme.color.success;
-    const timeStr = new Date(todayEntry!.at).toLocaleTimeString([], {
+    const recordedAt = todayEntry?.at ?? Date.now();
+    const timeStr = new Date(recordedAt).toLocaleTimeString([], {
       hour: '2-digit', minute: '2-digit',
     });
-    const dateStr = new Date(todayEntry!.at).toLocaleDateString('en-PH', {
+    const dateStr = new Date(recordedAt).toLocaleDateString('en-PH', {
       weekday: 'long', month: 'long', day: 'numeric',
     });
 

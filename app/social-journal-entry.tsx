@@ -9,7 +9,7 @@
  * Never imports from or modifies journal-entry.tsx or porn-journal-entry.tsx.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -34,7 +34,8 @@ import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useTodaySocialJournal } from '@/application/store';
+import { useTodaySocialJournal } from '@/application/store';
+import { JournalSequenceBanner, useJournalSequence } from '@/presentation/hooks/useJournalSequence';
 
 // ---------------------------------------------------------------------------
 // Step IDs
@@ -263,34 +264,42 @@ function ConfirmModal({ visible, onConfirm, onCancel }: {
 export default function SocialJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
-  const addJournal = useStore((s) => s.addJournal);
+  const journalSequence = useJournalSequence('social_media', safeBack);
   const insets   = useSafeAreaInsets();
 
-  const todayJournal     = useTodaySocialJournal();
+  const standaloneTodayJournal = useTodaySocialJournal();
+  const todayJournal = journalSequence.sequence ? journalSequence.todayJournal : standaloneTodayJournal;
   const alreadySubmitted = todayJournal != null;
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const submitting = useRef(false);
 
   // ── Form state ──────────────────────────────────────────────────────────
-  const [binged,       setBinged]       = useState<boolean | null>(null);
-  const [mood,         setMood]         = useState(5);
-  const [urgeIntensity, setUrgeIntensity] = useState(3);
-  const [whatHelped,   setWhatHelped]   = useState('');
-  const [reflection,   setReflection]   = useState('');
-  const [duration,     setDuration]     = useState<DurationOption | null>(null);
-  const [platforms,    setPlatforms]    = useState<PlatformOption[]>([]);
-  const [emotions,     setEmotions]     = useState<EmotionOption[]>([]);
-  const [trigger,      setTrigger]      = useState<TriggerOption | null>(null);
-  const [nextTimePlan, setNextTimePlan] = useState('');
+  const draft = journalSequence.draft;
+  const [binged, setBinged] = useState<boolean | null>(() => (draft?.binged as boolean | null | undefined) ?? null);
+  const [mood, setMood] = useState(() => (draft?.mood as number | undefined) ?? 5);
+  const [urgeIntensity, setUrgeIntensity] = useState(() => (draft?.urgeIntensity as number | undefined) ?? 3);
+  const [whatHelped, setWhatHelped] = useState(() => (draft?.whatHelped as string | undefined) ?? '');
+  const [reflection, setReflection] = useState(() => (draft?.reflection as string | undefined) ?? '');
+  const [duration, setDuration] = useState<DurationOption | null>(() => (draft?.duration as DurationOption | null | undefined) ?? null);
+  const [platforms, setPlatforms] = useState<PlatformOption[]>(() => (draft?.platforms as PlatformOption[] | undefined) ?? []);
+  const [emotions, setEmotions] = useState<EmotionOption[]>(() => (draft?.emotions as EmotionOption[] | undefined) ?? []);
+  const [trigger, setTrigger] = useState<TriggerOption | null>(() => (draft?.trigger as TriggerOption | null | undefined) ?? null);
+  const [nextTimePlan, setNextTimePlan] = useState(() => (draft?.nextTimePlan as string | undefined) ?? '');
 
   // ── Step management ─────────────────────────────────────────────────────
-  const [stepIdx, setStepIdx] = useState(0);
-  const frozenSteps = useRef<StepId[] | null>(null);
+  const [stepIdx, setStepIdx] = useState(() => (draft?.stepIdx as number | undefined) ?? 0);
+  const frozenSteps = useRef<StepId[] | null>(draft && binged !== null ? buildSteps(binged) : null);
   const steps       = frozenSteps.current ?? buildSteps(null);
   const currentStep = steps[stepIdx];
   const totalSteps  = steps.length;
   const isLastStep  = stepIdx === (frozenSteps.current ?? steps).length - 1;
+
+  useEffect(() => {
+    if (!journalSequence.sequence) return;
+    journalSequence.saveDraft({ binged, mood, urgeIntensity, whatHelped, reflection,
+      duration, platforms, emotions, trigger, nextTimePlan, stepIdx });
+  }, [binged, duration, emotions, journalSequence.sequence, mood, nextTimePlan, platforms, reflection, stepIdx, trigger, urgeIntensity, whatHelped]);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   function slide(dir: 'forward' | 'back', cb: () => void) {
@@ -333,7 +342,7 @@ export default function SocialJournalEntry() {
     submitting.current = true;
     setConfirmVisible(false);
 
-    addJournal({
+    journalSequence.submitJournal({
       binged: binged === true,
       text: reflection.trim() || (binged === true ? 'Social media binge recorded.' : 'Clean day recorded.'),
       mood,
@@ -345,9 +354,9 @@ export default function SocialJournalEntry() {
       bingeTrigger: binged === true && trigger ? trigger : undefined,
       bingeNextTimePlan: binged === true && nextTimePlan.trim() ? nextTimePlan.trim() : undefined,
     });
-
+    journalSequence.clearDraft();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    safeBack();
+    journalSequence.finishSection();
   }
 
   // ── Already-submitted gate ───────────────────────────────────────────────
@@ -598,6 +607,7 @@ export default function SocialJournalEntry() {
 
   return (
     <Screen scroll={false}>
+      {journalSequence.sequence ? <JournalSequenceBanner addiction="social_media" /> : null}
       {/* Header - back/close button + progress bar + step counter */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs, marginBottom: spacing.xl }}>
         <Pressable

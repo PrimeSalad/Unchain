@@ -7,7 +7,7 @@
  * No emoji anywhere.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/presentation/components/Screen';
@@ -32,7 +33,8 @@ import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
-import { useStore, useProfile, useTodayJournal } from '@/application/store';
+import { useProfile, useTodayJournal } from '@/application/store';
+import { JournalSequenceBanner, useJournalSequence } from '@/presentation/hooks/useJournalSequence';
 import { DEFAULT_CURRENCY, formatMoney, formatMoneyInput, parseMoneyInput } from '@/domain/gambling';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,10 +52,12 @@ type StepId =
   | 'reflection'
   | 'summary';
 
-function buildSteps(isGambling: boolean, gambled: boolean, lost: boolean | null): StepId[] {
+function buildSteps(isGambling: boolean, isOther: boolean, gambled: boolean, lost: boolean | null): StepId[] {
   const s: StepId[] = [];
-  if (isGambling) {
+  if (isGambling || isOther) {
     s.push('did_gamble');
+  }
+  if (isGambling) {
     // money_balance always follows did_gamble, regardless of whether the user
     // gambled. Financial tracking is independent of recovery status.
     s.push('money_balance');
@@ -335,16 +339,30 @@ function ConfirmModal({
 export default function JournalEntry() {
   const theme      = useTheme();
   const safeBack   = useSafeBack('/(tabs)/journal');
-  const profile    = useProfile();
-  const addJournal = useStore((s) => s.addJournal);
+  const params = useLocalSearchParams<{ addiction?: string }>();
+  const standaloneProfile = useProfile();
+  // The coordinator route is authoritative. The active profile is only a
+  // fallback for a standalone launch of this shared Gambling / Other wizard.
+  const targetType = params.addiction === 'other'
+    ? 'other' as const
+    : params.addiction === 'gambling'
+      ? 'gambling' as const
+      : standaloneProfile?.addictionType === 'other'
+        ? 'other' as const
+        : 'gambling' as const;
+  const journalSequence = useJournalSequence(targetType, safeBack);
+  const profile = journalSequence.sequence ? journalSequence.profile : standaloneProfile;
   const currency   = profile?.currency ?? DEFAULT_CURRENCY;
   const insets     = useSafeAreaInsets();
-  const isGambling = profile?.addictionType === 'gambling';
-  const isOther = profile?.addictionType === 'other';
+  const isGambling = targetType === 'gambling';
+  const isOther = targetType === 'other';
   const addictionName = isOther && profile?.addictionDetail ? profile.addictionDetail : null;
 
   // Block entry if user already submitted today
-  const todayJournal = useTodayJournal();
+  const standaloneTodayJournal = useTodayJournal();
+  const todayJournal = journalSequence.sequence || isOther
+    ? journalSequence.todayJournal
+    : standaloneTodayJournal;
   const alreadySubmitted = todayJournal != null;
 
   // Confirmation modal state
@@ -353,23 +371,34 @@ export default function JournalEntry() {
   // Debounce: prevent double-tap from firing commit twice
   const submitting = useRef(false);
 
-  const [gambled,       setGambled]       = useState<boolean | null>(null);
-  const [moneyBalance,  setMoneyBalance]  = useState('');
-  const [amountWagered, setAmountWagered] = useState('');
-  const [lost,          setLost]          = useState<boolean | null>(null);
-  const [amountLost,    setAmountLost]    = useState('');
-  const [whyOption,     setWhyOption]     = useState<WhyOption | null>(null);
-  const [whyOther,      setWhyOther]      = useState('');
-  const [mood,          setMood]          = useState(5);
-  const [notes,         setNotes]         = useState('');
+  const draft = journalSequence.draft;
+  const [gambled,       setGambled]       = useState<boolean | null>(() => (draft?.gambled as boolean | null | undefined) ?? null);
+  const [moneyBalance,  setMoneyBalance]  = useState(() => (draft?.moneyBalance as string | undefined) ?? '');
+  const [amountWagered, setAmountWagered] = useState(() => (draft?.amountWagered as string | undefined) ?? '');
+  const [lost,          setLost]          = useState<boolean | null>(() => (draft?.lost as boolean | null | undefined) ?? null);
+  const [amountLost,    setAmountLost]    = useState(() => (draft?.amountLost as string | undefined) ?? '');
+  const [whyOption,     setWhyOption]     = useState<WhyOption | null>(() => (draft?.whyOption as WhyOption | null | undefined) ?? null);
+  const [whyOther,      setWhyOther]      = useState(() => (draft?.whyOther as string | undefined) ?? '');
+  const [mood,          setMood]          = useState(() => (draft?.mood as number | undefined) ?? 5);
+  const [notes,         setNotes]         = useState(() => (draft?.notes as string | undefined) ?? '');
 
-  const [stepIdx, setStepIdx] = useState(0);
-  const frozenSteps = useRef<StepId[] | null>(null);
+  const [stepIdx, setStepIdx] = useState(() => (draft?.stepIdx as number | undefined) ?? 0);
+  const frozenSteps = useRef<StepId[] | null>(
+    draft && gambled !== null ? buildSteps(isGambling, isOther, gambled, lost) : null,
+  );
   // Default: show minimum possible path before user answers did_gamble.
   // For non-gambling users this is already the full path (no did_gamble step).
-  const steps       = frozenSteps.current ?? buildSteps(isGambling, false, null);
+  const steps       = frozenSteps.current ?? buildSteps(isGambling, isOther, false, null);
   const currentStep = steps[stepIdx];
   const totalSteps  = steps.length;
+
+  useEffect(() => {
+    if (!journalSequence.sequence) return;
+    journalSequence.saveDraft({
+      gambled, moneyBalance, amountWagered, lost, amountLost, whyOption,
+      whyOther, mood, notes, stepIdx,
+    });
+  }, [amountLost, amountWagered, gambled, journalSequence.sequence, lost, moneyBalance, mood, notes, stepIdx, whyOption, whyOther]);
 
   // Slide animation - clamped ±12px, no overflow:hidden needed
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -398,7 +427,7 @@ export default function JournalEntry() {
     // Freeze the step list the moment the user confirms did_gamble so the
     // progress bar denominator never changes mid-journey.
     if (currentStep === 'did_gamble' && frozenSteps.current === null) {
-      frozenSteps.current = buildSteps(isGambling, gambled === true, lost);
+      frozenSteps.current = buildSteps(isGambling, isOther, gambled === true, lost);
       if (gambled !== true) {
         setAmountWagered(''); setLost(null);
         setAmountLost('');    setWhyOption(null); setWhyOther('');
@@ -435,10 +464,12 @@ export default function JournalEntry() {
     setConfirmVisible(false);
 
     const whyText = whyOption === 'Other' ? whyOther.trim() : (whyOption ?? undefined);
-    addJournal({
-      gambled: gambled === true,
+    journalSequence.submitJournal({
+      ...(isOther ? { otherActed: gambled === true } : { gambled: gambled === true }),
       text: notes.trim() || (gambled === true
-        ? 'Gambling relapse recorded.'
+        ? isOther
+          ? `${addictionName ?? 'Custom habit'} relapse recorded.`
+          : 'Gambling relapse recorded.'
         : addictionName
           ? `${addictionName} - clean day recorded.`
           : 'Clean day recorded.'),
@@ -454,8 +485,9 @@ export default function JournalEntry() {
       // not affect recovery status, streak, or achievements.
       moneyBalance: moneyBalance.trim() ? parseFloat(moneyBalance.replace(/,/g, '')) || undefined : undefined,
     });
+    journalSequence.clearDraft();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    safeBack();
+    journalSequence.finishSection();
   }
 
   const isLastStep = stepIdx === (frozenSteps.current ?? steps).length - 1;
@@ -471,9 +503,10 @@ export default function JournalEntry() {
     const timeStr = todayJournal
       ? new Date(todayJournal.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
-    const accent = todayJournal?.gambled === true
+    const actedToday = isOther ? todayJournal?.otherActed : todayJournal?.gambled;
+    const accent = actedToday === true
       ? theme.color.danger
-      : todayJournal?.gambled === false
+      : actedToday === false
         ? theme.color.success
         : theme.color.primary;
 
@@ -573,7 +606,10 @@ export default function JournalEntry() {
       case 'did_gamble':
         return (
           <>
-            <StepHeading title="Did you gamble today?" subtitle="Be honest - this is just for you. No judgment here." />
+            <StepHeading
+              title={isOther ? `Did you return to ${addictionName ?? 'the habit'} today?` : 'Did you gamble today?'}
+              subtitle="Be honest - this is just for you. No judgment here."
+            />
             <YesNoToggle value={gambled} onChange={setGambled} yesLabel="Yes, I did" noLabel="No, I didn't" />
             {gambled === false && (
               <Card tone="successSoft" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, borderLeftWidth: 3, borderLeftColor: theme.color.success }}>
@@ -758,6 +794,8 @@ export default function JournalEntry() {
           {stepIdx + 1} of {totalSteps}
         </Text>
       </View>
+
+      {journalSequence.sequence ? <JournalSequenceBanner addiction={targetType} /> : null}
 
       {/* KeyboardAvoidingView wraps both the scroll area AND the action button
           so the button lifts above the keyboard when it appears. */}

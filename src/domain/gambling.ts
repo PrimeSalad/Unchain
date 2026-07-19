@@ -257,6 +257,8 @@ export interface RecoveryProfile {
   name: string;
   age?: number;
   addictionType: AddictionType;
+  /** All recovery tracks selected by the user. Missing on legacy profiles. */
+  selectedAddictions?: AddictionType[];
   addictionDetail?: string;
   /**
    * The LOCAL midnight timestamp of the day they last used.
@@ -294,7 +296,7 @@ const MS_PER_DAY = 86_400_000;
 export function currentStreakStart(
   profileStartedAt: number,
   relapses: Array<{ at: number }>,
-  journalEntries: Array<{ gambled?: boolean; watched?: boolean; drank?: boolean; smoked?: boolean; binged?: boolean; used?: boolean; played?: boolean; shopped?: boolean; at: number }>,
+  journalEntries: Array<{ gambled?: boolean; watched?: boolean; drank?: boolean; smoked?: boolean; binged?: boolean; used?: boolean; played?: boolean; shopped?: boolean; otherActed?: boolean; at: number }>,
 ): number {
   const relapseTimestamps: number[] = [
     ...relapses.map((r) => r.at),
@@ -306,7 +308,7 @@ export function currentStreakStart(
     // Drugs relapse: used === true
     // Gaming relapse: played === true
     // Online shopping relapse: shopped === true
-    ...journalEntries.filter((j) => j.gambled === true || j.watched === true || j.drank === true || j.smoked === true || j.binged === true || j.used === true || j.played === true || j.shopped === true).map((j) => j.at),
+    ...journalEntries.filter((j) => j.gambled === true || j.watched === true || j.drank === true || j.smoked === true || j.binged === true || j.used === true || j.played === true || j.shopped === true || j.otherActed === true).map((j) => j.at),
   ];
 
   if (relapseTimestamps.length === 0) {

@@ -7,7 +7,7 @@
  * Yes → did_watch → mood → watch duration → lead up → emotions before → trigger → next time plan → feeling now → summary (red day)
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -33,6 +33,7 @@ import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useTodayPornJournal, useProfile } from '@/application/store';
+import { JournalSequenceBanner, useJournalSequence } from '@/presentation/hooks/useJournalSequence';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 import { formatMoneyInput, parseMoneyInput, formatMoney, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
@@ -224,41 +225,51 @@ function ConfirmModal({ visible, onConfirm, onCancel }: { visible: boolean; onCo
 export default function PornJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
-  const addJournal = useStore((s) => s.addJournal);
-  const profile = useProfile();
+  const standaloneProfile = useProfile();
+  const journalSequence = useJournalSequence('pornography', safeBack);
+  const profile = journalSequence.sequence ? journalSequence.profile : standaloneProfile;
   const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const insets   = useSafeAreaInsets();
 
-  const todayJournal     = useTodayPornJournal();
+  const standaloneTodayJournal = useTodayPornJournal();
+  const todayJournal = journalSequence.sequence ? journalSequence.todayJournal : standaloneTodayJournal;
   const alreadySubmitted = todayJournal != null;
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const submitting = useRef(false);
 
   // ── Form state ─────────────────────────────────────────────────────────
-  const [watched,        setWatched]        = useState<boolean | null>(null);
-  const [moneyBalance,   setMoneyBalance]   = useState('');
-  const [didBuyPorn,     setDidBuyPorn]     = useState<boolean | null>(null);
-  const [pornSpendAmount, setPornSpendAmount] = useState('');
-  const [mood,           setMood]           = useState(5);
-  const [urgeIntensity,  setUrgeIntensity]  = useState(3);
-  const [cleanTriggers,  setCleanTriggers]  = useState<string[]>([]);
-  const [whatHelped,     setWhatHelped]     = useState('');
-  const [reflection,     setReflection]     = useState('');
-  const [durationOpt,    setDurationOpt]    = useState<DurationOption | null>(null);
-  const [leadUp,         setLeadUp]         = useState<LeadUpOption | null>(null);
-  const [emotions,       setEmotions]       = useState<EmotionOption[]>([]);
-  const [relapseTrigger, setRelapseTrigger] = useState<string | null>(null);
-  const [nextTimePlan,   setNextTimePlan]   = useState('');
-  const [feelingNow,     setFeelingNow]     = useState<FeelingNowOption | null>(null);
+  const draft = journalSequence.draft;
+  const [watched, setWatched] = useState<boolean | null>(() => (draft?.watched as boolean | null | undefined) ?? null);
+  const [moneyBalance, setMoneyBalance] = useState(() => (draft?.moneyBalance as string | undefined) ?? '');
+  const [didBuyPorn, setDidBuyPorn] = useState<boolean | null>(() => (draft?.didBuyPorn as boolean | null | undefined) ?? null);
+  const [pornSpendAmount, setPornSpendAmount] = useState(() => (draft?.pornSpendAmount as string | undefined) ?? '');
+  const [mood, setMood] = useState(() => (draft?.mood as number | undefined) ?? 5);
+  const [urgeIntensity, setUrgeIntensity] = useState(() => (draft?.urgeIntensity as number | undefined) ?? 3);
+  const [cleanTriggers, setCleanTriggers] = useState<string[]>(() => (draft?.cleanTriggers as string[] | undefined) ?? []);
+  const [whatHelped, setWhatHelped] = useState(() => (draft?.whatHelped as string | undefined) ?? '');
+  const [reflection, setReflection] = useState(() => (draft?.reflection as string | undefined) ?? '');
+  const [durationOpt, setDurationOpt] = useState<DurationOption | null>(() => (draft?.durationOpt as DurationOption | null | undefined) ?? null);
+  const [leadUp, setLeadUp] = useState<LeadUpOption | null>(() => (draft?.leadUp as LeadUpOption | null | undefined) ?? null);
+  const [emotions, setEmotions] = useState<EmotionOption[]>(() => (draft?.emotions as EmotionOption[] | undefined) ?? []);
+  const [relapseTrigger, setRelapseTrigger] = useState<string | null>(() => (draft?.relapseTrigger as string | null | undefined) ?? null);
+  const [nextTimePlan, setNextTimePlan] = useState(() => (draft?.nextTimePlan as string | undefined) ?? '');
+  const [feelingNow, setFeelingNow] = useState<FeelingNowOption | null>(() => (draft?.feelingNow as FeelingNowOption | null | undefined) ?? null);
 
   // ── Step management ────────────────────────────────────────────────────
-  const [stepIdx, setStepIdx]     = useState(0);
-  const frozenSteps               = useRef<StepId[] | null>(null);
+  const [stepIdx, setStepIdx] = useState(() => (draft?.stepIdx as number | undefined) ?? 0);
+  const frozenSteps = useRef<StepId[] | null>(draft && watched !== null ? buildSteps(watched, didBuyPorn) : null);
   const steps                     = frozenSteps.current ?? buildSteps(null);
   const currentStep               = steps[stepIdx];
   const totalSteps                = steps.length;
   const isLastStep                = stepIdx === (frozenSteps.current ?? steps).length - 1;
+
+  useEffect(() => {
+    if (!journalSequence.sequence) return;
+    journalSequence.saveDraft({ watched, moneyBalance, didBuyPorn, pornSpendAmount, mood,
+      urgeIntensity, cleanTriggers, whatHelped, reflection, durationOpt, leadUp,
+      emotions, relapseTrigger, nextTimePlan, feelingNow, stepIdx });
+  }, [cleanTriggers, didBuyPorn, durationOpt, emotions, feelingNow, journalSequence.sequence, leadUp, moneyBalance, mood, nextTimePlan, pornSpendAmount, reflection, relapseTrigger, stepIdx, urgeIntensity, watched, whatHelped]);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   function slide(dir: 'forward' | 'back', cb: () => void) {
@@ -317,7 +328,7 @@ export default function PornJournalEntry() {
     const pornSpend = watched === true && didBuyPorn === true ? parseFloat(pornSpendAmount.replace(/,/g, '')) || 0 : 0;
     const remainingMoney = Math.max(0, balance - pornSpend);
 
-    addJournal({
+    journalSequence.submitJournal({
       watched: watched === true,
       gambled: undefined,
       text: reflection.trim() || (watched === true ? 'Relapse recorded.' : 'Clean day recorded.'),
@@ -336,9 +347,9 @@ export default function PornJournalEntry() {
       nextTimePlan: watched === true && nextTimePlan.trim() ? nextTimePlan.trim() : undefined,
       feelingNow: watched === true && feelingNow ? feelingNow : undefined,
     });
-
+    journalSequence.clearDraft();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    safeBack();
+    journalSequence.finishSection();
   }
 
   // ── Already submitted gate ─────────────────────────────────────────────
@@ -699,6 +710,7 @@ export default function PornJournalEntry() {
 
   return (
     <Screen scroll={false}>
+      {journalSequence.sequence ? <JournalSequenceBanner addiction="pornography" /> : null}
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs, marginBottom: spacing.xl }}>
         <Pressable onPress={goBack} hitSlop={12} accessibilityRole="button" accessibilityLabel={stepIdx === 0 ? 'Close' : 'Back'}

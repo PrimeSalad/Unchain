@@ -30,13 +30,16 @@ import { useStore, useProfile, initialGames } from '@/application/store';
 import { shareCapturedContent } from '@/application/shareMedia';
 import {
   DEFAULT_CURRENCY,
+  ADDICTIONS,
   addictionMeta,
   currentStreakStart,
   formatMoney,
   streakDays,
   triggersForAddiction,
+  type AddictionType,
 } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
+import { normalizeSelectedAddictions } from '@/domain/multiAddiction';
 
 const BACKUP_MARKER = 'unchainly-backup';
 const LEGACY_BACKUP_MARKER = 'unchain-backup';
@@ -161,6 +164,14 @@ export function ProfileScreen() {
   const days = streakDays(currentStreakStart(profile.startedAt, relapses, journal));
   const meta = addictionMeta(profile.addictionType);
   const typeLabel = meta.label;
+  const selectedTracks = normalizeSelectedAddictions(profile.addictionType, profile.selectedAddictions);
+  const toggleRecoveryTrack = (addiction: AddictionType) => {
+    if (addiction === profile.addictionType) return;
+    const next = selectedTracks.includes(addiction)
+      ? selectedTracks.filter((item) => item !== addiction)
+      : [...selectedTracks, addiction];
+    update({ selectedAddictions: next });
+  };
   const initials = profile.name
     .split(/\s+/)
     .filter(Boolean)
@@ -353,10 +364,13 @@ export function ProfileScreen() {
       const s = useStore.getState();
       const backup = {
         app: BACKUP_MARKER,
-        version: 2,
+        version: 3,
         exportedAt: Date.now(),
         data: {
           profile: s.profile,
+          recoveryByAddiction: s.recoveryByAddiction,
+          dailyJournalPlan: s.dailyJournalPlan,
+          journalDrafts: s.journalDrafts,
           checkIns: s.checkIns,
           urges: s.urges,
           relapses: s.relapses,
@@ -432,7 +446,18 @@ export function ProfileScreen() {
         v && typeof v === 'object' && !Array.isArray(v) ? (v as T) : fallback;
       useStore.setState({
         onboarded: true,
-        profile: data.profile,
+        profile: {
+          ...data.profile,
+          selectedAddictions: normalizeSelectedAddictions(
+            data.profile.addictionType,
+            Array.isArray(data.profile.selectedAddictions) ? data.profile.selectedAddictions : undefined,
+          ),
+        },
+        recoveryByAddiction: obj(data.recoveryByAddiction, {}),
+        dailyJournalPlan: data.dailyJournalPlan && typeof data.dailyJournalPlan.day === 'string'
+          ? data.dailyJournalPlan
+          : null,
+        journalDrafts: obj(data.journalDrafts, {}),
         checkIns: arr(data.checkIns),
         urges: arr(data.urges),
         relapses: arr(data.relapses),
@@ -627,6 +652,40 @@ export function ProfileScreen() {
           </FlatGroup>
         </View>
 
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionTitle title="Recovery tracks" trailing={`${selectedTracks.length} selected`} />
+          <Text variant="footnote" dim style={{ marginBottom: spacing.md }}>
+            Changes apply to the next daily journal. Switch the active track from Home.
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {ADDICTIONS.map((addiction) => {
+              const selected = selectedTracks.includes(addiction.key);
+              const active = addiction.key === profile.addictionType;
+              return (
+                <Pressable
+                  key={addiction.key}
+                  onPress={() => toggleRecoveryTrack(addiction.key)}
+                  disabled={active}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected, disabled: active }}
+                  style={({ pressed }) => ({
+                    minHeight: 44, paddingHorizontal: spacing.md, borderRadius: radius.round,
+                    borderWidth: 1, borderColor: selected ? theme.color.primary : theme.color.hairline,
+                    backgroundColor: selected ? theme.color.primarySoft : theme.color.surface,
+                    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+                    opacity: pressed ? 0.72 : 1,
+                  })}
+                >
+                  {selected && <Ionicons name="checkmark" size={16} color={theme.color.primary} />}
+                  <Text variant="footnote" color={selected ? theme.color.primary : theme.color.text}>
+                    {addiction.label}{active ? ' · Active' : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
         {/* ── Recovery reason ── */}
         <View style={{ marginTop: spacing.xxl }}>

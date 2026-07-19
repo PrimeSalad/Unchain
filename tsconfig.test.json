@@ -9,5 +9,11 @@
     "strict": true,
     "esModuleInterop": true
   },
-  "files": ["src/domain/protection.ts", "src/domain/gambling.ts"]
+  "files": [
+    "src/domain/protection.ts",
+    "src/domain/gambling.ts",
+    "src/domain/records.ts",
+    "src/domain/multiAddiction.ts",
+    "src/domain/addictionJournal.ts"
+  ]
 }

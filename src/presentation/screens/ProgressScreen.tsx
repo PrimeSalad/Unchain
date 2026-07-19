@@ -187,6 +187,8 @@ export function ProgressScreen() {
         journalByDay.set(localMidnight(j.at), j.played);
       } else if (j.shopped !== undefined) {
         journalByDay.set(localMidnight(j.at), j.shopped);
+      } else if (j.otherActed !== undefined) {
+        journalByDay.set(localMidnight(j.at), j.otherActed);
       }
     });
 

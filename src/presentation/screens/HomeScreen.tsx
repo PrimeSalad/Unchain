@@ -11,12 +11,13 @@ import { StatTile } from '../components/StatTile';
 import { Mascot } from '../components/Mascot';
 import { DailyMissions } from '../components/DailyMissions';
 import { ProgressBar } from '../components/ProgressBar';
+import { ActionSheet } from '../components/ActionSheet';
 import { spacing, radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useNow } from '../hooks/useNow';
 import { useResponsive } from '../hooks/useResponsive';
 import { useReducedMotion } from '../hooks/useReducedMotion';
-import { useStore, useProfile } from '@/application/store';
+import { useStore, useProfile, useDailyJournalProgress } from '@/application/store';
 import {
   DEFAULT_CURRENCY,
   streakDays,
@@ -27,9 +28,10 @@ import {
   formatMoney,
   milestoneCrossed,
   recoveryFreeLabel,
+  addictionMeta,
+  type AddictionType,
 } from '@/domain/gambling';
 import type { TimelineType } from '@/domain/records';
-import { sameDay } from '@/domain/records';
 import { catchYourBreathAvailability } from '@/domain/catchYourBreath';
 import { cheersToChangeAvailability } from '@/domain/cheersToChange';
 import { QuoteFeed } from '../components/QuoteCards';
@@ -68,6 +70,7 @@ export function HomeScreen() {
   const [mascotActive, setMascotActive] = useState(true);
   const [showCatchPopup, setShowCatchPopup] = useState(false);
   const [showCheersPopup, setShowCheersPopup] = useState(false);
+  const [showAddictionPicker, setShowAddictionPicker] = useState(false);
   const [catchDismissed, setCatchDismissed] = useState(false);
   const [cheersDismissed, setCheersDismissed] = useState(false);
 
@@ -91,6 +94,8 @@ export function HomeScreen() {
   const blockedSites = useStore((s) => s.blockedSites);
   const lastCatchYourBreathAt = useStore((s) => s.lastCatchYourBreathAt);
   const lastCheersToChangeAt = useStore((s) => s.lastCheersToChangeAt);
+  const setActiveAddiction = useStore((s) => s.setActiveAddiction);
+  const journalProgress = useDailyJournalProgress();
 
   // Show Catch Your Breath popup when weekly assessment is available (smoking only)
   useFocusEffect(
@@ -139,9 +144,7 @@ export function HomeScreen() {
   // Auto-complete the daily_log mission the moment a journal entry exists
   // for today. Derived directly from the store (not from the ticking `now`)
   // so this effect only fires when the journal array actually changes.
-  const hasTodayJournal = useStore((s) =>
-    s.journal.some((j) => sameDay(j.at, Date.now())),
-  );
+  const hasTodayJournal = journalProgress.complete;
   const activityLimit = 4;
   const hasMoreActivity = timeline.length > activityLimit;
   const activityItems = showAllActivity ? timeline : timeline.slice(0, activityLimit);
@@ -169,6 +172,17 @@ export function HomeScreen() {
 
   if (!profile) return null;
 
+  const addictionChoices = profile.selectedAddictions?.length
+    ? profile.selectedAddictions
+    : [profile.addictionType];
+  const switchAddiction = (addiction: AddictionType) => {
+    Haptics.selectionAsync().catch(() => {});
+    setActiveAddiction(addiction);
+    setShowAddictionPicker(false);
+    setShowCatchPopup(false);
+    setShowCheersPopup(false);
+  };
+
   return (
     <Screen tabPadding>
       {/* Greeting */}
@@ -180,6 +194,24 @@ export function HomeScreen() {
           {greeting()}, {profile.name}
         </Text>
       </View>
+
+      <Pressable
+        onPress={() => setShowAddictionPicker(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`Active addiction: ${addictionMeta(profile.addictionType).label}`}
+        style={({ pressed }) => ({
+          minHeight: 52, marginTop: spacing.lg, paddingHorizontal: spacing.lg,
+          borderRadius: radius.input, borderWidth: 1, borderColor: theme.color.hairline,
+          backgroundColor: theme.color.surface, flexDirection: 'row', alignItems: 'center',
+          opacity: pressed ? 0.78 : 1,
+        })}
+      >
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="caption" dim style={{ textTransform: 'uppercase' }}>Active addiction</Text>
+          <Text variant="callout" color={theme.color.primary}>{addictionMeta(profile.addictionType).label}</Text>
+        </View>
+        <Ionicons name="chevron-down" size={20} color={theme.color.primary} />
+      </Pressable>
 
       <RecoveryHero
         days={days}
@@ -499,6 +531,39 @@ export function HomeScreen() {
           ))
         )}
       </View>
+
+      <ActionSheet visible={showAddictionPicker} onClose={() => setShowAddictionPicker(false)}>
+        <Text variant="title2">Switch recovery track</Text>
+        <Text variant="footnote" dim style={{ marginTop: spacing.xs, marginBottom: spacing.md }}>
+          This changes Home, Progress, and addiction-specific tools. Today’s journal still includes every selected track.
+        </Text>
+        <View style={{ gap: spacing.xs }}>
+          {addictionChoices.map((addiction) => {
+            const active = addiction === profile.addictionType;
+            const meta = addictionMeta(addiction);
+            return (
+              <Pressable
+                key={addiction}
+                onPress={() => switchAddiction(addiction)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => ({
+                  minHeight: 52, borderRadius: radius.input, paddingHorizontal: spacing.md,
+                  flexDirection: 'row', alignItems: 'center',
+                  backgroundColor: active ? theme.color.primarySoft : 'transparent',
+                  opacity: pressed ? 0.72 : 1,
+                })}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text variant="callout" color={active ? theme.color.primary : theme.color.text}>{meta.label}</Text>
+                  <Text variant="caption" dim>{active ? 'Currently active' : 'Switch to this track'}</Text>
+                </View>
+                <Ionicons name={active ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={active ? theme.color.primary : theme.color.textDim} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </ActionSheet>
 
       {/* ── Catch Your Breath weekly reminder popup (smoking only) ── */}
       {profile?.addictionType === 'smoking' && (

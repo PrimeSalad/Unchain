@@ -6,7 +6,7 @@
  * Yes → did_shop → amount_spent → where_shopped → emotions → trigger → next_time_plan → feeling_now → summary (red)
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -32,6 +32,7 @@ import { radius, spacing, elevation } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useStore, useTodayOnlineShoppingJournal, useProfile } from '@/application/store';
+import { JournalSequenceBanner, useJournalSequence } from '@/presentation/hooks/useJournalSequence';
 import { formatMoneyInput, parseMoneyInput, formatMoney, DEFAULT_CURRENCY, ONLINE_SHOPPING_TRIGGERS, SUPPORTED_CURRENCIES } from '@/domain/gambling';
 
 // ---------------------------------------------------------------------------
@@ -274,37 +275,46 @@ function ConfirmModal({ visible, onConfirm, onCancel }: {
 export default function OnlineShoppingJournalEntry() {
   const theme    = useTheme();
   const safeBack = useSafeBack('/(tabs)/journal');
-  const addJournal = useStore((s) => s.addJournal);
-  const profile = useProfile();
+  const standaloneProfile = useProfile();
+  const journalSequence = useJournalSequence('online_shopping', safeBack);
+  const profile = journalSequence.sequence ? journalSequence.profile : standaloneProfile;
   const currency = profile?.currency ?? DEFAULT_CURRENCY;
   const insets   = useSafeAreaInsets();
 
-  const todayJournal     = useTodayOnlineShoppingJournal();
+  const standaloneTodayJournal = useTodayOnlineShoppingJournal();
+  const todayJournal = journalSequence.sequence ? journalSequence.todayJournal : standaloneTodayJournal;
   const alreadySubmitted = todayJournal != null;
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const submitting = useRef(false);
 
   // Form state
-  const [shopped, setShopped]             = useState<boolean | null>(null);
-  const [moneyBalance, setMoneyBalance]   = useState('');
-  const [mood, setMood]                   = useState(5);
-  const [whatHelped, setWhatHelped]       = useState('');
-  const [reflection, setReflection]       = useState('');
-  const [amountSpent, setAmountSpent]     = useState('');
-  const [whereShopped, setWhereShopped]   = useState<ShopOption | null>(null);
-  const [emotions, setEmotions]           = useState<EmotionOption[]>([]);
-  const [trigger, setTrigger]             = useState<TriggerOption | null>(null);
-  const [nextTimePlan, setNextTimePlan]   = useState('');
-  const [feelingNow, setFeelingNow]       = useState('');
+  const draft = journalSequence.draft;
+  const [shopped, setShopped] = useState<boolean | null>(() => (draft?.shopped as boolean | null | undefined) ?? null);
+  const [moneyBalance, setMoneyBalance] = useState(() => (draft?.moneyBalance as string | undefined) ?? '');
+  const [mood, setMood] = useState(() => (draft?.mood as number | undefined) ?? 5);
+  const [whatHelped, setWhatHelped] = useState(() => (draft?.whatHelped as string | undefined) ?? '');
+  const [reflection, setReflection] = useState(() => (draft?.reflection as string | undefined) ?? '');
+  const [amountSpent, setAmountSpent] = useState(() => (draft?.amountSpent as string | undefined) ?? '');
+  const [whereShopped, setWhereShopped] = useState<ShopOption | null>(() => (draft?.whereShopped as ShopOption | null | undefined) ?? null);
+  const [emotions, setEmotions] = useState<EmotionOption[]>(() => (draft?.emotions as EmotionOption[] | undefined) ?? []);
+  const [trigger, setTrigger] = useState<TriggerOption | null>(() => (draft?.trigger as TriggerOption | null | undefined) ?? null);
+  const [nextTimePlan, setNextTimePlan] = useState(() => (draft?.nextTimePlan as string | undefined) ?? '');
+  const [feelingNow, setFeelingNow] = useState(() => (draft?.feelingNow as string | undefined) ?? '');
 
   // Step management
-  const [stepIdx, setStepIdx] = useState(0);
-  const frozenSteps = useRef<StepId[] | null>(null);
+  const [stepIdx, setStepIdx] = useState(() => (draft?.stepIdx as number | undefined) ?? 0);
+  const frozenSteps = useRef<StepId[] | null>(draft && shopped !== null ? buildSteps(shopped) : null);
   const steps       = frozenSteps.current ?? buildSteps(null);
   const currentStep = steps[stepIdx];
   const totalSteps  = steps.length;
   const isLastStep  = stepIdx === (frozenSteps.current ?? steps).length - 1;
+
+  useEffect(() => {
+    if (!journalSequence.sequence) return;
+    journalSequence.saveDraft({ shopped, moneyBalance, mood, whatHelped, reflection,
+      amountSpent, whereShopped, emotions, trigger, nextTimePlan, feelingNow, stepIdx });
+  }, [amountSpent, emotions, feelingNow, journalSequence.sequence, moneyBalance, mood, nextTimePlan, reflection, shopped, stepIdx, trigger, whatHelped, whereShopped]);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   function slide(dir: 'forward' | 'back', cb: () => void) {
@@ -354,7 +364,7 @@ export default function OnlineShoppingJournalEntry() {
     const spent = shopped === true ? numericValue(amountSpent) : 0;
     const remainingMoney = Math.max(0, balance - spent);
 
-    addJournal({
+    journalSequence.submitJournal({
       shopped: shopped === true,
       text: reflection.trim() || (shopped === true ? 'Online shopping relapse recorded.' : 'Clean day recorded.'),
       mood,
@@ -369,8 +379,9 @@ export default function OnlineShoppingJournalEntry() {
       shopFeelingNow: shopped === true ? feelingNow.trim() || undefined : undefined,
       shopWhatHelped: shopped === false ? whatHelped.trim() || undefined : undefined,
     });
+    journalSequence.clearDraft();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    safeBack();
+    journalSequence.finishSection();
   }
 
   const inputStyle = {
@@ -599,6 +610,7 @@ export default function OnlineShoppingJournalEntry() {
 
   return (
     <Screen scroll={false}>
+      {journalSequence.sequence ? <JournalSequenceBanner addiction="online_shopping" /> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs, marginBottom: spacing.xl }}>
         <Pressable onPress={goBack} hitSlop={12} accessibilityRole="button" accessibilityLabel={stepIdx === 0 ? 'Close' : 'Back'}
           style={({ pressed }) => ({ width: 40, height: 40, borderRadius: radius.round, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
