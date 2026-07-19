@@ -14,6 +14,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import { useRouter } from 'expo-router';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
 import { Button } from '@/presentation/components/Button';
+import { ActionSheet } from '@/presentation/components/ActionSheet';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
@@ -115,6 +117,8 @@ function ProgressRing({ progress, size, label, value, color }: {
 
 export default function FuelYourRecovery() {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const compact = width < 360;
   const router = useRouter();
   const safeBack = useSafeBack();
 
@@ -578,7 +582,10 @@ export default function FuelYourRecovery() {
           style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1, marginRight: spacing.md })}>
           <Ionicons name="chevron-back" size={20} color={theme.color.primary} />
         </Pressable>
-        <Text variant="title1" style={{ flex: 1, fontFamily: 'Nunito_900Black' }}>Fuel Your Recovery</Text>
+        <View style={{ flex: 1 }}>
+          <Text variant="headline" style={{ fontFamily: 'Nunito_800ExtraBold' }}>Fuel Your Recovery</Text>
+          <Text variant="caption" dim>Today’s nutrition at a glance</Text>
+        </View>
         <Pressable onPress={() => setShowGoalsModal(true)} hitSlop={12}
           style={({ pressed }) => ({ padding: spacing.xs, opacity: pressed ? 0.5 : 1 })}>
           <Ionicons name="settings-outline" size={22} color={theme.color.textDim} />
@@ -587,6 +594,30 @@ export default function FuelYourRecovery() {
           hitSlop={12} style={({ pressed }) => ({ marginLeft: spacing.md, opacity: pressed ? 0.5 : 1, padding: spacing.xs })}>
           <Ionicons name="add-circle-outline" size={24} color={theme.color.primary} />
         </Pressable>
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
+        {[
+          { label: 'Log meal', icon: 'restaurant-outline', color: theme.color.primary, onPress: () => setShowFoodModal(true) },
+          { label: 'Add water', icon: 'water-outline', color: '#4A6FA5', onPress: () => setShowWaterModal(true) },
+          { label: activeFast ? 'View fast' : 'Fasting', icon: 'timer-outline', color: activeFast ? theme.color.success : theme.color.celebrateText, onPress: () => setShowFastModal(true) },
+        ].map((action) => (
+          <Pressable
+            key={action.label}
+            onPress={() => { Haptics.selectionAsync().catch(() => {}); action.onPress(); }}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            style={({ pressed }) => ({
+              flex: 1, minHeight: 68, borderRadius: radius.input,
+              alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+              backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline,
+              opacity: pressed ? 0.72 : 1,
+            })}
+          >
+            <Ionicons name={action.icon as any} size={20} color={action.color} />
+            <Text variant="caption" color={action.color} center>{action.label}</Text>
+          </Pressable>
+        ))}
       </View>
 
       {/* ── Calorie summary ───────────────────────────────────────────── */}
@@ -609,10 +640,10 @@ export default function FuelYourRecovery() {
       </View>
 
       {/* ── Water + Fasting (side by side) ──────────────────────────────── */}
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+      <View style={{ flexDirection: compact ? 'column' : 'row', gap: spacing.sm, marginBottom: spacing.md }}>
         {/* Water tracker */}
         <View style={{
-          flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card,
+          flex: compact ? undefined : 1, width: compact ? '100%' : undefined, backgroundColor: theme.color.surface, borderRadius: radius.card,
           borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.md,
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
@@ -644,7 +675,7 @@ export default function FuelYourRecovery() {
 
         {/* Fasting tracker */}
         <View style={{
-          flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card,
+          flex: compact ? undefined : 1, width: compact ? '100%' : undefined, backgroundColor: theme.color.surface, borderRadius: radius.card,
           borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.md,
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
@@ -748,11 +779,19 @@ export default function FuelYourRecovery() {
                     borderWidth: 1, borderColor: theme.color.hairline,
                     padding: spacing.md, marginBottom: spacing.xs,
                   }}>
+                    <View style={{ width: 40, height: 40, borderRadius: radius.input, backgroundColor: meal.color + '16', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={meal.icon as any} size={18} color={meal.color} />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>{entry.name}</Text>
                       <Text variant="caption" dim style={{ marginTop: 2 }}>
-                        {fmtTime(entry.at)} · {entry.protein}g protein · {entry.carbs}g carbs
+                        {fmtTime(entry.at)} · {entry.servingSize}
                       </Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs }}>
+                        <Text variant="caption" color={theme.color.success}>{entry.protein}g protein</Text>
+                        <Text variant="caption" dim>{entry.fat}g fat</Text>
+                        <Text variant="caption" dim>{entry.fiber}g fiber</Text>
+                      </View>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text variant="callout" color={theme.color.primary} style={{ fontFamily: 'Nunito_800ExtraBold' }}>{entry.calories}</Text>
@@ -767,57 +806,76 @@ export default function FuelYourRecovery() {
       )}
 
       {/* ── Food logging modal ──────────────────────────────────────────── */}
-      <Modal visible={showFoodModal} transparent animationType="slide" onRequestClose={() => setShowFoodModal(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setShowFoodModal(false)} />
-          <View style={{
-            backgroundColor: theme.color.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet,
-            padding: spacing.xl, paddingBottom: 40, maxHeight: '85%',
-          }}>
-            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.color.hairline, alignSelf: 'center', marginBottom: spacing.lg }} />
-            <Text variant="headline" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.lg }}>Log Meal</Text>
+      <ActionSheet visible={showFoodModal} onClose={() => setShowFoodModal(false)}>
+        <View style={{ gap: spacing.lg }}>
+          <View>
+            <Text variant="headline" style={{ fontFamily: 'Nunito_800ExtraBold' }}>Log a meal</Text>
+            <Text variant="caption" dim style={{ marginTop: spacing.xs }}>Add only what you know. You can leave any nutrition field at zero.</Text>
+          </View>
 
-            {/* Meal category */}
-            <Text variant="caption" dim style={{ marginBottom: spacing.xs }}>Category</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          <View>
+            <Text variant="caption" dim style={{ marginBottom: spacing.sm }}>Meal</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
               {(['breakfast', 'lunch', 'dinner', 'snack'] as MealCategory[]).map((cat) => (
                 <Pressable key={cat} onPress={() => setFoodCategory(cat)}
                   style={({ pressed }) => ({
-                    flex: 1, height: 36, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
+                    minWidth: 88, height: 40, paddingHorizontal: spacing.md, borderRadius: radius.round,
+                    flexDirection: 'row', gap: spacing.xs, alignItems: 'center', justifyContent: 'center',
                     backgroundColor: foodCategory === cat ? theme.color.primary : theme.color.surfaceAlt,
+                    borderWidth: 1, borderColor: foodCategory === cat ? theme.color.primary : theme.color.hairline,
                     opacity: pressed ? 0.8 : 1,
                   })}>
-                  <Text variant="caption" color={foodCategory === cat ? '#FFFFFF' : theme.color.text} style={{ fontFamily: 'Nunito_700Bold', textTransform: 'capitalize' }}>{cat}</Text>
+                  <Ionicons name={mealIcons[cat].icon as any} size={14} color={foodCategory === cat ? theme.color.onPrimary : mealIcons[cat].color} />
+                  <Text variant="caption" color={foodCategory === cat ? theme.color.onPrimary : theme.color.text} style={{ textTransform: 'capitalize' }}>{cat}</Text>
                 </Pressable>
               ))}
-            </View>
+            </ScrollView>
+          </View>
 
-            {/* Food name */}
-            <TextInput value={foodName} onChangeText={setFoodName} placeholder="Food name" placeholderTextColor={theme.color.textDim}
-              style={{ backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md, color: theme.color.text, fontSize: 16, marginBottom: spacing.md }} />
+          <View>
+            <Text variant="caption" dim style={{ marginBottom: spacing.xs }}>Food name</Text>
+            <TextInput
+              value={foodName}
+              onChangeText={setFoodName}
+              placeholder="e.g. Chicken rice bowl"
+              placeholderTextColor={theme.color.textDim}
+              returnKeyType="next"
+              style={{ minHeight: 52, backgroundColor: theme.color.surfaceAlt, borderRadius: radius.input, borderWidth: 1, borderColor: theme.color.hairline, paddingHorizontal: spacing.md, color: theme.color.text, fontSize: 16 }}
+            />
+          </View>
 
-            {/* Macros row */}
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          <View>
+            <Text variant="caption" dim style={{ marginBottom: spacing.sm }}>Nutrition</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
               {[
-                { label: 'Cal', value: foodCalories, set: setFoodCalories, color: theme.color.primary },
-                { label: 'Protein', value: foodProtein, set: setFoodProtein, color: theme.color.success },
-                { label: 'Carbs', value: foodCarbs, set: setFoodCarbs, color: theme.color.primary },
-                { label: 'Fat', value: foodFat, set: setFoodFat, color: theme.color.accentText },
-                { label: 'Fiber', value: foodFiber, set: setFoodFiber, color: theme.color.celebrateText },
-              ].map((f) => (
-                <View key={f.label} style={{ flex: 1 }}>
-                  <Text variant="caption" dim style={{ marginBottom: 2 }}>{f.label}</Text>
-                  <TextInput value={f.value} onChangeText={f.set} keyboardType="numeric" placeholder="0" placeholderTextColor={theme.color.textDim}
-                    style={{ backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.sm, color: theme.color.text, fontSize: 14, textAlign: 'center' }} />
+                { label: 'Calories', unit: 'cal', value: foodCalories, set: setFoodCalories, color: theme.color.primary },
+                { label: 'Protein', unit: 'g', value: foodProtein, set: setFoodProtein, color: theme.color.success },
+                { label: 'Carbs', unit: 'g', value: foodCarbs, set: setFoodCarbs, color: '#4A6FA5' },
+                { label: 'Fat', unit: 'g', value: foodFat, set: setFoodFat, color: theme.color.accentText },
+                { label: 'Fiber', unit: 'g', value: foodFiber, set: setFoodFiber, color: theme.color.celebrateText },
+              ].map((field) => (
+                <View key={field.label} style={{ width: compact ? '100%' : '48%', minWidth: 0 }}>
+                  <Text variant="caption" color={field.color} style={{ marginBottom: spacing.xs }}>{field.label} ({field.unit})</Text>
+                  <TextInput
+                    value={field.value}
+                    onChangeText={field.set}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={theme.color.textDim}
+                    selectTextOnFocus
+                    style={{ minHeight: 48, backgroundColor: theme.color.surfaceAlt, borderRadius: radius.input, borderWidth: 1, borderColor: theme.color.hairline, paddingHorizontal: spacing.md, color: theme.color.text, fontSize: 16 }}
+                  />
                 </View>
               ))}
             </View>
+          </View>
 
-            <Button label="Save Meal" onPress={submitFood} disabled={!foodName.trim()} full />
-            <Button label="Cancel" kind="tertiary" onPress={() => setShowFoodModal(false)} full style={{ marginTop: spacing.sm }} />
+          <View style={{ gap: spacing.sm }}>
+            <Button label="Save meal" onPress={submitFood} disabled={!foodName.trim()} full />
+            <Button label="Cancel" kind="tertiary" onPress={() => setShowFoodModal(false)} full />
           </View>
         </View>
-      </Modal>
+      </ActionSheet>
 
       {/* ── Water modal ─────────────────────────────────────────────────── */}
       <Modal visible={showWaterModal} transparent animationType="slide" onRequestClose={() => setShowWaterModal(false)}>

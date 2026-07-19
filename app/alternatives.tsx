@@ -697,9 +697,10 @@ function ChipRow<T extends number>({
             accessibilityLabel={format(o)}
             accessibilityState={{ selected: on }}
             style={({ pressed }) => ({
-              flex: 1, height: 40, borderRadius: radius.round,
+              flex: 1, minHeight: 44, borderRadius: radius.input,
               alignItems: 'center', justifyContent: 'center',
               backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
+              borderWidth: 1, borderColor: on ? theme.color.primary : theme.color.hairline,
               opacity: pressed ? 0.8 : 1,
             })}
           >
@@ -770,6 +771,16 @@ function StretchSheet({
     });
   }, [finish]);
 
+  const goPrevious = useCallback(() => {
+    setStepIdx((current) => {
+      if (current <= 0) return current;
+      Haptics.selectionAsync().catch(() => {});
+      endAtRef.current = Date.now() + perStepRef.current * 1000;
+      setRemaining(perStepRef.current);
+      return current - 1;
+    });
+  }, []);
+
   useEffect(() => {
     if (phase !== 'running') return;
     const id = setInterval(() => {
@@ -820,8 +831,18 @@ function StretchSheet({
         <View style={{ gap: spacing.lg }}>
           <SheetHeading
             title="Stretch Your Body"
-            subtitle="Build your own routine - pick how many stretches and how long each one runs."
+            subtitle="Create a short guided routine that fits the time and energy you have right now."
           />
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: theme.color.primarySoft, borderRadius: radius.card, padding: spacing.md }}>
+            <View style={{ width: 44, height: 44, borderRadius: radius.input, backgroundColor: theme.color.surface, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="body" size={22} color={theme.color.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="callout" color={theme.color.primary}>{count}-stretch routine</Text>
+              <Text variant="caption" dim>About {estMinutes} minute{estMinutes === 1 ? '' : 's'} · {perStep} seconds each</Text>
+            </View>
+          </View>
 
           <View style={{ gap: spacing.sm }}>
             <Text variant="footnote" dim>How many stretches?</Text>
@@ -843,16 +864,23 @@ function StretchSheet({
             />
           </View>
 
-          <View
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-              backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md,
-            }}
-          >
-            <Ionicons name="shuffle" size={18} color={theme.color.primary} />
-            <Text variant="footnote" style={{ flex: 1, lineHeight: 19 }}>
-              {count} stretches · about {estMinutes} minute{estMinutes === 1 ? '' : 's'} - a fresh mix from {STRETCH_STEPS.length} moves
-            </Text>
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text variant="footnote" style={{ flex: 1 }}>Exercise library</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                <Ionicons name="shuffle" size={14} color={theme.color.primary} />
+                <Text variant="caption" color={theme.color.primary}>Mixed each session</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {STRETCH_STEPS.slice(0, 4).map((move) => (
+                <View key={move.title} style={{ width: '48%', minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.input, borderWidth: 1, borderColor: theme.color.hairline, paddingHorizontal: spacing.sm, backgroundColor: theme.color.surface }}>
+                  <Ionicons name={move.icon as any} size={16} color={theme.color.celebrateText} />
+                  <Text variant="caption" style={{ flex: 1 }}>{move.title}</Text>
+                </View>
+              ))}
+            </View>
+            <Text variant="caption" dim>Plus {STRETCH_STEPS.length - 4} more gentle movements in the library.</Text>
           </View>
 
           <View style={{ gap: spacing.sm }}>
@@ -861,29 +889,48 @@ function StretchSheet({
           </View>
         </View>
       ) : step == null ? null : (
-        <View style={{ gap: spacing.md, alignItems: 'center' }}>
-          <SheetHeading title={step.title} />
-          {/* Animated demo - move along with the figure. */}
-          <StretchFigure title={step.title} size={132} />
-          <Text variant="footnote" dim center style={{ lineHeight: 19, paddingHorizontal: spacing.sm }}>
-            {step.instruction}
-          </Text>
-          <Text
-            variant="display"
-            style={{ fontSize: 40, lineHeight: 46, fontVariant: ['tabular-nums'] }}
-            accessibilityLabel={`${remaining} seconds remaining`}
-          >
-            {fmtClock(remaining)}
-          </Text>
-          <View style={{ alignSelf: 'stretch', gap: spacing.sm }}>
-            <ProgressBar progress={overall} height={8} />
-            <Text variant="caption" dim center style={{ fontVariant: ['tabular-nums'] }}>
-              Stretch {stepIdx + 1} of {routine.length}
-            </Text>
+        <View style={{ gap: spacing.lg }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="caption" color={theme.color.primary} style={{ textTransform: 'uppercase' }}>Stretch {stepIdx + 1} of {routine.length}</Text>
+              <Text variant="title2" style={{ marginTop: spacing.xs }}>{step.title}</Text>
+            </View>
+            <View style={{ minWidth: 76, alignItems: 'flex-end' }}>
+              <Text
+                variant="title1"
+                color={theme.color.primary}
+                style={{ fontVariant: ['tabular-nums'], fontFamily: 'Nunito_900Black' }}
+                accessibilityLabel={`${remaining} seconds remaining`}
+              >
+                {fmtClock(remaining)}
+              </Text>
+              <Text variant="caption" dim>remaining</Text>
+            </View>
           </View>
-          <View style={{ alignSelf: 'stretch', gap: spacing.sm }}>
-            <Button label="Next stretch" kind="secondary" onPress={advance} full />
-            <Button label="Cancel Session" kind="destructive" onPress={onClose} full />
+
+          <View style={{ minHeight: 168, borderRadius: radius.card, backgroundColor: theme.color.primarySoft, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.color.primary + '20' }}>
+            <StretchFigure title={step.title} size={132} />
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, backgroundColor: theme.color.surfaceAlt, borderRadius: radius.input, padding: spacing.md }}>
+            <Ionicons name="information-circle-outline" size={20} color={theme.color.primary} />
+            <Text variant="footnote" style={{ flex: 1, lineHeight: 20 }}>{step.instruction}</Text>
+          </View>
+
+          <View style={{ gap: spacing.sm }}>
+            <ProgressBar progress={overall} height={8} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text variant="caption" dim>{Math.round(overall * 100)}% complete</Text>
+              <Text variant="caption" dim>{routine.length - stepIdx - 1} after this</Text>
+            </View>
+          </View>
+
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Button label="Previous" kind="secondary" onPress={goPrevious} disabled={stepIdx === 0} style={{ flex: 1 }} />
+              <Button label={stepIdx === routine.length - 1 ? 'Finish' : 'Next stretch'} onPress={advance} style={{ flex: 1 }} />
+            </View>
+            <Button label="Cancel session" kind="tertiary" onPress={onClose} full />
           </View>
         </View>
       )}

@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { Screen } from '@/presentation/components/Screen';
 import { Text } from '@/presentation/components/Text';
 import { Button } from '@/presentation/components/Button';
+import { ProgressBar } from '@/presentation/components/ProgressBar';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
@@ -31,9 +32,13 @@ export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/App
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const RING_SIZE = Math.min(260, SCREEN_W * 0.65);
-const TIMER_FONT = Math.min(56, SCREEN_W * 0.14);
+type TimerMode = 'focus' | 'short_break' | 'long_break';
+
+const TIMER_MODES: Array<{ id: TimerMode; label: string; minutes: number; icon: string }> = [
+  { id: 'focus', label: 'Focus', minutes: 25, icon: 'flash' },
+  { id: 'short_break', label: 'Short break', minutes: 5, icon: 'cafe' },
+  { id: 'long_break', label: 'Long break', minutes: 15, icon: 'leaf' },
+];
 
 function fmtClock(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -75,6 +80,7 @@ function PomodoroRing({ progress, size, color }: { progress: number; size: numbe
 
 export default function PomodoroTimer() {
   const theme = useTheme();
+  const { width, height } = useWindowDimensions();
   const router = useRouter();
   const safeBack = useSafeBack();
   const completeOmmSession = useStore((s) => s.completeOmmSession);
@@ -85,6 +91,7 @@ export default function PomodoroTimer() {
 
   type Phase = 'setup' | 'running' | 'paused' | 'done';
   const [phase, setPhase] = useState<Phase>('setup');
+  const [mode, setMode] = useState<TimerMode>('focus');
   const [selectedMinutes, setSelectedMinutes] = useState(25);
   const [remaining, setRemaining] = useState(0);
   const [totalSeconds, setTotalSeconds] = useState(0);
@@ -97,6 +104,17 @@ export default function PomodoroTimer() {
   const endAtRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const messageRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const modeMeta = TIMER_MODES.find((item) => item.id === mode) ?? TIMER_MODES[0];
+  const ringSize = Math.max(176, Math.min(280, width - spacing.huge, height * 0.36));
+  const timerFont = Math.max(42, Math.min(62, width * 0.15));
+  const durationOptions = Array.from(new Set([modeMeta.minutes, ...PRESET_DURATIONS])).sort((a, b) => a - b);
+
+  const chooseMode = (next: TimerMode) => {
+    const selected = TIMER_MODES.find((item) => item.id === next) ?? TIMER_MODES[0];
+    Haptics.selectionAsync().catch(() => {});
+    setMode(next);
+    setSelectedMinutes(selected.minutes);
+  };
 
   useEffect(() => {
     if (phase !== 'running') {
@@ -158,24 +176,28 @@ export default function PomodoroTimer() {
 
   const handleComplete = useCallback(() => {
     if (messageRef.current) clearInterval(messageRef.current);
-    completeOmmSession({
-      startedAt: sessionStartedAt,
-      endedAt: Date.now(),
-      plannedSeconds: totalSeconds,
-      actualSeconds: totalSeconds,
-      completed: true,
-    });
-    const allSessions = [{ id: 't', startedAt: sessionStartedAt, endedAt: Date.now(), plannedSeconds: totalSeconds, actualSeconds: totalSeconds, completed: true }, ...ommSessions];
-    const newStats = computeStats(allSessions);
-    const newIds = OMM_ACHIEVEMENTS.filter((a) => a.test(newStats) && !ommAchievements[a.id]).map((a) => a.id);
-    const newAch = newIds.map((id) => ommAchievementById(id)).filter((a): a is OneMoreMinuteAchievement => !!a);
-    setUnlockedAchievements(newAch);
-    setCompletedToday(newStats.todaySessions);
+    if (mode === 'focus') {
+      completeOmmSession({
+        startedAt: sessionStartedAt,
+        endedAt: Date.now(),
+        plannedSeconds: totalSeconds,
+        actualSeconds: totalSeconds,
+        completed: true,
+      });
+      const allSessions = [{ id: 't', startedAt: sessionStartedAt, endedAt: Date.now(), plannedSeconds: totalSeconds, actualSeconds: totalSeconds, completed: true }, ...ommSessions];
+      const newStats = computeStats(allSessions);
+      const newIds = OMM_ACHIEVEMENTS.filter((a) => a.test(newStats) && !ommAchievements[a.id]).map((a) => a.id);
+      const newAch = newIds.map((id) => ommAchievementById(id)).filter((a): a is OneMoreMinuteAchievement => !!a);
+      setUnlockedAchievements(newAch);
+      setCompletedToday(newStats.todaySessions);
+      if (newAch.length > 0) setShowCelebration(true);
+    } else {
+      setUnlockedAchievements([]);
+    }
     playSound('win', 0.7);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    if (newAch.length > 0) setShowCelebration(true);
     setPhase('done');
-  }, [totalSeconds, sessionStartedAt, ommSessions, ommAchievements, completeOmmSession]);
+  }, [totalSeconds, sessionStartedAt, ommSessions, ommAchievements, completeOmmSession, mode]);
 
   const progress = totalSeconds > 0 ? 1 - (remaining / totalSeconds) : 0;
 
@@ -183,55 +205,98 @@ export default function PomodoroTimer() {
   if (phase === 'setup') {
     return (
       <Screen edges={['top', 'bottom']} scroll={false}>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingTop: spacing.xl, paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xl }}>
+        <ScrollView
+          contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.lg }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 48 }}>
             <Pressable onPress={safeBack} hitSlop={12}
-              style={({ pressed }) => ({ width: 40, height: 40, borderRadius: radius.round, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
+              accessibilityRole="button" accessibilityLabel="Back"
+              style={({ pressed }) => ({ width: 44, height: 44, borderRadius: radius.round, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
               <Ionicons name="chevron-back" size={22} color={theme.color.primary} />
             </Pressable>
-            <Text variant="headline" style={{ flex: 1, marginLeft: spacing.md }}>Pomodoro</Text>
-          </View>
-
-          {/* Session count */}
-          <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
-            <View style={{ flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.md, alignItems: 'center' }}>
-              <Text variant="headline" color={theme.color.primary} style={{ fontFamily: 'Nunito_800ExtraBold' }}>{completedToday}</Text>
-              <Text variant="caption" dim>Today</Text>
-            </View>
-            <View style={{ flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.md, alignItems: 'center' }}>
-              <Text variant="headline" color={theme.color.success} style={{ fontFamily: 'Nunito_800ExtraBold' }}>{fmtDuration(stats.totalSeconds)}</Text>
-              <Text variant="caption" dim>Total</Text>
-            </View>
-            <View style={{ flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.md, alignItems: 'center' }}>
-              <Text variant="headline" color={theme.color.celebrateText} style={{ fontFamily: 'Nunito_800ExtraBold' }}>{stats.currentStreak}</Text>
-              <Text variant="caption" dim>Weeks</Text>
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text variant="headline">Pomodoro</Text>
+              <Text variant="caption" dim>Choose a session and settle in</Text>
             </View>
           </View>
 
-          {/* Duration picker */}
-          <Text variant="footnote" style={{ fontFamily: 'Nunito_700Bold', marginBottom: spacing.md }}>
-            Focus duration
-          </Text>
-          <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
-            {PRESET_DURATIONS.map((m) => (
-              <Pressable key={m} onPress={() => { setSelectedMinutes(m); Haptics.selectionAsync().catch(() => {}); }}
-                style={({ pressed }) => ({
-                  flex: 1, height: 56, borderRadius: radius.card,
-                  alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: selectedMinutes === m ? theme.color.primary : theme.color.surface,
-                  borderWidth: 1, borderColor: selectedMinutes === m ? theme.color.primary : theme.color.hairline,
-                  opacity: pressed ? 0.8 : 1,
-                })}>
-                <Text variant="headline" color={selectedMinutes === m ? '#FFFFFF' : theme.color.text} style={{ fontFamily: 'Nunito_800ExtraBold' }}>
-                  {m}
+          <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.lg }}>
+            {TIMER_MODES.map((item) => {
+              const selected = item.id === mode;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => chooseMode(item.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  style={({ pressed }) => ({
+                    flex: 1, minHeight: 48, borderRadius: radius.input,
+                    alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs,
+                    backgroundColor: selected ? theme.color.primarySoft : 'transparent',
+                    borderWidth: 1, borderColor: selected ? theme.color.primary : theme.color.hairline,
+                    opacity: pressed ? 0.75 : 1,
+                  })}
+                >
+                  <Text variant="caption" color={selected ? theme.color.primary : theme.color.textDim} center>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={{ alignItems: 'center', marginVertical: spacing.xl }}>
+            <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
+              <PomodoroRing progress={0} size={ringSize} color={theme.color.primary} />
+              <View style={{ position: 'absolute', width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
+                  <Ionicons name={modeMeta.icon as any} size={14} color={theme.color.primary} />
+                  <Text variant="caption" color={theme.color.primary} style={{ textTransform: 'uppercase' }}>{modeMeta.label}</Text>
+                </View>
+                <Text variant="display" style={{ fontSize: timerFont, lineHeight: timerFont + 6, fontVariant: ['tabular-nums'], fontFamily: 'Nunito_900Black' }}>
+                  {fmtClock(selectedMinutes * 60)}
                 </Text>
-                <Text variant="caption" color={selectedMinutes === m ? '#FFFFFF' : theme.color.textDim}>min</Text>
-              </Pressable>
+                <Text variant="caption" dim>Ready when you are</Text>
+              </View>
+            </View>
+          </View>
+
+          <Text variant="caption" dim center style={{ marginBottom: spacing.sm }}>Session length</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
+            {durationOptions.map((minutes) => {
+              const selected = selectedMinutes === minutes;
+              return (
+                <Pressable key={minutes} onPress={() => { setSelectedMinutes(minutes); Haptics.selectionAsync().catch(() => {}); }}
+                  style={({ pressed }) => ({
+                    minWidth: 58, height: 40, paddingHorizontal: spacing.md, borderRadius: radius.round,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: selected ? theme.color.primary : theme.color.surface,
+                    borderWidth: 1, borderColor: selected ? theme.color.primary : theme.color.hairline,
+                    opacity: pressed ? 0.8 : 1,
+                  })}>
+                  <Text variant="footnote" color={selected ? theme.color.onPrimary : theme.color.text}>{minutes} min</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <View style={{ marginTop: spacing.lg }}>
+            <Button label={`Start ${modeMeta.label}`} onPress={startSession} full />
+          </View>
+
+          <View style={{ flexDirection: 'row', marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: theme.color.hairline }}>
+            {[
+              { value: completedToday, label: 'Today' },
+              { value: fmtDuration(stats.totalSeconds), label: 'Focused' },
+              { value: stats.currentStreak, label: 'Week streak' },
+            ].map((item, index) => (
+              <View key={item.label} style={{ flex: 1, alignItems: 'center', borderLeftWidth: index === 0 ? 0 : 1, borderLeftColor: theme.color.hairline }}>
+                <Text variant="callout" color={theme.color.primary} style={{ fontFamily: 'Nunito_800ExtraBold' }}>{item.value}</Text>
+                <Text variant="caption" dim>{item.label}</Text>
+              </View>
             ))}
           </View>
-
-          <Button label="Start Focus" onPress={startSession} full />
         </ScrollView>
       </Screen>
     );
@@ -240,33 +305,58 @@ export default function PomodoroTimer() {
   // ── Running / Paused ─────────────────────────────────────────────────────
   if (phase === 'running' || phase === 'paused') {
     return (
-      <Screen edges={['top', 'bottom']}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl }}>
-          <View style={{ marginBottom: spacing.xl, alignItems: 'center' }}>
-            <PomodoroRing progress={progress} size={RING_SIZE} color={phase === 'running' ? theme.color.primary : theme.color.textDim} />
-            <View style={{ position: 'absolute', width: RING_SIZE, height: RING_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-              <Text variant="display" style={{ fontSize: TIMER_FONT, fontVariant: ['tabular-nums'], fontFamily: 'Nunito_900Black' }}>
+      <Screen edges={['top', 'bottom']} scroll={false}>
+        <View style={{ flex: 1, justifyContent: 'space-between', paddingTop: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 48 }}>
+            <Pressable onPress={cancel} hitSlop={12} accessibilityRole="button" accessibilityLabel="Reset timer"
+              style={({ pressed }) => ({ width: 44, height: 44, borderRadius: radius.round, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
+              <Ionicons name="chevron-back" size={22} color={theme.color.primary} />
+            </Pressable>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text variant="caption" dim>Current session</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                <Ionicons name={modeMeta.icon as any} size={14} color={theme.color.primary} />
+                <Text variant="callout" color={theme.color.primary}>{modeMeta.label}</Text>
+              </View>
+            </View>
+            <View style={{ width: 44 }} />
+          </View>
+
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ alignItems: 'center' }}>
+              <PomodoroRing progress={progress} size={ringSize} color={phase === 'running' ? theme.color.primary : theme.color.textDim} />
+              <View style={{ position: 'absolute', width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center' }}>
+              <Text variant="display" style={{ fontSize: timerFont, lineHeight: timerFont + 6, fontVariant: ['tabular-nums'], fontFamily: 'Nunito_900Black' }}>
                 {fmtClock(remaining)}
               </Text>
-              <Text variant="caption" dim style={{ marginTop: 4 }}>
-                {phase === 'running' ? 'Focus time' : 'Paused'}
+              <Text variant="footnote" color={phase === 'paused' ? theme.color.celebrateText : theme.color.textDim} style={{ marginTop: 4 }}>
+                {phase === 'running' ? `${modeMeta.label} in progress` : 'Paused'}
               </Text>
             </View>
           </View>
 
-          <Animated.View key={message} entering={FadeIn.duration(400)} style={{ marginBottom: spacing.xl, paddingHorizontal: spacing.lg }}>
-            <Text variant="callout" center color={theme.color.primary} style={{ fontFamily: 'Nunito_700Bold', fontStyle: 'italic' }}>
-              "{message}"
-            </Text>
-          </Animated.View>
+            <View style={{ alignSelf: 'stretch', marginTop: spacing.xl }}>
+              <ProgressBar progress={progress} height={6} color={phase === 'running' ? theme.color.primary : theme.color.textDim} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xs }}>
+                <Text variant="caption" dim>{Math.round(progress * 100)}%</Text>
+                <Text variant="caption" dim>{selectedMinutes} minute session</Text>
+              </View>
+            </View>
 
-          <View style={{ gap: spacing.sm, alignSelf: 'stretch' }}>
+            <Animated.View key={message} entering={FadeIn.duration(400)} style={{ marginTop: spacing.lg, paddingHorizontal: spacing.lg, minHeight: 44, justifyContent: 'center' }}>
+              <Text variant="callout" center color={theme.color.primary} style={{ fontFamily: 'Nunito_700Bold' }}>
+                {mode === 'focus' ? message : 'Give your mind a little room to reset.'}
+              </Text>
+            </Animated.View>
+          </View>
+
+          <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
             {phase === 'running' ? (
-              <Button label="Pause" kind="secondary" onPress={pause} full />
+              <Button label="Pause" onPress={pause} full />
             ) : (
               <Button label="Resume" onPress={resume} full />
             )}
-            <Button label="Cancel" kind="tertiary" onPress={cancel} full />
+            <Button label="Reset timer" kind="tertiary" onPress={cancel} full />
           </View>
         </View>
       </Screen>
@@ -289,10 +379,12 @@ export default function PomodoroTimer() {
         </Animated.View>
 
         <Text variant="headline" center style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.xs }}>
-          Focus complete
+          {modeMeta.label} complete
         </Text>
         <Text variant="footnote" dim center style={{ lineHeight: 20, marginBottom: spacing.xl }}>
-          Great job! You stayed focused for {fmtDuration(totalSeconds)}.
+          {mode === 'focus'
+            ? `Great job! You stayed focused for ${fmtDuration(totalSeconds)}.`
+            : `You gave yourself ${fmtDuration(totalSeconds)} to reset.`}
         </Text>
 
         <View style={{
@@ -311,14 +403,14 @@ export default function PomodoroTimer() {
             </View>
             <View style={{ width: 1, backgroundColor: theme.color.hairline }} />
             <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text variant="headline" color={theme.color.celebrateText} style={{ fontFamily: 'Nunito_800ExtraBold' }}>+1</Text>
-              <Text variant="caption" dim>Habits</Text>
+              <Text variant="headline" color={theme.color.celebrateText} style={{ fontFamily: 'Nunito_800ExtraBold' }}>{mode === 'focus' ? '+1' : 'Ready'}</Text>
+              <Text variant="caption" dim>{mode === 'focus' ? 'Habits' : 'Status'}</Text>
             </View>
           </View>
         </View>
 
         <View style={{ alignSelf: 'stretch', gap: spacing.sm }}>
-          <Button label="Start Another" kind="secondary" onPress={() => setPhase('setup')} full />
+          <Button label="Start another" kind="secondary" onPress={() => setPhase('setup')} full />
           <Button label="Back to SOS" onPress={safeBack} full />
         </View>
       </ScrollView>
