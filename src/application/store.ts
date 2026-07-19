@@ -734,7 +734,11 @@ export const useStore = create<RecoveryState>()(
       eduProgress: {},
       eduLastGuideId: null,
 
-      updateLastCheckedIn: () => set({ lastCheckedIn: Date.now() }),
+      updateLastCheckedIn: () => set((s) =>
+        s.profile?.addictionType === 'pornography'
+          ? { lastCheckedIn: Date.now() }
+          : {},
+      ),
 
       toggleEduBookmark: (id) =>
         set((s) => ({

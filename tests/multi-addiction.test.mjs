@@ -8,6 +8,8 @@ import {
   journalCompletedToday,
   journalConfig,
   journalEntryMatches,
+  journalEntryOutcome,
+  journalStatsForAddiction,
   nextIncompleteAddiction,
 } from '../.test-build/addictionJournal.js';
 import { normalizeSelectedAddictions } from '../.test-build/multiAddiction.js';
@@ -69,6 +71,29 @@ test('an entry only completes the section represented by its status field', () =
   assert.equal(journalEntryMatches(gambling, 'pornography'), false);
   assert.equal(journalEntryMatches(porn, 'pornography'), true);
   assert.equal(journalEntryMatches(porn, 'gambling'), false);
+});
+
+test('active journal summaries use only the configured addiction field', () => {
+  const journal = [
+    entry('g1', { gambled: false, mood: 4 }),
+    entry('g2', { gambled: true, mood: 2 }),
+    entry('p1', { watched: false, mood: 5 }),
+  ];
+
+  assert.equal(journalEntryOutcome(journal[0], 'gambling'), false);
+  assert.equal(journalEntryOutcome(journal[0], 'pornography'), undefined);
+  assert.deepEqual(journalStatsForAddiction(journal, 'gambling'), {
+    total: 2,
+    cleanDays: 1,
+    relapseDays: 1,
+    averageMood: 3,
+  });
+  assert.deepEqual(journalStatsForAddiction(journal, 'pornography'), {
+    total: 1,
+    cleanDays: 1,
+    relapseDays: 0,
+    averageMood: 5,
+  });
 });
 
 test('all selected sections are required before the daily journal is complete', () => {

@@ -15,6 +15,7 @@ import { captureShareRef, saveShareRefToPhotos, saveSvgRefToPhotos, saveToPhotos
 import { currentStreakStart, streakDays } from '@/domain/gambling';
 import { ALTERNATIVES, WATER_GOAL_GLASSES, alternativeById, type AlternativeId } from '@/domain/alternatives';
 import { formatDistance, formatPace } from '@/domain/walk';
+import { journalStatsForAddiction } from '@/domain/addictionJournal';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
 
@@ -98,6 +99,9 @@ export default function ShareActivity() {
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
   const journalCount = journal.length;
+  const journalStats = profile
+    ? journalStatsForAddiction(journal, profile.addictionType)
+    : null;
   const cardRef = useRef<View>(null);
   const svgRef = useRef<any>(null);
   const [pendingAction, setPendingAction] = useState<'share' | 'save' | null>(null);
@@ -163,8 +167,8 @@ export default function ShareActivity() {
       case 'journal':
         // Journal counts are derived from the journal itself, not altCounts.
         return [
-          { label: 'Entries', value: `${journalCount}` },
-          { label: 'Clean days', value: `${journal.filter((j) => j.gambled === false).length}` },
+          { label: 'Entries', value: `${journalStats?.total ?? journalCount}` },
+          { label: 'Clean days', value: `${journalStats?.cleanDays ?? 0}` },
           { label: 'Day streak', value: `${streak}` },
         ];
       default: // water - glasses instead of duration

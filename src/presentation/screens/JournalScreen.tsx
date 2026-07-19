@@ -3,7 +3,7 @@
  * filters, compact stats, and expandable day cards.
  */
 
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   Modal,
   Pressable,
@@ -30,6 +30,7 @@ import { elevation, spacing, radius, palette, motion } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
 import { DEFAULT_CURRENCY, formatMoney, recoveryAdjustedBalance } from '@/domain/gambling';
+import { journalEntryOutcome, journalStatsForAddiction } from '@/domain/addictionJournal';
 import type { JournalEntry } from '@/domain/records';
 
 // Enable layout animation on Android
@@ -737,6 +738,13 @@ export function JournalScreen() {
   const [showDateSheet, setShowDateSheet]     = useState(false);
   const [showStatusSheet, setShowStatusSheet] = useState(false);
 
+  // Tabs stay mounted while the active recovery changes. Reset a status value
+  // that may only exist for the previous addiction (for example, "watched").
+  useEffect(() => {
+    setFilter('all');
+    setShowStatusSheet(false);
+  }, [profile?.addictionType]);
+
   const toggleSearch = useCallback(() => {
     setSearching((v) => {
       if (v) setQuery('');
@@ -747,41 +755,8 @@ export function JournalScreen() {
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const isPorn = profile?.addictionType === 'pornography';
-    const isSocial = profile?.addictionType === 'social_media';
-    const total    = entries.length;
-    // Gambling stats
-    const clean    = entries.filter((e) => e.gambled === false).length;
-    const relapses = entries.filter((e) => e.gambled === true).length;
-    // Porn stats
-    const pornClean    = entries.filter((e) => e.watched === false).length;
-    const pornRelapses = entries.filter((e) => e.watched === true).length;
-    // Social media stats
-    const socialClean    = entries.filter((e) => e.binged === false).length;
-    const socialRelapses = entries.filter((e) => e.binged === true).length;
-    // Smoking stats
-    const smokeClean    = entries.filter((e) => e.smoked === false).length;
-    const smokeRelapses = entries.filter((e) => e.smoked === true).length;
-    // Alcohol stats
-    const alcoholClean    = entries.filter((e) => e.drank === false).length;
-    const alcoholRelapses = entries.filter((e) => e.drank === true).length;
-    // Drugs stats
-    const drugClean    = entries.filter((e) => e.used === false).length;
-    const drugRelapses = entries.filter((e) => e.used === true).length;
-    // Gaming stats
-    const gamingClean    = entries.filter((e) => e.played === false).length;
-    const gamingRelapses = entries.filter((e) => e.played === true).length;
-    // Online shopping stats
-    const shopClean    = entries.filter((e) => e.shopped === false).length;
-    const shopRelapses = entries.filter((e) => e.shopped === true).length;
-    // Custom / Other stats
-    const otherClean    = entries.filter((e) => e.otherActed === false).length;
-    const otherRelapses = entries.filter((e) => e.otherActed === true).length;
-    const withMood = entries.filter((e) => e.mood != null);
-    const avgMood  = withMood.length
-      ? Math.round(withMood.reduce((s, e) => s + (e.mood ?? 0), 0) / withMood.length * 10) / 10
-      : null;
-    return { total, clean, relapses, pornClean, pornRelapses, socialClean, socialRelapses, smokeClean, smokeRelapses, alcoholClean, alcoholRelapses, drugClean, drugRelapses, gamingClean, gamingRelapses, shopClean, shopRelapses, otherClean, otherRelapses, avgMood };
+    if (!profile) return { total: 0, cleanDays: 0, relapseDays: 0, averageMood: null };
+    return journalStatsForAddiction(entries, profile.addictionType);
   }, [entries, profile]);
 
   // ── Filtered + sorted entries ─────────────────────────────────────────────
@@ -810,42 +785,11 @@ export function JournalScreen() {
       .filter((e) => {
         // Date range
         if (cutoff > 0 && e.at < cutoff) return false;
-        // Addiction-specific status filter
-        if (isGambling) {
-          if (filter === 'clean'   && e.gambled !== false) return false;
-          if (filter === 'gambled' && e.gambled !== true)  return false;
-        }
-        if (isPorn) {
-          if (filter === 'clean'   && e.watched !== false) return false;
-          if (filter === 'watched' && e.watched !== true)  return false;
-        }
-        if (isSocial) {
-          if (filter === 'clean'   && e.binged !== false) return false;
-          if (filter === 'gambled' && e.binged !== true)  return false;
-        }
-        if (isSmoke) {
-          if (filter === 'clean'   && e.smoked !== false) return false;
-          if (filter === 'gambled' && e.smoked !== true)  return false;
-        }
-        if (isAlcohol) {
-          if (filter === 'clean'   && e.drank !== false) return false;
-          if (filter === 'gambled' && e.drank !== true)  return false;
-        }
-        if (isDrugs) {
-          if (filter === 'clean'   && e.used !== false) return false;
-          if (filter === 'gambled' && e.used !== true)  return false;
-        }
-        if (isGaming) {
-          if (filter === 'clean'   && e.played !== false) return false;
-          if (filter === 'gambled' && e.played !== true)  return false;
-        }
-        if (isShop) {
-          if (filter === 'clean'   && e.shopped !== false) return false;
-          if (filter === 'gambled' && e.shopped !== true)  return false;
-        }
-        if (isOther) {
-          if (filter === 'clean'   && e.otherActed !== false) return false;
-          if (filter === 'gambled' && e.otherActed !== true)  return false;
+        // Resolve status from the active addiction's configured journal field.
+        if (profile) {
+          const outcome = journalEntryOutcome(e, profile.addictionType);
+          if (filter === 'clean' && outcome !== false) return false;
+          if ((filter === 'gambled' || filter === 'watched') && outcome !== true) return false;
         }
         // Search
         if (query && !e.text.toLowerCase().includes(query.toLowerCase())) return false;
@@ -853,7 +797,7 @@ export function JournalScreen() {
       })
       // Newest first
       .sort((a, b) => b.at - a.at);
-  }, [entries, query, filter, dateRange, isGambling, isPorn, isSocial, isShop, isSmoke, isAlcohol, isDrugs, isGaming, isOther]);
+  }, [entries, query, filter, dateRange, profile]);
 
   // Status filter options per addiction type
   const statusFilters: { key: Filter; label: string }[] =
@@ -930,22 +874,22 @@ export function JournalScreen() {
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
           <StatCard
             icon="checkmark-circle"
-            value={isGambling ? stats.clean : isPorn ? stats.pornClean : isSocial ? stats.socialClean : isShop ? stats.shopClean : isSmoke ? stats.smokeClean : isAlcohol ? stats.alcoholClean : isGaming ? stats.gamingClean : isOther ? stats.otherClean : stats.drugClean}
+            value={stats.cleanDays}
             label="Clean"
             color={theme.color.success}
             delay={0}
           />
           <StatCard
             icon="alert-circle"
-            value={isGambling ? stats.relapses : isPorn ? stats.pornRelapses : isSocial ? stats.socialRelapses : isShop ? stats.shopRelapses : isSmoke ? stats.smokeRelapses : isAlcohol ? stats.alcoholRelapses : isGaming ? stats.gamingRelapses : isOther ? stats.otherRelapses : stats.drugRelapses}
+            value={stats.relapseDays}
             label="Relapses"
             color={theme.color.danger}
             delay={60}
           />
-          {stats.avgMood != null && (
+          {stats.averageMood != null && (
             <StatCard
               icon="happy"
-              value={stats.avgMood}
+              value={stats.averageMood}
               label="Mood"
               color={theme.color.primary}
               delay={120}

@@ -39,6 +39,31 @@ export function journalEntryMatches(entry: JournalEntry, addictionType: Addictio
   return entry[journalConfig(addictionType).statusField] !== undefined;
 }
 
+/** The active addiction's outcome, without hard-coding a particular journal field. */
+export function journalEntryOutcome(
+  entry: JournalEntry,
+  addictionType: AddictionType,
+): boolean | undefined {
+  return entry[journalConfig(addictionType).statusField] as boolean | undefined;
+}
+
+/** Summary derived only from entries belonging to the requested addiction. */
+export function journalStatsForAddiction(
+  journal: readonly JournalEntry[],
+  addictionType: AddictionType,
+) {
+  const entries = journal.filter((entry) => journalEntryMatches(entry, addictionType));
+  const moods = entries.flatMap((entry) => entry.mood == null ? [] : [entry.mood]);
+  return {
+    total: entries.length,
+    cleanDays: entries.filter((entry) => journalEntryOutcome(entry, addictionType) === false).length,
+    relapseDays: entries.filter((entry) => journalEntryOutcome(entry, addictionType) === true).length,
+    averageMood: moods.length === 0
+      ? null
+      : Math.round((moods.reduce((sum, mood) => sum + mood, 0) / moods.length) * 10) / 10,
+  };
+}
+
 export function journalCompletedToday(
   journal: readonly JournalEntry[],
   addictionType: AddictionType,

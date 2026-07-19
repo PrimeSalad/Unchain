@@ -18,9 +18,9 @@ import {
   syncPredictionNotifications,
   registerPredictionNotificationHandler,
 } from '@/application/triggerPrediction';
-import { scheduleCatchYourBreathReminder } from '@/application/catchYourBreathReminder';
-import { scheduleCheersToChangeReminder } from '@/application/cheersToChangeReminder';
-import { scheduleBackOnTrackReminder } from '@/application/backOnTrackReminder';
+import { cancelCatchYourBreathReminders, scheduleCatchYourBreathReminder } from '@/application/catchYourBreathReminder';
+import { cancelCheersToChangeReminders, scheduleCheersToChangeReminder } from '@/application/cheersToChangeReminder';
+import { cancelBackOnTrackReminders, scheduleBackOnTrackReminder } from '@/application/backOnTrackReminder';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -79,6 +79,7 @@ export default function RootLayout() {
   // Record every foreground event as the "Last Check-in" timestamp for porn
   // recovery users. Fires on cold launch and every return from background.
   const updateLastCheckedIn = useStore((s) => s.updateLastCheckedIn);
+  const activeAddiction = useStore((s) => s.profile?.addictionType);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   useEffect(() => {
     updateLastCheckedIn();
@@ -89,7 +90,7 @@ export default function RootLayout() {
       appState.current = next;
     });
     return () => sub.remove();
-  }, [updateLastCheckedIn]);
+  }, [activeAddiction, updateLastCheckedIn]);
 
   // ── Trigger Prediction Scheduler ──────────────────────────────────────────
   // Re-syncs notification schedule whenever the urges array changes.
@@ -120,20 +121,29 @@ export default function RootLayout() {
   // ── Catch Your Breath weekly reminder ────────────────────────────────────
   const lastCatchYourBreathAt = useStore((s) => s.lastCatchYourBreathAt);
   useEffect(() => {
-    scheduleCatchYourBreathReminder(lastCatchYourBreathAt).catch(() => {});
-  }, [lastCatchYourBreathAt]);
+    const sync = activeAddiction === 'smoking'
+      ? scheduleCatchYourBreathReminder(lastCatchYourBreathAt)
+      : cancelCatchYourBreathReminders();
+    sync.catch(() => {});
+  }, [activeAddiction, lastCatchYourBreathAt]);
 
   // ── Cheers to Change weekly reminder ─────────────────────────────────────
   const lastCheersToChangeAt = useStore((s) => s.lastCheersToChangeAt);
   useEffect(() => {
-    scheduleCheersToChangeReminder(lastCheersToChangeAt).catch(() => {});
-  }, [lastCheersToChangeAt]);
+    const sync = activeAddiction === 'alcohol'
+      ? scheduleCheersToChangeReminder(lastCheersToChangeAt)
+      : cancelCheersToChangeReminders();
+    sync.catch(() => {});
+  }, [activeAddiction, lastCheersToChangeAt]);
 
   // ── Back on Track weekly reminder ───────────────────────────────────────
   const lastBackOnTrackAt = useStore((s) => s.lastBackOnTrackAt);
   useEffect(() => {
-    scheduleBackOnTrackReminder(lastBackOnTrackAt).catch(() => {});
-  }, [lastBackOnTrackAt]);
+    const sync = activeAddiction === 'drugs'
+      ? scheduleBackOnTrackReminder(lastBackOnTrackAt)
+      : cancelBackOnTrackReminders();
+    sync.catch(() => {});
+  }, [activeAddiction, lastBackOnTrackAt]);
 
   if (!ready) {
     // iOS keeps the native splash visible. Web has no equivalent guarantee,
