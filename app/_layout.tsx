@@ -20,6 +20,7 @@ import {
 } from '@/application/triggerPrediction';
 import { scheduleCatchYourBreathReminder } from '@/application/catchYourBreathReminder';
 import { scheduleCheersToChangeReminder } from '@/application/cheersToChangeReminder';
+import { scheduleBackOnTrackReminder } from '@/application/backOnTrackReminder';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -128,6 +129,12 @@ export default function RootLayout() {
     scheduleCheersToChangeReminder(lastCheersToChangeAt).catch(() => {});
   }, [lastCheersToChangeAt]);
 
+  // ── Back on Track weekly reminder ───────────────────────────────────────
+  const lastBackOnTrackAt = useStore((s) => s.lastBackOnTrackAt);
+  useEffect(() => {
+    scheduleBackOnTrackReminder(lastBackOnTrackAt).catch(() => {});
+  }, [lastBackOnTrackAt]);
+
   if (!ready) {
     // iOS keeps the native splash visible. Web has no equivalent guarantee,
     // so render an explicit startup state instead of a white page.
@@ -175,6 +182,10 @@ export default function RootLayout() {
             <Stack.Screen name="drug-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="game-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="need-or-want-log" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="back-on-track" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="back-on-track-log" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="back-on-track-history" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="back-on-track-insights" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="reflection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen
               name="share"

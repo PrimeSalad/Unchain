@@ -41,6 +41,8 @@ import type { CatchYourBreathEntry } from '@/domain/catchYourBreath';
 import { catchYourBreathAvailability } from '@/domain/catchYourBreath';
 import type { CheersToChangeEntry } from '@/domain/cheersToChange';
 import { cheersToChangeAvailability } from '@/domain/cheersToChange';
+import type { BackOnTrackEntry } from '@/domain/backOnTrack';
+import { backOnTrackAvailability } from '@/domain/backOnTrack';
 import type { OneMoreMinuteSession } from '@/domain/oneMoreMinute';
 import { computeStats as computeOmmStats, evaluateOmmAchievements } from '@/domain/oneMoreMinute';
 import type { FoodEntry, WaterEntry, FastingSession, NutritionGoals } from '@/domain/fuelYourRecovery';
@@ -181,6 +183,12 @@ interface RecoveryState {
   /** Timestamp of the last completed assessment. null = never completed. */
   lastCheersToChangeAt: number | null;
 
+  // ── Back on Track (drug/substance-only weekly reflection) ───────────────
+  /** All weekly recovery check-in entries, newest first. */
+  backOnTrackEntries: BackOnTrackEntry[];
+  /** Timestamp of the last completed assessment. null = never completed. */
+  lastBackOnTrackAt: number | null;
+
   // ── One More Minute (universal recovery timer) ──────────────────────────
   /** All timer sessions (history). */
   ommSessions: OneMoreMinuteSession[];
@@ -308,6 +316,13 @@ interface RecoveryState {
   canCompleteCheersToChange: () => { available: boolean; nextAt?: number; daysLeft?: number };
   /** Delete a Cheers to Change entry from history. */
   deleteCheersToChangeEntry: (id: string) => void;
+  /** Save a Back on Track weekly assessment. Returns any habit achievements
+   *  newly unlocked. Increments healthyHabitsCount and awards points. */
+  addBackOnTrack: (entry: Omit<BackOnTrackEntry, 'id' | 'at'>) => AltAchievement[];
+  /** Whether the Back on Track assessment is available now (7-day cooldown). */
+  canCompleteBackOnTrack: () => { available: boolean; nextAt?: number; daysLeft?: number };
+  /** Delete a Back on Track entry from history. */
+  deleteBackOnTrackEntry: (id: string) => void;
   /** Complete a One More Minute session. Awards points, achievements, and timeline events. */
   completeOmmSession: (session: Omit<OneMoreMinuteSession, 'id'>) => void;
   /** Log a food entry. */
@@ -431,8 +446,8 @@ function altFullDay(
   return ALTERNATIVES.every((a) => {
     // 'need-or-want' only counts for online shopping addiction
     if (a.id === 'need-or-want' && addictionType !== 'online_shopping') return true;
-    // 'catch-your-breath' and 'cheers-to-change' are weekly, not daily
-    if (a.id === 'catch-your-breath' || a.id === 'cheers-to-change') return true;
+    // 'catch-your-breath', 'cheers-to-change', and 'back-on-track' are weekly, not daily
+    if (a.id === 'catch-your-breath' || a.id === 'cheers-to-change' || a.id === 'back-on-track') return true;
     return a.id === 'journal'
       ? journal.some((j) => sameDay(j.at, now))
       : alternatives[a.id] != null && sameDay(alternatives[a.id]!, now);
@@ -516,6 +531,8 @@ export const useStore = create<RecoveryState>()(
       lastCatchYourBreathAt: null,
       cheersToChangeEntries: [],
       lastCheersToChangeAt: null,
+      backOnTrackEntries: [],
+      lastBackOnTrackAt: null,
       ommSessions: [],
       ommAchievements: {},
       fuelFoodEntries: [],
@@ -718,6 +735,60 @@ export const useStore = create<RecoveryState>()(
       deleteCheersToChangeEntry: (id) =>
         set((s) => ({
           cheersToChangeEntries: s.cheersToChangeEntries.filter((e) => e.id !== id),
+        })),
+
+      canCompleteBackOnTrack: () => {
+        const { lastBackOnTrackAt } = get();
+        const result = backOnTrackAvailability(lastBackOnTrackAt);
+        return result.available
+          ? { available: true }
+          : { available: false, nextAt: result.nextAt, daysLeft: result.daysLeft };
+      },
+
+      addBackOnTrack: (data) => {
+        let unlocked: AltAchievement[] = [];
+        const now = Date.now();
+
+        const { lastBackOnTrackAt } = get();
+        const avail = backOnTrackAvailability(lastBackOnTrackAt, now);
+        if (!avail.available) return [];
+
+        const entry: BackOnTrackEntry = {
+          ...data,
+          id: uid(),
+          at: now,
+        };
+        set((s) => {
+          const altCounts: AltCounts = { ...s.altCounts, 'back-on-track': (s.altCounts['back-on-track'] ?? 0) + 1 };
+          const counts: AltCounts = { ...altCounts, journal: s.journal.length };
+          unlocked = newAltUnlocks(
+            counts,
+            altFullDay(s.alternatives, s.journal, now, s.profile?.addictionType),
+            s.altAchievements,
+          );
+          return {
+            backOnTrackEntries: [entry, ...s.backOnTrackEntries],
+            lastBackOnTrackAt: now,
+            alternatives: { ...s.alternatives, 'back-on-track': now },
+            altCounts,
+            altAchievements: unlocked.length
+              ? { ...s.altAchievements, ...Object.fromEntries(unlocked.map((a) => [a.id, now])) }
+              : s.altAchievements,
+            points: s.points + 5 + unlocked.length * 5,
+            healthyHabitsCount: s.healthyHabitsCount + 1,
+            timeline: [
+              ...unlocked.map((a) => evt('achievement', `Achievement unlocked - ${a.title}`)),
+              evt('activity', 'Recovery activity - Back on Track'),
+              ...s.timeline,
+            ],
+          };
+        });
+        return unlocked;
+      },
+
+      deleteBackOnTrackEntry: (id) =>
+        set((s) => ({
+          backOnTrackEntries: s.backOnTrackEntries.filter((e) => e.id !== id),
         })),
 
       completeOmmSession: (sessionData) => {
