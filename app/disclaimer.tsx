@@ -98,35 +98,39 @@ export default function Disclaimer() {
             Unchainly is a mobile application that provides self-help tools for personal {addictionName} recovery, including journaling, progress tracking, habit logging, urge management, and educational resources. All data is stored locally on the user's device.
           </TermSection>
 
-          <TermSection num="3" title="No Professional Advice">
+          <TermSection num="3" title="Third-Party Independence">
+            Unchainly is an independent self-help application. It is not affiliated with, endorsed by, sponsored by, or connected to any social network, online marketplace, game publisher, content platform, retailer, payment provider, or other third-party service. Any user-entered reference to a third-party product or service remains the responsibility of the user and does not imply a relationship with Unchainly.
+          </TermSection>
+
+          <TermSection num="4" title="No Professional Advice">
             All content, features, and tools within this application are for self-reflection and informational purposes only. They do not constitute medical, psychological, financial, or professional advice. The application is not a replacement for professional treatment, therapy, counseling, or medical care.
           </TermSection>
 
-          <TermSection num="4" title="Emergency Situations">
+          <TermSection num="5" title="Emergency Situations">
             This application does not provide crisis intervention. If you or someone else may be in immediate danger, contact the emergency services for your current location. For substance withdrawal or other urgent health concerns, seek qualified local medical help. Unchainly does not verify your location or provide emergency services.
           </TermSection>
 
-          <TermSection num="5" title="User Responsibility">
+          <TermSection num="6" title="User Responsibility">
             You are solely responsible for your use of this application and any decisions you make based on its content. Your use of this application is entirely at your own risk. Recovery is a personal journey, and individual results vary.
           </TermSection>
 
-          <TermSection num="6" title="Data Privacy">
+          <TermSection num="7" title="Data Privacy">
             All data entered into this application is stored locally on your device. We do not collect, store, transmit, or have access to any of your personal information, journal entries, or recovery data. You are responsible for the security and backup of your device.
           </TermSection>
 
-          <TermSection num="7" title="No Guarantees">
+          <TermSection num="8" title="No Guarantees">
             This application is provided "as is" and "as available" without warranties of any kind, either express or implied. We do not guarantee that the application will be error-free, uninterrupted, or that it will produce specific results.
           </TermSection>
 
-          <TermSection num="8" title="Limitation of Liability">
+          <TermSection num="9" title="Limitation of Liability">
             In no event shall the developers, creators, or distributors of this application be liable for any indirect, incidental, special, consequential, or punitive damages arising out of your use of or inability to use this application.
           </TermSection>
 
-          <TermSection num="9" title="Modifications">
+          <TermSection num="10" title="Modifications">
             We reserve the right to modify these terms at any time. Continued use of the application after changes constitutes acceptance of the updated terms. We encourage you to review these terms periodically.
           </TermSection>
 
-          <TermSection num="10" title="Contact">
+          <TermSection num="11" title="Contact">
             If you have questions about these terms, please contact us through the application's support channels.
           </TermSection>
         </Animated.View>

@@ -722,7 +722,31 @@ function captureAddictionSnapshot(s: RecoveryState): AddictionRecoverySnapshot |
 
 function activeStateFromSnapshot(snapshot: AddictionRecoverySnapshot): Omit<AddictionRecoverySnapshot, 'setup'> {
   const { setup: _setup, ...activeState } = snapshot;
-  return activeState;
+  // Persisted snapshots can predate fields added to the active root state.
+  // Never spread `undefined` collections into Zustand: selectors render
+  // immediately after a switch and commonly call `.length`, `.filter`, or
+  // object spread on these values.
+  return {
+    ...activeState,
+    checkIns: activeState.checkIns ?? [],
+    urges: activeState.urges ?? [],
+    relapses: activeState.relapses ?? [],
+    journal: activeState.journal ?? [],
+    reflections: activeState.reflections ?? [],
+    timeline: activeState.timeline ?? [],
+    goals: activeState.goals ?? [],
+    celebratedBadges: activeState.celebratedBadges ?? [],
+    alternatives: activeState.alternatives ?? {},
+    altCounts: activeState.altCounts ?? {},
+    altAchievements: activeState.altAchievements ?? {},
+    altSeconds: activeState.altSeconds ?? {},
+    altSessions: activeState.altSessions ?? {},
+    needOrWantEntries: activeState.needOrWantEntries ?? [],
+    catchYourBreathEntries: activeState.catchYourBreathEntries ?? [],
+    cheersToChangeEntries: activeState.cheersToChangeEntries ?? [],
+    backOnTrackEntries: activeState.backOnTrackEntries ?? [],
+    dailyMissions: activeState.dailyMissions ?? { day: missionDayKey(), completed: [] },
+  };
 }
 
 function synchronizeSnapshotProfiles(
@@ -2054,11 +2078,14 @@ export const useStore = create<RecoveryState>()(
             ...activeStateFromSnapshot(target),
             profile: {
               ...target.profile,
+              // The map key is authoritative. Older/corrupt snapshots may
+              // contain a stale embedded category and must not activate it.
+              addictionType: addiction,
               name: s.profile.name,
               age: s.profile.age,
               selectedAddictions: selections,
             },
-            dailyMissions: target.dailyMissions.day === today
+            dailyMissions: target.dailyMissions?.day === today
               ? target.dailyMissions
               : { day: today, completed: [] },
             recoveryByAddiction: current

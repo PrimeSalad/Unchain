@@ -3,7 +3,7 @@
  * Offline-first: everything here is computed from locally-stored data.
  */
 
-import { recoveryTrack, type AddictionType } from './recoveryTracks';
+import { recoveryTrack, tryRecoveryTrack, type AddictionType } from './recoveryTracks';
 export type { AddictionType } from './recoveryTracks';
 
 export interface AddictionMeta {
@@ -34,12 +34,12 @@ export const ADDICTIONS: AddictionMeta[] = [
   {
     key: 'social_media', label: 'Social Media', verb: 'binge social media', freeLabel: 'Free', hasExpense: false,
     specificQuestion: 'Which platforms pull you in most?',
-    specificOptions: ['Facebook', 'TikTok', 'Instagram', 'X (Twitter)', 'YouTube', 'Other'],
+    specificOptions: ['Short-form video', 'Photo and story feeds', 'Video platforms', 'Discussion feeds', 'Messaging communities', 'Other'],
   },
   {
     key: 'online_shopping', label: 'Online Shopping', verb: 'shop online', freeLabel: 'Shop-Free', hasExpense: true,
     specificQuestion: 'Where do you mostly shop?',
-    specificOptions: ['Shopee', 'Lazada', 'Amazon', 'TikTok Shop', 'Instagram Shopping', 'Facebook Marketplace', 'Other'],
+    specificOptions: ['Online marketplace', 'Social shopping feed', 'Brand or retailer app', 'Second-hand marketplace', 'Livestream shopping', 'Other'],
   },
   {
     key: 'smoking', label: 'Smoking', verb: 'smoke', freeLabel: 'Smoke-Free', hasExpense: true,
@@ -67,7 +67,17 @@ export const ADDICTIONS: AddictionMeta[] = [
 ];
 
 export function addictionMeta(k: AddictionType): AddictionMeta {
-  const definition = recoveryTrack(k);
+  const definition = tryRecoveryTrack(k);
+  if (!definition) {
+    return {
+      key: 'other',
+      label: 'Unavailable recovery track',
+      verb: 'continue the habit',
+      freeLabel: 'Habit-Free',
+      specificQuestion: 'Review this recovery track in Profile.',
+      hasExpense: false,
+    };
+  }
   return {
     key: definition.type,
     label: definition.label,

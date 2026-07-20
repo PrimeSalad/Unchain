@@ -69,12 +69,11 @@ function buildSteps(shopped: boolean | null): StepId[] {
 // ---------------------------------------------------------------------------
 
 const SHOP_OPTIONS = [
-  'Shopee',
-  'Lazada',
-  'Amazon',
-  'TikTok Shop',
-  'Instagram Shopping',
-  'Facebook Marketplace',
+  'Online marketplace',
+  'Social shopping feed',
+  'Brand or retailer app',
+  'Second-hand marketplace',
+  'Livestream shopping',
   'Other',
 ] as const;
 type ShopOption = (typeof SHOP_OPTIONS)[number];

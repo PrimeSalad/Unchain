@@ -67,7 +67,7 @@ export const RECOVERY_TRACKS = {
   },
   social_media: {
     type: 'social_media', label: 'Social Media', verb: 'binge social media', freeLabel: 'Social Media-Free',
-    detailQuestion: 'Which platforms pull you in most?', detailOptions: ['Facebook', 'TikTok', 'Instagram', 'X (Twitter)', 'YouTube', 'Other'],
+    detailQuestion: 'Which platform type pulls you in most?', detailOptions: ['Short-form video', 'Photo and story feeds', 'Video platforms', 'Discussion feeds', 'Messaging communities', 'Other'],
     triggers: ['Boredom', 'Procrastinating tasks', 'Waking up / before bed', 'FOMO', 'Loneliness', 'Waiting (queues, commute)', 'Anxiety or stress', 'Seeking validation', 'Other'],
     intake: common(false, true), baseline: 'time', journal: { route: '/social-journal-entry', statusField: 'binged', primaryQuestion: 'Did you binge social media today?' },
     heroMetric: 'time_reclaimed', flagshipFeature: 'scroll-reclaim', capabilities: ['time_baseline'],
@@ -75,7 +75,7 @@ export const RECOVERY_TRACKS = {
   },
   online_shopping: {
     type: 'online_shopping', label: 'Online Shopping', verb: 'shop online', freeLabel: 'Shop-Free',
-    detailQuestion: 'Where do you mostly shop?', detailOptions: ['Shopee', 'Lazada', 'Amazon', 'TikTok Shop', 'Instagram Shopping', 'Facebook Marketplace', 'Other'],
+    detailQuestion: 'Where do you mostly shop?', detailOptions: ['Online marketplace', 'Social shopping feed', 'Brand or retailer app', 'Second-hand marketplace', 'Livestream shopping', 'Other'],
     triggers: ['Boredom', 'Stress', 'Sale / flash deals', 'Social media ads', 'FOMO / limited stock', 'Emotional spending', 'Payday / extra cash', 'Other'],
     intake: common(true), baseline: 'money', journal: { route: '/online-shopping-journal-entry', statusField: 'shopped', primaryQuestion: 'Did you shop online today?' },
     heroMetric: 'paused_purchases', flagshipFeature: 'need-or-want', capabilities: ['expense'],
@@ -118,9 +118,16 @@ export const RECOVERY_TRACKS = {
 } as const satisfies Record<AddictionType, RecoveryTrackDefinition>;
 
 export function recoveryTrack(type: AddictionType): RecoveryTrackDefinition {
-  return RECOVERY_TRACKS[type];
+  const definition = RECOVERY_TRACKS[type];
+  if (!definition) throw new Error(`Unknown recovery track: ${String(type)}`);
+  return definition;
 }
 
 export function isAddictionType(value: unknown): value is AddictionType {
   return typeof value === 'string' && (ADDICTION_TYPES as readonly string[]).includes(value);
+}
+
+/** Runtime-safe resolver for persisted data and route parameters. */
+export function tryRecoveryTrack(value: unknown): RecoveryTrackDefinition | null {
+  return isAddictionType(value) ? RECOVERY_TRACKS[value] : null;
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ADDICTION_TYPES, RECOVERY_TRACKS, recoveryTrack, isAddictionType } from '../.test-build/domain/recoveryTracks.js';
+import { ADDICTION_TYPES, RECOVERY_TRACKS, recoveryTrack, isAddictionType, tryRecoveryTrack } from '../.test-build/domain/recoveryTracks.js';
 import { RECOVERY_FEATURES, resolveRecoveryFeature } from '../.test-build/application/recoveryFeatureRegistry.js';
 import { planRecoveryReminders } from '../.test-build/domain/recoveryReminderPlanner.js';
 
@@ -23,6 +23,8 @@ test('recovery catalog is exhaustive and every definition is complete', () => {
 test('unknown categories never silently resolve to Gambling', () => {
   assert.equal(isAddictionType('unknown'), false);
   assert.equal(RECOVERY_TRACKS.unknown, undefined);
+  assert.equal(tryRecoveryTrack('unknown'), null);
+  assert.throws(() => recoveryTrack('unknown'), /Unknown recovery track/);
 });
 
 test('feature registry has unique routes or intentional shared internal route and safe gates', () => {

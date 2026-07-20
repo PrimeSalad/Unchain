@@ -89,6 +89,13 @@ export function ActionSheet({
     if (!title) return;
     if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
     focusTimerRef.current = setTimeout(() => {
+      if (Platform.OS === "web") {
+        // react-native-web does not implement findNodeHandle. Its host ref is
+        // the DOM element, so focus it directly.
+        const element = headingRef.current as unknown as { focus?: () => void } | null;
+        element?.focus?.();
+        return;
+      }
       const node = findNodeHandle(headingRef.current);
       if (node) AccessibilityInfo.setAccessibilityFocus(node);
     }, reduceMotion ? 0 : 60);
@@ -163,6 +170,7 @@ export function ActionSheet({
                 <View
                   ref={headingRef}
                   accessible
+                  focusable
                   accessibilityRole="header"
                   accessibilityLabel={description ? `${title}. ${description}` : title}
                 >

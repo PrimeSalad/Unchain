@@ -79,11 +79,11 @@ const DURATION_OPTIONS = [
 type DurationOption = (typeof DURATION_OPTIONS)[number];
 
 const PLATFORM_OPTIONS = [
-  'TikTok',
-  'Facebook',
-  'Instagram',
-  'X (Twitter)',
-  'YouTube',
+  'Short-form video',
+  'Photo and story feeds',
+  'Video platforms',
+  'Discussion feeds',
+  'Messaging communities',
   'Reddit',
   'Snapchat',
   'Other',
