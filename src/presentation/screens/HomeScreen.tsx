@@ -471,10 +471,9 @@ export function HomeScreen() {
         <QuickAction icon="walk"   label="Habits"    onPress={() => router.push('/alternatives' as Href)} />
       </View>
 
-      {/* Recreational Games */}
-      <Text variant="callout" style={{ marginTop: spacing.xl, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>
-        Take a Break
-      </Text>
+      {/* Gaming-recovery tracks never receive a recreational-game recommendation. */}
+      {profile.addictionType !== 'gaming' && <>
+      <Text variant="callout" style={{ marginTop: spacing.xl, marginBottom: spacing.sm, fontFamily: 'Nunito_700Bold' }}>Take a Break</Text>
       <Pressable
         onPress={() => router.push('/games' as Href)}
         accessibilityRole="button"
@@ -505,6 +504,7 @@ export function HomeScreen() {
           <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
         </View>
       </Pressable>
+      </>}
 
       {/* Recent activity */}
       <View style={{ marginTop: spacing.xl, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>

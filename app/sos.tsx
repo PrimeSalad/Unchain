@@ -400,7 +400,9 @@ export default function Sos() {
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             <ToolTile icon="book" label="Journal" onPress={() => router.replace('/(tabs)/journal')} />
-            <ToolTile icon="game-controller" label="Games" onPress={() => router.replace('/games' as Href)} />
+            {profile?.addictionType !== 'gaming' && (
+              <ToolTile icon="game-controller" label="Games" onPress={() => router.replace('/games' as Href)} />
+            )}
             <ToolTile icon="walk" label="Habits" onPress={() => router.push('/alternatives' as Href)} />
             <ToolTile icon="shield-checkmark" label="Protect" onPress={() => router.push('/protection' as Href)} />
             <ToolTile icon="create" label="Reflect" onPress={() => router.replace('/reflection')} />
@@ -454,33 +456,6 @@ export default function Sos() {
                 <Text variant="callout" color={palette.fog}>Pomodoro</Text>
                 <Text variant="caption" color={FOG_SOFT} style={{ marginTop: 1 }}>
                   Focus on recovery for a little while
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={FOG_SOFT} />
-            </GlassTile>
-          </Pressable>
-
-          {/* Fuel Your Recovery */}
-          <Pressable
-            onPress={() => router.push('/fuel-your-recovery' as Href)}
-            accessibilityRole="button"
-            accessibilityLabel="Open Fuel Your Recovery"
-            style={({ pressed }) => ({ marginTop: spacing.sm, opacity: pressed ? 0.8 : 1 })}
-          >
-            <GlassTile style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-              <View
-                style={{
-                  width: 40, height: 40, borderRadius: 12,
-                  backgroundColor: 'rgba(185,143,214,0.18)',
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Ionicons name="nutrition" size={20} color={palette.grape300} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text variant="callout" color={palette.fog}>Fuel Your Recovery</Text>
-                <Text variant="caption" color={FOG_SOFT} style={{ marginTop: 1 }}>
-                  Track meals, hydration & nutrition
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={FOG_SOFT} />

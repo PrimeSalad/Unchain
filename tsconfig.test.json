@@ -10,6 +10,9 @@
     "esModuleInterop": true
   },
   "files": [
+    "src/domain/recoveryTracks.ts",
+    "src/domain/recoveryReminderPlanner.ts",
+    "src/application/recoveryFeatureRegistry.ts",
     "src/domain/protection.ts",
     "src/domain/gambling.ts",
     "src/domain/records.ts",

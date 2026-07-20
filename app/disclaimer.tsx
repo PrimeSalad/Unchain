@@ -103,7 +103,7 @@ export default function Disclaimer() {
           </TermSection>
 
           <TermSection num="4" title="Emergency Situations">
-            This application is not designed for crisis intervention. If you or someone you know is experiencing a mental health crisis, suicidal thoughts, or substance withdrawal symptoms, please contact emergency services (911), the National Suicide Prevention Lifeline (988), or SAMHSA's National Helpline (1-800-662-4357) immediately.
+            This application does not provide crisis intervention. If you or someone else may be in immediate danger, contact the emergency services for your current location. For substance withdrawal or other urgent health concerns, seek qualified local medical help. Unchainly does not verify your location or provide emergency services.
           </TermSection>
 
           <TermSection num="5" title="User Responsibility">

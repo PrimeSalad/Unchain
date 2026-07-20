@@ -3,16 +3,8 @@
  * Offline-first: everything here is computed from locally-stored data.
  */
 
-export type AddictionType =
-  | 'gambling'
-  | 'pornography'
-  | 'social_media'
-  | 'online_shopping'
-  | 'smoking'
-  | 'alcohol'
-  | 'drugs'
-  | 'gaming'
-  | 'other';
+import { recoveryTrack, type AddictionType } from './recoveryTracks';
+export type { AddictionType } from './recoveryTracks';
 
 export interface AddictionMeta {
   key: AddictionType;
@@ -75,7 +67,16 @@ export const ADDICTIONS: AddictionMeta[] = [
 ];
 
 export function addictionMeta(k: AddictionType): AddictionMeta {
-  return ADDICTIONS.find((a) => a.key === k) ?? ADDICTIONS[0];
+  const definition = recoveryTrack(k);
+  return {
+    key: definition.type,
+    label: definition.label,
+    verb: definition.verb,
+    freeLabel: definition.freeLabel,
+    specificQuestion: definition.detailQuestion,
+    specificOptions: definition.detailOptions ? [...definition.detailOptions] : undefined,
+    hasExpense: definition.capabilities.includes('expense'),
+  };
 }
 
 /** Addiction-specific streak wording for the Home recovery summary. */
@@ -240,17 +241,7 @@ export const ONLINE_SHOPPING_TRIGGERS = [
 
 /** Returns the appropriate trigger list for a given addiction type. */
 export function triggersForAddiction(type: AddictionType): readonly string[] {
-  switch (type) {
-    case 'gambling':       return GAMBLING_TRIGGERS;
-    case 'smoking':        return SMOKING_TRIGGERS;
-    case 'alcohol':        return ALCOHOL_TRIGGERS;
-    case 'drugs':          return DRUGS_TRIGGERS;
-    case 'social_media':   return SOCIAL_MEDIA_TRIGGERS;
-    case 'gaming':         return GAMING_TRIGGERS;
-    case 'online_shopping': return ONLINE_SHOPPING_TRIGGERS;
-    case 'pornography':    return []; // handled separately via PORN_TRIGGERS
-    default:               return OTHER_TRIGGERS;
-  }
+  return recoveryTrack(type).triggers;
 }
 
 export interface RecoveryProfile {
