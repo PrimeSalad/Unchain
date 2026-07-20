@@ -241,6 +241,17 @@ export default function LogUrge() {
     closeWithoutPrompt();
   };
 
+  // When opened to view/edit an existing urge (e.g. from SOS), allow the
+  // first close so the swipe-to-dismiss gesture doesn't flash the discard
+  // alert before the user has had a chance to interact with the form.
+  useEffect(() => {
+    if (existing && !dirty) {
+      allowClose.current = true;
+    } else if (dirty) {
+      allowClose.current = false;
+    }
+  }, [existing, dirty]);
+
   useEffect(() => navigation.addListener('beforeRemove', (event: any) => {
     if (allowClose.current || !dirty || saved) return;
     event.preventDefault();
