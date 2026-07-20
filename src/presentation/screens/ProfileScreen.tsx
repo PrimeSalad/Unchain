@@ -14,7 +14,7 @@ import {
   View,
   findNodeHandle,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -26,7 +26,7 @@ import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useReliableSafeAreaInsets } from '../hooks/useReliableSafeAreaInsets';
-import { useStore, useProfile, initialGames } from '@/application/store';
+import { useStore, useProfile, materializeRecoveryByAddiction } from '@/application/store';
 import { shareCapturedContent } from '@/application/shareMedia';
 import {
   DEFAULT_CURRENCY,
@@ -40,6 +40,7 @@ import {
 } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 import { normalizeSelectedAddictions } from '@/domain/multiAddiction';
+import { RECOVERY_STATE_SCHEMA_VERSION, migrateRecoveryState } from '@/domain/recoveryStateMigration';
 
 const BACKUP_MARKER = 'unchainly-backup';
 const LEGACY_BACKUP_MARKER = 'unchain-backup';
@@ -83,6 +84,10 @@ export function ProfileScreen() {
   const navigation = useNavigation();
   const profile = useProfile();
   const update = useStore((s) => s.updateProfile);
+  const recoveryByAddiction = useStore((s) => s.recoveryByAddiction);
+  const setActiveAddiction = useStore((s) => s.setActiveAddiction);
+  const archiveRecoveryTrack = useStore((s) => s.archiveRecoveryTrack);
+  const resumeRecoveryTrack = useStore((s) => s.resumeRecoveryTrack);
   const themePref = useStore((s) => s.themePref);
   const setTheme = useStore((s) => s.setTheme);
   const resetRecovery = useStore((s) => s.resetRecovery);
@@ -165,13 +170,13 @@ export function ProfileScreen() {
   const meta = addictionMeta(profile.addictionType);
   const typeLabel = meta.label;
   const selectedTracks = normalizeSelectedAddictions(profile.addictionType, profile.selectedAddictions);
-  const toggleRecoveryTrack = (addiction: AddictionType) => {
-    if (addiction === profile.addictionType) return;
-    const next = selectedTracks.includes(addiction)
-      ? selectedTracks.filter((item) => item !== addiction)
-      : [...selectedTracks, addiction];
-    update({ selectedAddictions: next });
-  };
+  const selectedTrackSet = new Set(selectedTracks);
+  const archivedTracks = ADDICTIONS.filter(
+    (addiction) => !selectedTrackSet.has(addiction.key) && recoveryByAddiction[addiction.key] != null,
+  );
+  const newTrackCount = ADDICTIONS.filter(
+    (addiction) => !selectedTrackSet.has(addiction.key) && recoveryByAddiction[addiction.key] == null,
+  ).length;
   const initials = profile.name
     .split(/\s+/)
     .filter(Boolean)
@@ -223,6 +228,118 @@ export function ProfileScreen() {
         }).start(() => setToast(null));
       }
     }, 3000);
+  };
+
+  // ── Recovery track lifecycle ─────────────────────────────────────────────
+
+  const openRecoveryTrackSetup = (mode: 'add' | 'review', addiction?: AddictionType) => {
+    const query = addiction
+      ? `?mode=${mode}&type=${encodeURIComponent(addiction)}`
+      : `?mode=${mode}`;
+    router.push(`/recovery-track-setup${query}` as Href);
+  };
+
+  const switchRecoveryTrack = (addiction: AddictionType) => {
+    if (addiction === profile.addictionType) return;
+    const performSwitch = () => {
+      Keyboard.dismiss();
+      setActiveAddiction(addiction);
+      const switched = useStore.getState().profile?.addictionType === addiction;
+      if (switched) {
+        showToast(`${addictionMeta(addiction).label} is now active`);
+      } else {
+        showToast('Could not switch recovery tracks', 'error');
+      }
+    };
+    if (!triggersDirty && !editingReason) {
+      performSwitch();
+      return;
+    }
+    Alert.alert(
+      'Save changes before switching?',
+      'Your reason and triggers belong to the active recovery track.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        {
+          text: 'Discard & switch',
+          style: 'destructive',
+          onPress: () => {
+            setTriggersDraft(profile.triggers);
+            setEditingReason(false);
+            performSwitch();
+          },
+        },
+        {
+          text: 'Save & switch',
+          onPress: () => {
+            const nextReason = editingReason ? reasonValue.trim() : profile.reason;
+            if (!nextReason) {
+              AccessibilityInfo.announceForAccessibility('Add a recovery reason before switching.');
+              reasonRef.current?.focus();
+              showToast('Add a recovery reason before switching', 'error');
+              return;
+            }
+            update({
+              ...(editingReason ? { reason: nextReason } : {}),
+              ...(triggersDirty ? { triggers: triggersDraft } : {}),
+            });
+            setEditingReason(false);
+            performSwitch();
+          },
+        },
+      ],
+    );
+  };
+
+  const confirmArchiveRecoveryTrack = (addiction: AddictionType) => {
+    const label = addictionMeta(addiction).label;
+    if (selectedTracks.length <= 1) {
+      Alert.alert('Keep one recovery track', 'Add another recovery track before archiving this one.');
+      return;
+    }
+    if (addiction === profile.addictionType) {
+      Alert.alert('Switch tracks first', 'Make another recovery track active before archiving this one.');
+      return;
+    }
+    Alert.alert(
+      `Archive ${label}?`,
+      'Its history stays saved. It will no longer appear in your daily recovery tracks, and you can resume it later.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive',
+          style: 'destructive',
+          onPress: () => {
+            const result = archiveRecoveryTrack(addiction);
+            if (result === 'archived') {
+              showToast(`${label} archived`);
+            } else if (result === 'only_track') {
+              Alert.alert('Keep one recovery track', 'Add another recovery track before archiving this one.');
+            } else {
+              showToast(`Could not archive ${label}`, 'error');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const resumeArchivedTrack = (addiction: AddictionType) => {
+    const label = addictionMeta(addiction).label;
+    const result = resumeRecoveryTrack(addiction);
+    if (result === 'resumed') {
+      showToast(`${label} resumed`);
+      return;
+    }
+    if (result === 'needs_review') {
+      openRecoveryTrackSetup('review', addiction);
+      return;
+    }
+    if (result === 'already_selected') {
+      showToast(`${label} is already in your recovery tracks`);
+      return;
+    }
+    showToast(`Could not resume ${label}`, 'error');
   };
 
   // ── Name editing ─────────────────────────────────────────────────────────
@@ -283,6 +400,12 @@ export function ProfileScreen() {
 
   const commitReason = () => {
     const trimmed = reasonValue.trim();
+    if (!trimmed) {
+      AccessibilityInfo.announceForAccessibility('Add a recovery reason before saving.');
+      reasonRef.current?.focus();
+      showToast('Recovery reason cannot be empty', 'error');
+      return;
+    }
     if (trimmed !== (profile.reason ?? '')) {
       try {
         update({ reason: trimmed });
@@ -364,11 +487,15 @@ export function ProfileScreen() {
       const s = useStore.getState();
       const backup = {
         app: BACKUP_MARKER,
-        version: 3,
+        version: RECOVERY_STATE_SCHEMA_VERSION,
         exportedAt: Date.now(),
         data: {
+          // Keep future data slices automatically; JSON serialization omits
+          // store action functions. Explicit fields below document/override
+          // the recovery-critical portions of the backup.
+          ...s,
           profile: s.profile,
-          recoveryByAddiction: s.recoveryByAddiction,
+          recoveryByAddiction: materializeRecoveryByAddiction(s),
           dailyJournalPlan: s.dailyJournalPlan,
           journalDrafts: s.journalDrafts,
           checkIns: s.checkIns,
@@ -433,76 +560,46 @@ export function ProfileScreen() {
       if (res.canceled || !res.assets?.[0]) return;
       const text = await FileSystem.readAsStringAsync(res.assets[0].uri);
       const parsed = JSON.parse(text);
-      const data =
+      const rawData =
         parsed?.app === BACKUP_MARKER || parsed?.app === LEGACY_BACKUP_MARKER || parsed?.data
           ? parsed.data
           : parsed;
-      if (!data || typeof data !== 'object' || !data.profile || typeof data.profile.startedAt !== 'number') {
+      const backupVersion = typeof parsed?.version === 'number' ? parsed.version : 0;
+      const preview = migrateRecoveryState(rawData, backupVersion) as any;
+      const previewProfile = preview?.profile;
+      const validType = typeof previewProfile?.addictionType === 'string'
+        && ADDICTIONS.some((item) => item.key === previewProfile.addictionType);
+      if (!validType || typeof previewProfile.startedAt !== 'number') {
         showToast('That file is not a valid Unchainly backup', 'error');
         return;
       }
-      const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
-      const obj = <T extends object>(v: unknown, fallback: T): T =>
-        v && typeof v === 'object' && !Array.isArray(v) ? (v as T) : fallback;
-      useStore.setState({
-        onboarded: true,
-        profile: {
-          ...data.profile,
-          selectedAddictions: normalizeSelectedAddictions(
-            data.profile.addictionType,
-            Array.isArray(data.profile.selectedAddictions) ? data.profile.selectedAddictions : undefined,
-          ),
+      const previewTracks = normalizeSelectedAddictions(
+        previewProfile.addictionType,
+        Array.isArray(previewProfile.selectedAddictions) ? previewProfile.selectedAddictions : undefined,
+      );
+      const exportedLabel = typeof parsed?.exportedAt === 'number'
+        ? new Date(parsed.exportedAt).toLocaleString()
+        : 'Unknown date';
+      const journalCount = Array.isArray(preview.journal) ? preview.journal.length : 0;
+      setModal({
+        title: 'Restore this backup?',
+        body: [
+          `Profile: ${previewProfile.name || 'Friend'}`,
+          `Recovery tracks: ${previewTracks.length}`,
+          `Active journal entries: ${journalCount}`,
+          `Exported: ${exportedLabel}`,
+          '',
+          'This replaces the local data currently on this device. This cannot be undone unless you export the current data first.',
+        ].join('\n'),
+        confirmLabel: 'Restore backup',
+        onConfirm: () => {
+          const result = useStore.getState().restoreBackup(rawData, backupVersion);
+          showToast(
+            result === 'restored' ? 'Backup restored successfully' : 'Backup could not be restored',
+            result === 'restored' ? 'success' : 'error',
+          );
         },
-        recoveryByAddiction: obj(data.recoveryByAddiction, {}),
-        dailyJournalPlan: data.dailyJournalPlan && typeof data.dailyJournalPlan.day === 'string'
-          ? data.dailyJournalPlan
-          : null,
-        journalDrafts: obj(data.journalDrafts, {}),
-        checkIns: arr(data.checkIns),
-        urges: arr(data.urges),
-        relapses: arr(data.relapses),
-        journal: arr(data.journal),
-        reflections: arr(data.reflections),
-        timeline: arr(data.timeline),
-        points: typeof data.points === 'number' ? data.points : 0,
-        longestStreak: typeof data.longestStreak === 'number' ? data.longestStreak : 0,
-        goals: arr(data.goals),
-        celebratedBadges: arr(data.celebratedBadges),
-        games: data.games && typeof data.games === 'object' ? { ...initialGames, ...data.games } : initialGames,
-        themePref: ['system', 'light', 'dark'].includes(data.themePref) ? data.themePref : 'system',
-        alternatives: obj(data.alternatives, {}),
-        altCounts: obj(data.altCounts, {}),
-        altAchievements: obj(data.altAchievements, {}),
-        altSeconds: obj(data.altSeconds, {}),
-        altSessions: obj(data.altSessions, {}),
-        walkSteps: typeof data.walkSteps === 'number' ? data.walkSteps : 0,
-        walkMeters: typeof data.walkMeters === 'number' ? data.walkMeters : 0,
-        waterToday:
-          data.waterToday && typeof data.waterToday.day === 'string' && typeof data.waterToday.glasses === 'number'
-            ? data.waterToday
-            : { day: '', glasses: 0 },
-        waterGlassesTotal: typeof data.waterGlassesTotal === 'number' ? data.waterGlassesTotal : 0,
-        lastCheckedIn: typeof data.lastCheckedIn === 'number' ? data.lastCheckedIn : null,
-        urgesResisted: typeof data.urgesResisted === 'number' ? data.urgesResisted : 0,
-        urgesResistedWeek: typeof data.urgesResistedWeek === 'number' ? data.urgesResistedWeek : 0,
-        healthyHabitsCount: typeof data.healthyHabitsCount === 'number' ? data.healthyHabitsCount : 0,
-        eduBookmarks: arr(data.eduBookmarks),
-        eduProgress: obj(data.eduProgress, {}),
-        eduLastGuideId: typeof data.eduLastGuideId === 'string' ? data.eduLastGuideId : null,
-        blockedSites: arr(data.blockedSites),
-        dailyMissions:
-          data.dailyMissions && typeof data.dailyMissions.day === 'string' && Array.isArray(data.dailyMissions.completed)
-            ? data.dailyMissions
-            : { day: '', completed: [] },
-        missionXp: typeof data.missionXp === 'number' ? data.missionXp : 0,
-        favoriteQuotes: arr(data.favoriteQuotes),
-        dailyQuote:
-          data.dailyQuote && typeof data.dailyQuote.day === 'string' && typeof data.dailyQuote.index === 'number'
-            ? data.dailyQuote
-            : null,
-        recentQuotes: arr(data.recentQuotes),
       });
-      showToast('Backup restored successfully');
     } catch {
       showToast('Could not read that backup', 'error');
     }
@@ -656,36 +753,63 @@ export function ProfileScreen() {
         <View style={{ marginTop: spacing.xxl }}>
           <SectionTitle title="Recovery tracks" trailing={`${selectedTracks.length} selected`} />
           <Text variant="footnote" dim style={{ marginBottom: spacing.md }}>
-            Changes apply to the next daily journal. Switch the active track from Home.
+            Tap a track to make it active. Added or archived tracks apply to your next daily journal.
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            {ADDICTIONS.map((addiction) => {
-              const selected = selectedTracks.includes(addiction.key);
-              const active = addiction.key === profile.addictionType;
+          <View style={{ gap: spacing.sm }}>
+            {selectedTracks.map((addiction) => {
+              const snapshot = recoveryByAddiction[addiction];
+              const active = addiction === profile.addictionType;
+              const trackProfile = active ? profile : snapshot?.profile;
+              const needsReview = snapshot == null
+                || snapshot.setup.setupStatus === 'needs_review'
+                || snapshot.setup.setupCompletedAt == null;
               return (
-                <Pressable
-                  key={addiction.key}
-                  onPress={() => toggleRecoveryTrack(addiction.key)}
-                  disabled={active}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected, disabled: active }}
-                  style={({ pressed }) => ({
-                    minHeight: 44, paddingHorizontal: spacing.md, borderRadius: radius.round,
-                    borderWidth: 1, borderColor: selected ? theme.color.primary : theme.color.hairline,
-                    backgroundColor: selected ? theme.color.primarySoft : theme.color.surface,
-                    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
-                    opacity: pressed ? 0.72 : 1,
-                  })}
-                >
-                  {selected && <Ionicons name="checkmark" size={16} color={theme.color.primary} />}
-                  <Text variant="footnote" color={selected ? theme.color.primary : theme.color.text}>
-                    {addiction.label}{active ? ' · Active' : ''}
-                  </Text>
-                </Pressable>
+                <RecoveryTrackCard
+                  key={addiction}
+                  label={addictionMeta(addiction).label}
+                  detail={trackProfile?.addictionDetail}
+                  active={active}
+                  needsReview={needsReview}
+                  canArchive={!active && selectedTracks.length > 1}
+                  onSelect={() => switchRecoveryTrack(addiction)}
+                  onFinishSetup={() => openRecoveryTrackSetup('review', addiction)}
+                  onArchive={() => confirmArchiveRecoveryTrack(addiction)}
+                />
               );
             })}
           </View>
+
+          <AddRecoveryTrackButton
+            disabled={newTrackCount === 0}
+            onPress={() => openRecoveryTrackSetup('add')}
+          />
         </View>
+
+        {archivedTracks.length > 0 ? (
+          <View style={{ marginTop: spacing.xxl }}>
+            <SectionTitle title="Archived" trailing={`${archivedTracks.length} saved`} />
+            <Text variant="footnote" dim style={{ marginBottom: spacing.md }}>
+              Archived history stays on this device until you choose to resume it.
+            </Text>
+            <View style={{ gap: spacing.sm }}>
+              {archivedTracks.map((addiction) => {
+                const snapshot = recoveryByAddiction[addiction.key]!;
+                const needsReview = snapshot.setup.setupStatus === 'needs_review'
+                  || snapshot.setup.setupCompletedAt == null;
+                return (
+                  <ArchivedRecoveryTrackRow
+                    key={addiction.key}
+                    label={addiction.label}
+                    needsReview={needsReview}
+                    onPress={() => needsReview
+                      ? openRecoveryTrackSetup('review', addiction.key)
+                      : resumeArchivedTrack(addiction.key)}
+                  />
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         {/* ── Recovery reason ── */}
         <View style={{ marginTop: spacing.xxl }}>
@@ -1075,6 +1199,259 @@ function FlatGroup({ children }: { children: React.ReactNode }) {
     >
       {children}
     </View>
+  );
+}
+
+function RecoveryTrackCard({
+  label,
+  detail,
+  active,
+  needsReview,
+  canArchive,
+  onSelect,
+  onFinishSetup,
+  onArchive,
+}: {
+  label: string;
+  detail?: string;
+  active: boolean;
+  needsReview: boolean;
+  canArchive: boolean;
+  onSelect: () => void;
+  onFinishSetup: () => void;
+  onArchive: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        borderRadius: radius.input,
+        borderWidth: 1,
+        borderColor: active ? theme.color.primary : theme.color.hairline,
+        backgroundColor: active ? theme.color.primarySoft : theme.color.surface,
+        overflow: 'hidden',
+      }}
+    >
+      <Pressable
+        onPress={onSelect}
+        disabled={active}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} recovery track${active ? ', active' : ''}`}
+        accessibilityHint={active ? 'This is your active recovery track' : `Makes ${label} your active recovery track`}
+        accessibilityState={{ selected: active, disabled: active }}
+        style={({ pressed }) => ({
+          minHeight: 68,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.md,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          backgroundColor: pressed ? theme.color.surfaceAlt : 'transparent',
+        })}
+      >
+        <View
+          accessible={false}
+          style={{
+            width: 44,
+            height: 44,
+            flexShrink: 0,
+            borderRadius: 22,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: active ? theme.color.primary : theme.color.surfaceAlt,
+          }}
+        >
+          <Ionicons
+            name={active ? 'checkmark' : 'shield-checkmark-outline'}
+            size={21}
+            color={active ? theme.color.onPrimary : theme.color.primary}
+          />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="callout" color={active ? theme.color.primary : theme.color.text}>
+            {label}
+          </Text>
+          <Text variant="caption" dim numberOfLines={2} style={{ marginTop: 2 }}>
+            {detail?.trim() || (active ? 'Currently active' : 'Tap to make active')}
+          </Text>
+        </View>
+        {active ? (
+          <View
+            style={{
+              minHeight: 28,
+              justifyContent: 'center',
+              paddingHorizontal: spacing.sm,
+              borderRadius: radius.round,
+              backgroundColor: theme.color.primary,
+            }}
+          >
+            <Text variant="caption" color={theme.color.onPrimary}>Active</Text>
+          </View>
+        ) : (
+          <Ionicons name="chevron-forward" size={19} color={theme.color.textDim} />
+        )}
+      </Pressable>
+
+      {needsReview || canArchive ? (
+        <View
+          style={{
+            minHeight: 52,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: spacing.sm,
+            paddingHorizontal: spacing.sm,
+            paddingVertical: spacing.xs,
+            borderTopWidth: 1,
+            borderTopColor: theme.color.hairline,
+          }}
+        >
+          {needsReview ? (
+            <Pressable
+              onPress={onFinishSetup}
+              accessibilityRole="button"
+              accessibilityLabel={`Finish setup for ${label}`}
+              accessibilityHint="Opens the recovery track setup questions"
+              style={({ pressed }) => ({
+                minHeight: 44,
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: spacing.xs,
+                paddingHorizontal: spacing.sm,
+                borderRadius: radius.chip,
+                backgroundColor: theme.color.accentSoft,
+                opacity: pressed ? 0.72 : 1,
+              })}
+            >
+              <Ionicons name="clipboard-outline" size={17} color={theme.color.accentText} />
+              <Text variant="footnote" color={theme.color.accentText}>Finish setup</Text>
+            </Pressable>
+          ) : null}
+          {canArchive ? (
+            <Pressable
+              onPress={onArchive}
+              accessibilityRole="button"
+              accessibilityLabel={`Archive ${label} recovery track`}
+              accessibilityHint="Keeps its history saved and removes it from your selected tracks"
+              style={({ pressed }) => ({
+                minHeight: 44,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: spacing.xs,
+                paddingHorizontal: spacing.md,
+                borderRadius: radius.chip,
+                borderWidth: 1,
+                borderColor: theme.color.danger,
+                opacity: pressed ? 0.68 : 1,
+              })}
+            >
+              <Ionicons name="archive-outline" size={17} color={theme.color.danger} />
+              <Text variant="footnote" color={theme.color.danger}>Archive</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function AddRecoveryTrackButton({
+  disabled,
+  onPress,
+}: {
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={disabled ? 'No new recovery categories available' : 'Add recovery track'}
+      accessibilityHint={disabled ? undefined : 'Opens setup for another recovery track'}
+      accessibilityState={{ disabled }}
+      style={({ pressed }) => ({
+        minHeight: 52,
+        marginTop: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        borderRadius: radius.input,
+        backgroundColor: theme.color.primary,
+        opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
+      })}
+    >
+      <Ionicons name={disabled ? 'checkmark' : 'add'} size={21} color={theme.color.onPrimary} />
+      <Text variant="callout" color={theme.color.onPrimary}>
+        {disabled ? 'No new categories available' : 'Add recovery track'}
+      </Text>
+    </Pressable>
+  );
+}
+
+function ArchivedRecoveryTrackRow({
+  label,
+  needsReview,
+  onPress,
+}: {
+  label: string;
+  needsReview: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  const action = needsReview ? 'Finish setup' : 'Resume';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${action} ${label} recovery track`}
+      accessibilityHint={needsReview ? 'Completes setup before restoring this track' : 'Restores this track with its saved history'}
+      style={({ pressed }) => ({
+        minHeight: 64,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: radius.input,
+        borderWidth: 1,
+        borderColor: theme.color.hairline,
+        backgroundColor: pressed ? theme.color.surfaceAlt : theme.color.surface,
+      })}
+    >
+      <View
+        accessible={false}
+        style={{
+          width: 40,
+          height: 40,
+          flexShrink: 0,
+          borderRadius: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: needsReview ? theme.color.accentSoft : theme.color.surfaceAlt,
+        }}
+      >
+        <Ionicons
+          name={needsReview ? 'clipboard-outline' : 'archive-outline'}
+          size={19}
+          color={needsReview ? theme.color.accentText : theme.color.primary}
+        />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="callout">{label}</Text>
+        <Text variant="caption" dim style={{ marginTop: 2 }}>History saved on this device</Text>
+      </View>
+      <Text variant="footnote" color={needsReview ? theme.color.accentText : theme.color.primary}>
+        {action}
+      </Text>
+      <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
+    </Pressable>
   );
 }
 

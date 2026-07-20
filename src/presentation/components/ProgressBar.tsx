@@ -11,9 +11,10 @@ interface ProgressBarProps {
   color?: string;
   track?: string;
   height?: number;
+  accessibilityLabel?: string;
 }
 
-export function ProgressBar({ progress, color, track, height = 10 }: ProgressBarProps) {
+export function ProgressBar({ progress, color, track, height = 10, accessibilityLabel = 'Progress' }: ProgressBarProps) {
   const theme = useTheme();
   const reduce = useReducedMotion();
   const w = useSharedValue(0);
@@ -26,6 +27,10 @@ export function ProgressBar({ progress, color, track, height = 10 }: ProgressBar
 
   return (
     <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(Math.max(0, Math.min(1, progress)) * 100) }}
       style={{
         height,
         borderRadius: radius.round,

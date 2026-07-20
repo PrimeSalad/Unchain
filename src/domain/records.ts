@@ -13,6 +13,8 @@ export interface DailyCheckIn {
 export interface UrgeLog {
   id: string;
   at: number;
+  /** Provenance separates real manual logs from old journal-generated rows. */
+  source?: 'manual' | 'journal_generated';
   intensity: number; // 1..10
   trigger?: string;
   /** Multiple selected triggers. `trigger` is retained for older local data. */

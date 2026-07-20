@@ -8,7 +8,7 @@ const middleware = require('zustand/middleware') as typeof ZustandMiddleware;
 const { persist, createJSONStorage } = middleware;
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AddictionType, RecoveryProfile } from '@/domain/gambling';
-import { streakDays, currentStreakStart } from '@/domain/gambling';
+import { ADDICTIONS, streakDays, currentStreakStart } from '@/domain/gambling';
 import { currentWeekStart } from '@/domain/pornRecovery';
 import type { Badge, Goal, GoalKind } from '@/domain/achievements';
 import type { SudokuLevel } from '@/domain/games/sudoku';
@@ -62,6 +62,22 @@ import { missionById, missionDayKey } from '@/domain/missions';
 import { challengeDayNumber, dailyChallengeTarget } from '@/domain/games/inhibition';
 import { normalizeSelectedAddictions } from '@/domain/multiAddiction';
 import { journalCompletedToday } from '@/domain/addictionJournal';
+import {
+  RECOVERY_STATE_SCHEMA_VERSION,
+  migrateRecoveryState,
+} from '@/domain/recoveryStateMigration';
+import {
+  RECOVERY_TRACK_SETUP_VERSION,
+  createRecoverySetupSubmission,
+  recoveryProfileFromTrackSetup,
+  recoveryProfilesFromSubmission,
+  toLocalMidnight,
+  trackUsesExpense,
+  validateRecoveryTrackSetup,
+  type RecoverySetupSubmission,
+  type RecoveryTrackResult,
+  type RecoveryTrackSetup,
+} from '@/domain/recoveryTrackSetup';
 
 /**
  * Single local store for the recovery companion. Offline-first: no accounts,
@@ -128,6 +144,8 @@ export const initialGames: GamesState = {
 
 export interface AddictionRecoverySnapshot {
   profile: RecoveryProfile;
+  /** Explicit setup provenance. Empty optional values never imply incomplete setup. */
+  setup: RecoveryTrackSetup;
   checkIns: DailyCheckIn[];
   urges: UrgeLog[];
   relapses: RelapseEvent[];
@@ -176,7 +194,11 @@ export interface PersistedJournalDraft {
   values: Record<string, unknown>;
 }
 
-interface RecoveryState {
+export type EditableProfilePatch = Partial<
+  Omit<RecoveryProfile, 'addictionType' | 'selectedAddictions'>
+>;
+
+export interface RecoveryState {
   onboarded: boolean;
   disclaimerAccepted: boolean;
   profile: RecoveryProfile | null;
@@ -420,7 +442,21 @@ interface RecoveryState {
    *  today's pick already exists. */
   ensureDailyQuote: () => number;
 
+  /** @deprecated Compatibility entry point for legacy callers. */
   completeSetup: (profile: RecoveryProfile) => void;
+  completeSetupV2: (submission: RecoverySetupSubmission) => RecoveryTrackResult<undefined>;
+  addRecoveryTrack: (track: RecoveryTrackSetup) =>
+    'added' | 'already_selected' | 'archived_exists' | 'invalid';
+  archiveRecoveryTrack: (addiction: AddictionType) =>
+    'archived' | 'only_track' | 'not_selected';
+  resumeRecoveryTrack: (addiction: AddictionType) =>
+    'resumed' | 'already_selected' | 'missing_history' | 'needs_review';
+  completeLegacyTrackSetup: (
+    track: RecoveryTrackSetup,
+    options?: { resumeIfArchived?: boolean },
+  ) =>
+    'completed' | 'missing_track' | 'invalid';
+  restoreBackup: (data: unknown, fromVersion?: number) => 'restored' | 'invalid';
   setActiveAddiction: (addiction: AddictionType) => void;
   ensureDailyJournalPlan: () => AddictionType[];
   saveJournalDraft: (addiction: AddictionType, values: Record<string, unknown>) => void;
@@ -431,10 +467,10 @@ interface RecoveryState {
   /** Recompute earned badges + goal completions; returns badges newly earned
    *  since the last call (for celebration). Safe to call on any change. */
   syncAchievements: () => Badge[];
-  updateProfile: (patch: Partial<RecoveryProfile>) => void;
+  updateProfile: (patch: EditableProfilePatch) => void;
   submitCheckIn: (data: Omit<DailyCheckIn, 'id' | 'at'>) => void;
-  logUrge: (data: Omit<UrgeLog, 'id' | 'at'>) => string;
-  updateUrge: (id: string, data: Omit<UrgeLog, 'id' | 'at'>) => void;
+  logUrge: (data: Omit<UrgeLog, 'id' | 'at' | 'source'>) => string;
+  updateUrge: (id: string, data: Omit<UrgeLog, 'id' | 'at' | 'source'>) => void;
   deleteUrge: (id: string) => void;
   logRelapse: (data: Omit<RelapseEvent, 'id' | 'at'>) => void;
   addJournal: (data: Omit<JournalEntry, 'id' | 'at'>) => void;
@@ -451,6 +487,46 @@ interface RecoveryState {
   resetAll: () => void;
 }
 
+type RecoveryDataState = Partial<RecoveryState>;
+let initialRecoveryData: RecoveryDataState | null = null;
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function recoveryDataOnly(state: RecoveryState): RecoveryDataState {
+  return Object.fromEntries(
+    Object.entries(state).filter(([, value]) => typeof value !== 'function'),
+  ) as RecoveryDataState;
+}
+
+function cloneRecoveryData(data: RecoveryDataState): RecoveryDataState {
+  return JSON.parse(JSON.stringify(data)) as RecoveryDataState;
+}
+
+/** Whitelist imported JSON against current persisted data keys and broad shapes. */
+function sanitizeImportedRecoveryData(
+  imported: Record<string, unknown>,
+  defaults: RecoveryDataState,
+): RecoveryDataState {
+  const safe: Record<string, unknown> = {};
+  for (const [key, fallback] of Object.entries(defaults)) {
+    if (!Object.prototype.hasOwnProperty.call(imported, key)) continue;
+    const value = imported[key];
+    if (value === undefined) continue;
+    if (Array.isArray(fallback)) {
+      if (Array.isArray(value)) safe[key] = value;
+    } else if (fallback === null) {
+      safe[key] = value;
+    } else if (isPlainRecord(fallback)) {
+      if (isPlainRecord(value)) safe[key] = value;
+    } else if (typeof value === typeof fallback) {
+      safe[key] = value;
+    }
+  }
+  return safe as RecoveryDataState;
+}
+
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -461,6 +537,66 @@ function evt(type: TimelineType, label: string): TimelineEvent {
 
 function selectedAddictions(profile: RecoveryProfile): AddictionType[] {
   return normalizeSelectedAddictions(profile.addictionType, profile.selectedAddictions);
+}
+
+/** Lossless compatibility metadata for profiles created before setup v1. */
+function setupFromLegacyProfile(
+  profile: RecoveryProfile,
+  status: RecoveryTrackSetup['setupStatus'],
+  completedAt = Date.now(),
+): RecoveryTrackSetup {
+  return {
+    addictionType: profile.addictionType,
+    ...(profile.addictionDetail?.trim()
+      ? { addictionDetail: profile.addictionDetail.trim() }
+      : {}),
+    goalMode: 'quit',
+    startedAtLocalMidnight: toLocalMidnight(profile.startedAt),
+    ...(trackUsesExpense(profile.addictionType)
+      ? {
+          expense: {
+            amount: Number.isFinite(profile.expenseAmount) && profile.expenseAmount >= 0
+              ? profile.expenseAmount
+              : 0,
+            period: profile.expensePeriod ?? 'weekly',
+            currency: profile.currency || '₱',
+          },
+        }
+      : {}),
+    triggers: Array.isArray(profile.triggers) ? [...profile.triggers] : [],
+    reason: profile.reason ?? '',
+    setupVersion: RECOVERY_TRACK_SETUP_VERSION,
+    setupStatus: status,
+    ...((status === 'complete' || status === 'archived')
+      ? { setupCompletedAt: completedAt }
+      : {}),
+  };
+}
+
+function setupWithProfileEdits(
+  setup: RecoveryTrackSetup,
+  profile: RecoveryProfile,
+): RecoveryTrackSetup {
+  const { addictionDetail: _oldDetail, expense: _oldExpense, ...base } = setup;
+  return {
+    ...base,
+    addictionType: profile.addictionType,
+    ...(profile.addictionDetail?.trim()
+      ? { addictionDetail: profile.addictionDetail.trim() }
+      : {}),
+    startedAtLocalMidnight: toLocalMidnight(profile.startedAt),
+    ...(trackUsesExpense(profile.addictionType)
+      ? {
+          expense: {
+            amount: Math.max(0, profile.expenseAmount),
+            period: profile.expensePeriod,
+            currency: profile.currency,
+          },
+        }
+      : {}),
+    triggers: [...profile.triggers],
+    reason: profile.reason,
+  };
 }
 
 function seededJournalEntry(addiction: AddictionType, at: number, relapsed: boolean): JournalEntry {
@@ -500,10 +636,13 @@ function initialRecoveryHistory(profile: RecoveryProfile): Pick<AddictionRecover
   return { relapses, journal, timeline: [evt('start', 'Recovery started')] };
 }
 
-function createAddictionSnapshot(profile: RecoveryProfile): AddictionRecoverySnapshot {
+function createAddictionSnapshot(
+  profile: RecoveryProfile,
+  setup: RecoveryTrackSetup = setupFromLegacyProfile(profile, 'needs_review'),
+): AddictionRecoverySnapshot {
   const history = initialRecoveryHistory(profile);
   return {
-    profile, checkIns: [], urges: [], relapses: history.relapses, journal: history.journal,
+    profile, setup, checkIns: [], urges: [], relapses: history.relapses, journal: history.journal,
     reflections: [], timeline: history.timeline, points: 0, longestStreak: 0,
     goals: [], celebratedBadges: [], alternatives: {}, altCounts: {}, altAchievements: {},
     altSeconds: {}, altSessions: {}, walkSteps: 0, walkMeters: 0,
@@ -543,8 +682,10 @@ function createSecondaryProfile(
 
 function captureAddictionSnapshot(s: RecoveryState): AddictionRecoverySnapshot | null {
   if (!s.profile) return null;
+  const storedSetup = s.recoveryByAddiction[s.profile.addictionType]?.setup
+    ?? setupFromLegacyProfile(s.profile, 'needs_review');
   return {
-    profile: s.profile, checkIns: s.checkIns, urges: s.urges, relapses: s.relapses,
+    profile: s.profile, setup: storedSetup, checkIns: s.checkIns, urges: s.urges, relapses: s.relapses,
     journal: s.journal, reflections: s.reflections, timeline: s.timeline,
     points: s.points, longestStreak: s.longestStreak, goals: s.goals,
     celebratedBadges: s.celebratedBadges, alternatives: s.alternatives,
@@ -560,6 +701,51 @@ function captureAddictionSnapshot(s: RecoveryState): AddictionRecoverySnapshot |
     urgesResistedWeek: s.urgesResistedWeek, healthyHabitsCount: s.healthyHabitsCount,
     dailyMissions: s.dailyMissions, missionXp: s.missionXp,
   };
+}
+
+function activeStateFromSnapshot(snapshot: AddictionRecoverySnapshot): Omit<AddictionRecoverySnapshot, 'setup'> {
+  const { setup: _setup, ...activeState } = snapshot;
+  return activeState;
+}
+
+function synchronizeSnapshotProfiles(
+  snapshots: Partial<Record<AddictionType, AddictionRecoverySnapshot>>,
+  selections: AddictionType[],
+  account: Pick<RecoveryProfile, 'name' | 'age'>,
+): Partial<Record<AddictionType, AddictionRecoverySnapshot>> {
+  const synchronized: Partial<Record<AddictionType, AddictionRecoverySnapshot>> = {};
+  for (const [key, snapshot] of Object.entries(snapshots) as Array<
+    [AddictionType, AddictionRecoverySnapshot | undefined]
+  >) {
+    if (!snapshot) continue;
+    synchronized[key] = {
+      ...snapshot,
+      profile: {
+        ...snapshot.profile,
+        name: account.name,
+        ...(account.age == null ? { age: undefined } : { age: account.age }),
+        selectedAddictions: [...selections],
+      },
+    };
+  }
+  return synchronized;
+}
+
+/** Build a backup-safe map whose active snapshot reflects current root state. */
+export function materializeRecoveryByAddiction(
+  state: RecoveryState,
+): Partial<Record<AddictionType, AddictionRecoverySnapshot>> {
+  if (!state.profile) return { ...state.recoveryByAddiction };
+  const current = captureAddictionSnapshot(state);
+  const selections = selectedAddictions(state.profile);
+  return synchronizeSnapshotProfiles(
+    {
+      ...state.recoveryByAddiction,
+      ...(current ? { [current.profile.addictionType]: current } : {}),
+    },
+    selections,
+    state.profile,
+  );
 }
 
 function journalForAddictionState(s: RecoveryState, addiction: AddictionType): JournalEntry[] {
@@ -1435,13 +1621,22 @@ export const useStore = create<RecoveryState>()(
 
       completeSetup: (profile) => {
         const selections = selectedAddictions(profile);
+        // Compatibility is deliberately single-track only. Multi-track
+        // creation must use completeSetupV2 so every category is validated.
+        if (selections.length !== 1) return;
         profile = { ...profile, selectedAddictions: selections };
         const recoveryByAddiction: Partial<Record<AddictionType, AddictionRecoverySnapshot>> = {};
         for (const addictionType of selections) {
           const trackProfile = addictionType === profile.addictionType
             ? profile
             : createSecondaryProfile(profile, addictionType, selections);
-          recoveryByAddiction[addictionType] = createAddictionSnapshot(trackProfile);
+          recoveryByAddiction[addictionType] = createAddictionSnapshot(
+            trackProfile,
+            setupFromLegacyProfile(
+              trackProfile,
+              addictionType === profile.addictionType ? 'complete' : 'needs_review',
+            ),
+          );
         }
         // If the user last used on a past day, seed:
         //   1. A RelapseEvent on that day (for streak math).
@@ -1536,6 +1731,283 @@ export const useStore = create<RecoveryState>()(
         });
       },
 
+      completeSetupV2: (submission) => {
+        const validated = createRecoverySetupSubmission(submission);
+        if (!validated.ok) return validated;
+
+        const profiles = recoveryProfilesFromSubmission(validated.value);
+        const recoveryByAddiction: Partial<Record<AddictionType, AddictionRecoverySnapshot>> = {};
+        for (const addictionType of profiles.trackOrder) {
+          const profile = profiles.profiles[addictionType];
+          const setup = validated.value.tracks[addictionType];
+          if (!profile || !setup) continue;
+          recoveryByAddiction[addictionType] = createAddictionSnapshot(profile, setup);
+        }
+        const active = recoveryByAddiction[validated.value.activeTrack];
+        if (!active) {
+          return {
+            ok: false,
+            issues: [{
+              code: 'active_track_missing',
+              field: 'activeTrack',
+              message: 'The active recovery track could not be created.',
+            }],
+          };
+        }
+
+        set({
+          onboarded: true,
+          ...activeStateFromSnapshot(active),
+          recoveryByAddiction,
+          dailyJournalPlan: null,
+          journalDrafts: {},
+        });
+        return { ok: true, value: undefined };
+      },
+
+      addRecoveryTrack: (track) => {
+        const currentState = get();
+        const currentProfile = currentState.profile;
+        if (!currentProfile || validateRecoveryTrackSetup(track).length > 0 || track.setupStatus !== 'complete') {
+          return 'invalid';
+        }
+        const selections = selectedAddictions(currentProfile);
+        if (selections.includes(track.addictionType)) return 'already_selected';
+        if (currentState.recoveryByAddiction[track.addictionType]) return 'archived_exists';
+
+        const nextSelections = [...selections, track.addictionType];
+        const currentSnapshot = captureAddictionSnapshot(currentState);
+        const baseMap = currentSnapshot
+          ? {
+              ...currentState.recoveryByAddiction,
+              [currentSnapshot.profile.addictionType]: currentSnapshot,
+            }
+          : { ...currentState.recoveryByAddiction };
+        const newProfile = recoveryProfileFromTrackSetup(
+          { name: currentProfile.name, age: currentProfile.age },
+          track,
+          nextSelections,
+          currentProfile.currency,
+        );
+        baseMap[track.addictionType] = createAddictionSnapshot(newProfile, track);
+        const recoveryByAddiction = synchronizeSnapshotProfiles(
+          baseMap,
+          nextSelections,
+          currentProfile,
+        );
+        set({
+          profile: { ...currentProfile, selectedAddictions: nextSelections },
+          recoveryByAddiction,
+        });
+        return 'added';
+      },
+
+      archiveRecoveryTrack: (addiction) => {
+        const currentState = get();
+        const currentProfile = currentState.profile;
+        if (!currentProfile) return 'not_selected';
+        const selections = selectedAddictions(currentProfile);
+        if (!selections.includes(addiction)) return 'not_selected';
+        if (selections.length === 1) return 'only_track';
+
+        const nextSelections = selections.filter((item) => item !== addiction);
+        const currentSnapshot = captureAddictionSnapshot(currentState);
+        const baseMap = currentSnapshot
+          ? {
+              ...currentState.recoveryByAddiction,
+              [currentSnapshot.profile.addictionType]: currentSnapshot,
+            }
+          : { ...currentState.recoveryByAddiction };
+        const archived = baseMap[addiction];
+        if (archived) {
+          baseMap[addiction] = {
+            ...archived,
+            setup: { ...archived.setup, setupStatus: 'archived' },
+          };
+        }
+        const recoveryByAddiction = synchronizeSnapshotProfiles(
+          baseMap,
+          nextSelections,
+          currentProfile,
+        );
+
+        if (currentProfile.addictionType !== addiction) {
+          set({
+            profile: { ...currentProfile, selectedAddictions: nextSelections },
+            recoveryByAddiction,
+          });
+          return 'archived';
+        }
+
+        const nextActive = nextSelections[0];
+        const target = recoveryByAddiction[nextActive];
+        if (!target) return 'not_selected';
+        set({
+          ...activeStateFromSnapshot(target),
+          profile: {
+            ...target.profile,
+            name: currentProfile.name,
+            age: currentProfile.age,
+            selectedAddictions: nextSelections,
+          },
+          recoveryByAddiction,
+        });
+        return 'archived';
+      },
+
+      resumeRecoveryTrack: (addiction) => {
+        const currentState = get();
+        const currentProfile = currentState.profile;
+        if (!currentProfile) return 'missing_history';
+        const selections = selectedAddictions(currentProfile);
+        if (selections.includes(addiction)) return 'already_selected';
+        const archived = currentState.recoveryByAddiction[addiction];
+        if (!archived) return 'missing_history';
+        const resumedSetup: RecoveryTrackSetup = {
+          ...archived.setup,
+          setupStatus: 'complete',
+        };
+        if (
+          !['archived', 'complete'].includes(archived.setup.setupStatus)
+          || validateRecoveryTrackSetup(resumedSetup).length > 0
+        ) return 'needs_review';
+
+        const nextSelections = [...selections, addiction];
+        const currentSnapshot = captureAddictionSnapshot(currentState);
+        const baseMap = {
+          ...currentState.recoveryByAddiction,
+          ...(currentSnapshot
+            ? { [currentSnapshot.profile.addictionType]: currentSnapshot }
+            : {}),
+          [addiction]: {
+            ...archived,
+            setup: resumedSetup,
+          },
+        };
+        const recoveryByAddiction = synchronizeSnapshotProfiles(
+          baseMap,
+          nextSelections,
+          currentProfile,
+        );
+        set({
+          profile: { ...currentProfile, selectedAddictions: nextSelections },
+          recoveryByAddiction,
+        });
+        return 'resumed';
+      },
+
+      completeLegacyTrackSetup: (track, options) => {
+        const currentState = get();
+        const currentProfile = currentState.profile;
+        if (!currentProfile || validateRecoveryTrackSetup(track).length > 0 || track.setupStatus !== 'complete') {
+          return 'invalid';
+        }
+        const existing = currentState.recoveryByAddiction[track.addictionType];
+        if (!existing) return 'missing_track';
+        const currentSelections = selectedAddictions(currentProfile);
+        const selections = options?.resumeIfArchived && !currentSelections.includes(track.addictionType)
+          ? [...currentSelections, track.addictionType]
+          : currentSelections;
+        const trackProfile = recoveryProfileFromTrackSetup(
+          { name: currentProfile.name, age: currentProfile.age },
+          track,
+          selections,
+          currentProfile.currency,
+        );
+        const updated: AddictionRecoverySnapshot = {
+          ...existing,
+          profile: trackProfile,
+          setup: track,
+        };
+        const currentSnapshot = captureAddictionSnapshot(currentState);
+        const recoveryByAddiction = synchronizeSnapshotProfiles(
+          {
+            ...currentState.recoveryByAddiction,
+            ...(currentSnapshot
+              ? { [currentSnapshot.profile.addictionType]: currentSnapshot }
+              : {}),
+            [track.addictionType]: updated,
+          },
+          selections,
+          currentProfile,
+        );
+        set({
+          profile: currentProfile.addictionType === track.addictionType
+            ? { ...trackProfile, selectedAddictions: selections }
+            : { ...currentProfile, selectedAddictions: selections },
+          recoveryByAddiction,
+        });
+        return 'completed';
+      },
+
+      restoreBackup: (rawData, fromVersion = 0) => {
+        const migrated = migrateRecoveryState(rawData, fromVersion);
+        const migratedProfile = isPlainRecord(migrated.profile)
+          ? migrated.profile
+          : null;
+        const addictionType = migratedProfile?.addictionType;
+        const knownAddiction = typeof addictionType === 'string'
+          && ADDICTIONS.some((item) => item.key === addictionType);
+        if (
+          !migratedProfile
+          || !knownAddiction
+          || typeof migratedProfile.startedAt !== 'number'
+          || !Number.isFinite(migratedProfile.startedAt)
+        ) return 'invalid';
+
+        const defaults = cloneRecoveryData(
+          initialRecoveryData ?? recoveryDataOnly(get()),
+        );
+        const imported = sanitizeImportedRecoveryData(migrated, defaults);
+        const profile = {
+          ...(migratedProfile as unknown as RecoveryProfile),
+          selectedAddictions: normalizeSelectedAddictions(
+            addictionType as AddictionType,
+            Array.isArray(migratedProfile.selectedAddictions)
+              ? migratedProfile.selectedAddictions as AddictionType[]
+              : undefined,
+          ),
+        };
+        const today = missionDayKey();
+        const rawPlan = isPlainRecord(imported.dailyJournalPlan)
+          ? imported.dailyJournalPlan as unknown as DailyJournalPlan
+          : null;
+        const dailyJournalPlan = rawPlan?.day === today ? rawPlan : null;
+        const rawDrafts = isPlainRecord(imported.journalDrafts)
+          ? imported.journalDrafts as RecoveryState['journalDrafts']
+          : {};
+        const journalDrafts = Object.fromEntries(
+          Object.entries(rawDrafts).filter(([, draft]) => draft?.day === today),
+        ) as RecoveryState['journalDrafts'];
+        const storedMissions = isPlainRecord(imported.dailyMissions)
+          ? imported.dailyMissions as unknown as DailyMissionState
+          : null;
+
+        set({
+          ...defaults,
+          ...imported,
+          onboarded: true,
+          disclaimerAccepted: typeof imported.disclaimerAccepted === 'boolean'
+            ? imported.disclaimerAccepted
+            : true,
+          profile,
+          recoveryByAddiction: isPlainRecord(imported.recoveryByAddiction)
+            ? imported.recoveryByAddiction as RecoveryState['recoveryByAddiction']
+            : {},
+          dailyJournalPlan,
+          journalDrafts,
+          games: {
+            ...initialGames,
+            ...(isPlainRecord(imported.games) ? imported.games as Partial<GamesState> : {}),
+          },
+          dailyMissions: storedMissions?.day === today
+            ? storedMissions
+            : { day: today, completed: [] },
+          missionXp: typeof imported.missionXp === 'number' ? imported.missionXp : 0,
+        });
+        return 'restored';
+      },
+
       setActiveAddiction: (addiction) =>
         set((s) => {
           if (!s.profile || s.profile.addictionType === addiction) return s;
@@ -1545,15 +2017,11 @@ export const useStore = create<RecoveryState>()(
             : [];
           if (!selections.includes(addiction) && !requiredToday.includes(addiction)) return s;
           const current = captureAddictionSnapshot(s);
-          const target = s.recoveryByAddiction[addiction] ?? createAddictionSnapshot({
-            ...s.profile,
-            addictionType: addiction,
-            addictionDetail: undefined,
-            selectedAddictions: selections,
-          });
+          const target = s.recoveryByAddiction[addiction];
+          if (!target) return s;
           const today = missionDayKey();
           return {
-            ...target,
+            ...activeStateFromSnapshot(target),
             profile: {
               ...target.profile,
               name: s.profile.name,
@@ -1641,23 +2109,27 @@ export const useStore = create<RecoveryState>()(
       updateProfile: (patch) =>
         set((s) => {
           if (!s.profile) return s;
-          const profile = { ...s.profile, ...patch };
-          const previousSelections = selectedAddictions(s.profile);
-          const nextSelections = selectedAddictions(profile);
-          const added = nextSelections.filter((addiction) => !previousSelections.includes(addiction));
-          if (added.length === 0) return { profile };
-
-          const recoveryByAddiction = { ...s.recoveryByAddiction };
-          for (const addiction of added) {
-            // Re-selecting a previously removed track restores its history;
-            // only a genuinely new track receives a fresh snapshot.
-            if (!recoveryByAddiction[addiction]) {
-              recoveryByAddiction[addiction] = createAddictionSnapshot(
-                createSecondaryProfile(profile, addiction, nextSelections),
-              );
-            }
-          }
-          return { profile, recoveryByAddiction };
+          // Track lifecycle is deliberately excluded. Callers cannot add,
+          // archive, or switch a track through a generic profile patch.
+          const { addictionType: _type, selectedAddictions: _selected, ...editable } =
+            patch as Partial<RecoveryProfile>;
+          const profile = { ...s.profile, ...editable };
+          const activeSnapshot = s.recoveryByAddiction[profile.addictionType];
+          return {
+            profile,
+            ...(activeSnapshot
+              ? {
+                  recoveryByAddiction: {
+                    ...s.recoveryByAddiction,
+                    [profile.addictionType]: {
+                      ...activeSnapshot,
+                      profile,
+                      setup: setupWithProfileEdits(activeSnapshot.setup, profile),
+                    },
+                  },
+                }
+              : {}),
+          };
         }),
 
       submitCheckIn: (data) => {
@@ -1685,7 +2157,7 @@ export const useStore = create<RecoveryState>()(
 
       logUrge: (data) => {
         const now = Date.now();
-        const entry: UrgeLog = { ...data, id: uid(), at: now };
+        const entry: UrgeLog = { ...data, id: uid(), at: now, source: 'manual' };
         set((s) => ({
           urges: [entry, ...s.urges],
           points: s.points + 5,
@@ -1826,55 +2298,26 @@ export const useStore = create<RecoveryState>()(
           }
 
           if (data.watched === false) {
-            const now = Date.now();
-            const cleanTriggers = data.triggersEncountered ?? (data.trigger ? [data.trigger] : undefined);
-            const urgeEntry: UrgeLog = {
-              id: uid(),
-              at: now,
-              intensity: data.urgeIntensity ?? 1,
-              trigger: cleanTriggers?.[0] ?? 'Daily journal',
-              triggers: cleanTriggers,
-              notes: data.whatHelped ?? data.text,
-              resisted: true,
-              mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
-                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
                 ...s.timeline,
               ],
             };
           }
 
           if (data.gambled === false) {
-            const now = Date.now();
-            const urgeEntry: UrgeLog = {
-              id: uid(),
-              at: now,
-              intensity: 1,
-              trigger: 'Daily journal',
-              triggers: ['Daily journal'],
-              notes: data.text,
-              resisted: true,
-              mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
-                evt('urge', 'Logged a clean-day urge check from journal'),
                 ...s.timeline,
               ],
             };
@@ -1902,21 +2345,13 @@ export const useStore = create<RecoveryState>()(
           }
 
           if (data.otherActed === false) {
-            const now = Date.now();
-            const urgeEntry: UrgeLog = {
-              id: uid(), at: now, intensity: 1, trigger: 'Daily journal',
-              triggers: ['Daily journal'], notes: data.text, resisted: true, mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a custom habit journal entry - clean day'),
-                evt('urge', 'Logged a clean-day urge check from journal'),
                 ...s.timeline,
               ],
             };
@@ -1949,28 +2384,13 @@ export const useStore = create<RecoveryState>()(
           }
 
           if (data.binged === false) {
-            const now = Date.now();
-            const cleanTriggers = data.socialTriggersEncountered;
-            const urgeEntry: UrgeLog = {
-              id: uid(),
-              at: now,
-              intensity: data.socialUrgeIntensity ?? 1,
-              trigger: cleanTriggers?.[0] ?? 'Daily journal',
-              triggers: cleanTriggers?.length ? cleanTriggers : ['Daily journal'],
-              notes: data.socialWhatHelped ?? data.text,
-              resisted: true,
-              mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
-                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
                 ...s.timeline,
               ],
             };
@@ -2003,27 +2423,13 @@ export const useStore = create<RecoveryState>()(
           }
 
           if (data.smoked === false) {
-            const now = Date.now();
-            const urgeEntry: UrgeLog = {
-              id: uid(),
-              at: now,
-              intensity: data.smokeUrgeIntensity ?? 1,
-              trigger: data.smokeTrigger ?? 'Daily journal',
-              triggers: data.smokeTrigger ? [data.smokeTrigger] : ['Daily journal'],
-              notes: data.smokeWhatHelped ?? data.text,
-              resisted: true,
-              mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
-                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
                 ...s.timeline,
               ],
             };
@@ -2056,28 +2462,13 @@ export const useStore = create<RecoveryState>()(
           }
 
           if (data.drank === false) {
-            const now = Date.now();
-            const cleanTriggers = data.triggersEncountered;
-            const urgeEntry: UrgeLog = {
-              id: uid(),
-              at: now,
-              intensity: data.alcoholUrgeIntensity ?? 1,
-              trigger: cleanTriggers?.[0] ?? 'Daily journal',
-              triggers: cleanTriggers?.length ? cleanTriggers : ['Daily journal'],
-              notes: data.alcoholWhatHelped ?? data.text,
-              resisted: true,
-              mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
-                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
                 ...s.timeline,
               ],
             };
@@ -2110,27 +2501,13 @@ export const useStore = create<RecoveryState>()(
           }
 
           if (data.used === false) {
-            const now = Date.now();
-            const urgeEntry: UrgeLog = {
-              id: uid(),
-              at: now,
-              intensity: data.drugUrgeIntensity ?? 1,
-              trigger: data.drugWhatHelped ?? 'Daily journal',
-              triggers: data.drugWhatHelped ? [data.drugWhatHelped] : ['Daily journal'],
-              notes: data.drugWhatHelped ?? data.text,
-              resisted: true,
-              mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
-                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
                 ...s.timeline,
               ],
             };
@@ -2163,27 +2540,13 @@ export const useStore = create<RecoveryState>()(
           }
 
           if (data.played === false) {
-            const now = Date.now();
-            const urgeEntry: UrgeLog = {
-              id: uid(),
-              at: now,
-              intensity: data.gamingUrgeIntensity ?? 1,
-              trigger: data.gamingWhatHelped ?? 'Daily journal',
-              triggers: data.gamingWhatHelped ? [data.gamingWhatHelped] : ['Daily journal'],
-              notes: data.gamingWhatHelped ?? data.text,
-              resisted: true,
-              mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
-                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
                 ...s.timeline,
               ],
             };
@@ -2217,27 +2580,13 @@ export const useStore = create<RecoveryState>()(
           }
 
           if (data.shopped === false) {
-            const now = Date.now();
-            const urgeEntry: UrgeLog = {
-              id: uid(),
-              at: now,
-              intensity: data.shopUrgeIntensity ?? 1,
-              trigger: data.shopWhatHelped ?? 'Daily journal',
-              triggers: data.shopWhatHelped ? [data.shopWhatHelped] : ['Daily journal'],
-              notes: data.shopWhatHelped ?? data.text,
-              resisted: true,
-              mood: data.mood,
-            };
             return {
               journal: journalAfter,
-              urges: [urgeEntry, ...s.urges],
               points: s.points + 5 + altUnlocked.length * 5,
-              ...resistedCounterPatch(s, now),
               ...altPatch,
               timeline: [
                 ...altEvents,
                 evt('journal', 'Wrote a journal entry - clean day'),
-                evt('urge', `Resisted urge via journal - intensity ${urgeEntry.intensity}/10`),
                 ...s.timeline,
               ],
             };
@@ -2289,30 +2638,66 @@ export const useStore = create<RecoveryState>()(
       setTheme: (t) => set({ themePref: t }),
 
       resetRecovery: () =>
-        set((s) => ({
-          checkIns: [],
-          urges: [],
-          relapses: [],
-          journal: [],
-          reflections: [],
-          timeline: [evt('start', 'Recovery restarted')],
-          points: 0,
-          longestStreak: 0,
-          goals: [],
-          celebratedBadges: [],
-          alternatives: {},
-          dailyJournalPlan: null,
-          journalDrafts: {},
-          needOrWantCooldown: null,
-          needOrWantEntries: [],
-          activeNeedOrWantId: null,
-          // Weekly porn-recovery counters are recovery data - restart them
-          // with the streak. Lifetime habit totals are kept, like altCounts.
-          urgesResisted: 0,
-          urgesResistedWeek: 0,
-          // Restart the streak from right now, keeping all profile details.
-          profile: s.profile ? { ...s.profile, startedAt: Date.now() } : null,
-        })),
+        set((s) => {
+          const profile = s.profile
+            ? { ...s.profile, startedAt: toLocalMidnight(Date.now()) }
+            : null;
+          const activeSnapshot = profile
+            ? s.recoveryByAddiction[profile.addictionType]
+            : undefined;
+          const restartTimeline = [evt('start', 'Recovery restarted')];
+          return {
+            checkIns: [],
+            urges: [],
+            relapses: [],
+            journal: [],
+            reflections: [],
+            timeline: restartTimeline,
+            points: 0,
+            longestStreak: 0,
+            goals: [],
+            celebratedBadges: [],
+            alternatives: {},
+            dailyJournalPlan: null,
+            journalDrafts: {},
+            needOrWantCooldown: null,
+            needOrWantEntries: [],
+            activeNeedOrWantId: null,
+            // Weekly porn-recovery counters are recovery data - restart them
+            // with the streak. Lifetime habit totals are kept, like altCounts.
+            urgesResisted: 0,
+            urgesResistedWeek: 0,
+            profile,
+            ...(profile && activeSnapshot
+              ? {
+                  recoveryByAddiction: {
+                    ...s.recoveryByAddiction,
+                    [profile.addictionType]: {
+                      ...activeSnapshot,
+                      profile,
+                      setup: setupWithProfileEdits(activeSnapshot.setup, profile),
+                      checkIns: [],
+                      urges: [],
+                      relapses: [],
+                      journal: [],
+                      reflections: [],
+                      timeline: restartTimeline,
+                      points: 0,
+                      longestStreak: 0,
+                      goals: [],
+                      celebratedBadges: [],
+                      alternatives: {},
+                      needOrWantCooldown: null,
+                      needOrWantEntries: [],
+                      activeNeedOrWantId: null,
+                      urgesResisted: 0,
+                      urgesResistedWeek: 0,
+                    },
+                  },
+                }
+              : {}),
+          };
+        }),
 
       resetAll: () => {
         // Remove the AsyncStorage key so wiped state persists across restarts.
@@ -2382,7 +2767,9 @@ export const useStore = create<RecoveryState>()(
     }),
     {
       name: PERSIST_KEY,
+      version: RECOVERY_STATE_SCHEMA_VERSION,
       storage: createJSONStorage(() => persistentStorage),
+      migrate: (persistedState, fromVersion) => migrateRecoveryState(persistedState, fromVersion),
       // Deep-merge the games slice so users upgrading from an older build get
       // defaults for fields that didn't exist when their state was saved.
       // Also normalise dailyMissions to today so the selector never has to
@@ -2419,6 +2806,10 @@ export const useStore = create<RecoveryState>()(
     },
   ),
 );
+
+// Capture a pristine, action-free baseline once. Backup restore starts here so
+// fields absent from older backups cannot leak from the currently open profile.
+initialRecoveryData = cloneRecoveryData(recoveryDataOnly(useStore.getInitialState()));
 
 // --- selectors --------------------------------------------------------------
 

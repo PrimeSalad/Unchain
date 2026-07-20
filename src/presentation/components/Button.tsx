@@ -61,9 +61,10 @@ export function Button({ label, onPress, kind = 'primary', disabled, full, style
       <Animated.View
         style={[
           {
-            height: 50,
+            minHeight: 50,
             minWidth: 100,
             paddingHorizontal: spacing.xl,
+            paddingVertical: spacing.md,
             borderRadius: radius.button,
             backgroundColor: t.bg,
             alignItems: 'center',

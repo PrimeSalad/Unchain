@@ -166,6 +166,10 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="onboarding" />
+            <Stack.Screen
+              name="recovery-track-setup"
+              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+            />
             <Stack.Screen name="loading" options={{ animation: 'fade' }} />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen

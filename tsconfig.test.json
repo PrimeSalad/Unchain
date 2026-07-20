@@ -14,6 +14,9 @@
     "src/domain/gambling.ts",
     "src/domain/records.ts",
     "src/domain/multiAddiction.ts",
-    "src/domain/addictionJournal.ts"
+    "src/domain/addictionJournal.ts",
+    "src/domain/recoveryTrackSetup.ts",
+    "src/domain/recoveryStateMigration.ts",
+    "src/domain/patternInsights.ts"
   ]
 }
