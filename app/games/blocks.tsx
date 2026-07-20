@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Easing, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
@@ -16,14 +16,17 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import { playSound } from '@/application/sound';
 import { nextAchievementHint, type GameAchievement } from '@/domain/games/achievements';
+import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 import {
   SIZE,
+  acceptsInteractionCallback,
   canPlace,
   canPlaceAnywhere,
   clearLines,
   emptyGrid,
   hasAnyMove,
   newTray,
+  nextInteractionGeneration,
   place,
   scorePlacement,
   type Grid,
@@ -60,15 +63,24 @@ export default function Blocks() {
   const [unlocked, setUnlocked] = useState<GameAchievement[]>([]);
   const [newBest, setNewBest] = useState(false);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
   const [gridFrame, setGridFrame] = useState<{ x: number; y: number; cell: number } | null>(null);
   const [flashCells, setFlashCells] = useState<Set<number>>(new Set());
   const [scorePop, setScorePop] = useState<{ amount: number; key: number } | null>(null);
+  const [interactionGeneration, setInteractionGeneration] = useState(0);
   const flashAnim = useRef(new Animated.Value(0)).current;
   const maxComboRef = useRef(0);
   const maxLinesRef = useRef(0);
+  const finishedRef = useRef(false);
+  const generationRef = useRef(0);
+  const interactionGenerationRef = useRef(0);
 
   const gridBoxRef = useRef<View>(null);
   const tutorial = useGameTutorial('blocks');
+  const tutorialVisibleRef = useRef(tutorial.visible);
+  tutorialVisibleRef.current = tutorial.visible;
+  const appActiveRef = useRef(AppState.currentState == null || AppState.currentState === 'active');
+  const reduceMotion = useReducedMotion();
   const layout = useSquareBoardSize({ reservedHeight: 378, horizontalPadding: spacing.lg * 2, max: 328 });
   const trayCell = layout.compact ? 18 : 22;
 
@@ -84,9 +96,29 @@ export default function Blocks() {
   // double-place a piece.
   const dragRef = useRef<Drag | null>(null);
 
-  const measure = useCallback(() => {
-    gridBoxRef.current?.measureInWindow((x, y, w) => setGridFrame({ x, y, cell: w / SIZE }));
+  const cancelInteraction = useCallback(() => {
+    const nextGeneration = nextInteractionGeneration(interactionGenerationRef.current);
+    interactionGenerationRef.current = nextGeneration;
+    setInteractionGeneration(nextGeneration);
+    dragRef.current = null;
+    setDrag(null);
+    setSelectedPiece(null);
   }, []);
+
+  const isCurrentInteraction = useCallback((callbackGeneration: number) => (
+    acceptsInteractionCallback(
+      callbackGeneration,
+      interactionGenerationRef.current,
+      tutorialVisibleRef.current || !appActiveRef.current || overRef.current,
+    )
+  ), []);
+
+  const measure = useCallback(() => {
+    gridBoxRef.current?.measureInWindow((x, y, w) => {
+      const inset = (layout.compact ? 4 : 5) + 1; // board padding + border
+      setGridFrame({ x: x + inset, y: y + inset, cell: (w - inset * 2) / SIZE });
+    });
+  }, [layout.compact]);
 
   const cellFor = useCallback((absX: number, absY: number, i: number) => {
     const f = frameRef.current;
@@ -101,8 +133,8 @@ export default function Blocks() {
     return { row, col, left, top };
   }, []);
 
-  const beginDrag = useCallback((i: number, absX: number, absY: number) => {
-    if (overRef.current) return;
+  const beginDrag = useCallback((callbackGeneration: number, i: number, absX: number, absY: number) => {
+    if (!isCurrentInteraction(callbackGeneration)) return;
     const p = piecesRef.current[i];
     if (!p) return;
     const c = cellFor(absX, absY, i);
@@ -110,9 +142,12 @@ export default function Blocks() {
     const next: Drag = { index: i, ...c, valid: canPlace(gridRef.current, p.shape, c.row, c.col) };
     dragRef.current = next;
     setDrag(next);
-  }, [cellFor]);
+  }, [cellFor, isCurrentInteraction]);
 
-  const moveDrag = useCallback((i: number, absX: number, absY: number) => {
+  const moveDrag = useCallback((callbackGeneration: number, i: number, absX: number, absY: number) => {
+    if (!isCurrentInteraction(callbackGeneration)) return;
+    const activeDrag = dragRef.current;
+    if (!activeDrag || activeDrag.index !== i) return;
     const p = piecesRef.current[i];
     if (!p) return;
     const c = cellFor(absX, absY, i);
@@ -120,9 +155,12 @@ export default function Blocks() {
     const next: Drag = { index: i, ...c, valid: canPlace(gridRef.current, p.shape, c.row, c.col) };
     dragRef.current = next;
     setDrag(next);
-  }, [cellFor]);
+  }, [cellFor, isCurrentInteraction]);
 
   const finishGame = useCallback((finalScore: number) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    overRef.current = true;
     setOver(true);
     const wasBest = finalScore > (useStore.getState().games.blocksBest || 0);
     setNewBest(wasBest);
@@ -136,22 +174,18 @@ export default function Blocks() {
     Haptics.notificationAsync(
       wasBest ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,
     ).catch(() => {});
-    setTimeout(() => setCelebrate(true), 550);
+    const generation = generationRef.current;
+    setTimeout(() => {
+      if (generation === generationRef.current && finishedRef.current) setCelebrate(true);
+    }, 550);
   }, [recordBlocks, completeMission]);
 
-  const dropDrag = useCallback((i: number) => {
-    // Claim the drag synchronously: onEnd AND onFinalize both call this, and
-    // the second call must find nothing to do.
-    const d = dragRef.current;
-    if (!d || d.index !== i) return;
-    dragRef.current = null;
-    setDrag(null);
-    if (!d.valid) return;
+  const placePieceAt = useCallback((i: number, row: number, col: number) => {
+    if (overRef.current) return;
     const piece = piecesRef.current[i];
-    if (!piece) return;
+    if (!piece || !canPlace(gridRef.current, piece.shape, row, col)) return;
 
-    // Place, then clear full lines.
-    const placed = place(gridRef.current, piece.shape, d.row, d.col, piece.color);
+    const placed = place(gridRef.current, piece.shape, row, col, piece.color);
     const { grid: cleared, lines } = clearLines(placed);
     const nextCombo = lines > 0 ? comboRef.current + 1 : 0;
     const gained = scorePlacement(piece.shape.size, lines, nextCombo);
@@ -162,8 +196,7 @@ export default function Blocks() {
     Haptics.impactAsync(lines > 0 ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     playSound(lines > 0 ? 'clear' : 'place', lines > 0 ? 0.8 : 0.7);
 
-    // Flash the cells that just cleared.
-    if (lines > 0) {
+    if (lines > 0 && !reduceMotion) {
       const clearedSet = new Set<number>();
       for (let k = 0; k < placed.length; k++) if (placed[k] !== 0 && cleared[k] === 0) clearedSet.add(k);
       setFlashCells(clearedSet);
@@ -171,36 +204,58 @@ export default function Blocks() {
       Animated.timing(flashAnim, { toValue: 0, duration: 380, easing: Easing.out(Easing.quad), useNativeDriver: false })
         .start(() => setFlashCells(new Set()));
     }
-    // Floating score pop.
     if (gained > 0) setScorePop({ amount: gained, key: Date.now() });
 
-    // Remove the used piece; refill the tray when all three are gone.
-    let nextPieces = piecesRef.current.map((p, idx) => (idx === i ? null : p));
-    if (nextPieces.every((p) => p == null)) nextPieces = newTray(nextScore);
+    let nextPieces = piecesRef.current.map((candidate, index) => (index === i ? null : candidate));
+    if (nextPieces.every((candidate) => candidate == null)) nextPieces = newTray(nextScore);
 
+    // Ref writes are synchronous so rapid taps cannot place one tray piece twice.
+    gridRef.current = cleared;
+    piecesRef.current = nextPieces;
+    scoreRef.current = nextScore;
+    comboRef.current = nextCombo;
     setGrid(cleared);
     setPieces(nextPieces);
     setScore(nextScore);
     setCombo(nextCombo);
+    setSelectedPiece(null);
+    AccessibilityInfo.announceForAccessibility(
+      lines > 0 ? `${lines} line${lines === 1 ? '' : 's'} cleared. Score ${nextScore}.` : `Piece placed. Score ${nextScore}.`,
+    );
 
-    // Game over the moment no remaining piece fits anywhere.
     if (!hasAnyMove(cleared, nextPieces)) finishGame(nextScore);
-  }, [finishGame, flashAnim]);
+  }, [finishGame, flashAnim, reduceMotion]);
+
+  const dropDrag = useCallback((callbackGeneration: number, i: number) => {
+    if (!isCurrentInteraction(callbackGeneration)) return;
+    // Claim the drag synchronously: onEnd AND onFinalize both call this, and
+    // the second call must find nothing to do.
+    const d = dragRef.current;
+    if (!d || d.index !== i) return;
+    dragRef.current = null;
+    setDrag(null);
+    if (!d.valid) return;
+    placePieceAt(i, d.row, d.col);
+  }, [placePieceAt]);
 
   // Three stable gestures (indices are fixed).
   const gestures = useMemo(
     () =>
       [0, 1, 2].map((i) =>
         Gesture.Pan()
-          .onBegin((e) => { runOnJS(beginDrag)(i, e.absoluteX, e.absoluteY); })
-          .onUpdate((e) => { runOnJS(moveDrag)(i, e.absoluteX, e.absoluteY); })
-          .onEnd(() => { runOnJS(dropDrag)(i); })
-          .onFinalize(() => { runOnJS(dropDrag)(i); }),
+          .minDistance(8)
+          .onStart((e) => { runOnJS(beginDrag)(interactionGeneration, i, e.absoluteX, e.absoluteY); })
+          .onUpdate((e) => { runOnJS(moveDrag)(interactionGeneration, i, e.absoluteX, e.absoluteY); })
+          .onEnd(() => { runOnJS(dropDrag)(interactionGeneration, i); })
+          .onFinalize(() => { runOnJS(dropDrag)(interactionGeneration, i); }),
       ),
-    [beginDrag, moveDrag, dropDrag],
+    [beginDrag, moveDrag, dropDrag, interactionGeneration],
   );
 
   const reset = () => {
+    cancelInteraction();
+    generationRef.current += 1;
+    finishedRef.current = false;
     setGrid(emptyGrid());
     setPieces(newTray(0));
     setScore(0);
@@ -209,14 +264,34 @@ export default function Blocks() {
     setCelebrate(false);
     setUnlocked([]);
     setNewBest(false);
-    dragRef.current = null;
-    setDrag(null);
     setFlashCells(new Set());
     setScorePop(null);
     maxComboRef.current = 0;
     maxLinesRef.current = 0;
     playSound('tap', 0.4);
   };
+
+  useEffect(() => {
+    if (tutorial.visible) cancelInteraction();
+  }, [tutorial.visible, cancelInteraction]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      appActiveRef.current = state === 'active';
+      if (!appActiveRef.current) cancelInteraction();
+    });
+    return () => subscription.remove();
+  }, [cancelInteraction]);
+
+  useFocusEffect(
+    useCallback(() => () => cancelInteraction(), [cancelInteraction]),
+  );
+
+  useEffect(() => () => {
+    generationRef.current += 1;
+    interactionGenerationRef.current = nextInteractionGeneration(interactionGenerationRef.current);
+    dragRef.current = null;
+  }, []);
 
   // Cells that would be filled by the current (valid) drag - for the ghost preview.
   const hoverCells = useMemo(() => {
@@ -244,7 +319,7 @@ export default function Blocks() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? 2 : spacing.sm }}>
           <BackButton fallback="/games" confirmExit />
           <Text variant="headline" style={{ flex: 1 }}>Block Puzzle</Text>
-          <TutorialInfoButton onPress={tutorial.open} />
+          <TutorialInfoButton onPress={() => { cancelInteraction(); tutorial.open(); }} />
         </View>
 
         {/* Stats bar — Score | Best | Combo */}
@@ -304,15 +379,28 @@ export default function Blocks() {
                   const v = grid[idx];
                   const ghost = hoverCells.has(idx);
                   const flashing = flashCells.has(idx);
+                  const selectedTrayPiece = selectedPiece == null ? null : pieces[selectedPiece];
+                  const validTapOrigin = !!selectedTrayPiece && canPlace(grid, selectedTrayPiece.shape, r, c);
                   return (
-                    <View key={c} style={{ flex: 1, padding: layout.compact ? 1.5 : 2 }}>
+                    <Pressable
+                      key={c}
+                      disabled={!validTapOrigin || over}
+                      onPress={() => {
+                        if (selectedPiece != null) placePieceAt(selectedPiece, r, c);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Board row ${r + 1}, column ${c + 1}${validTapOrigin ? ', valid placement' : ''}`}
+                      accessibilityHint={validTapOrigin ? 'Places the selected piece here.' : undefined}
+                      accessibilityState={{ disabled: !validTapOrigin || over }}
+                      style={({ pressed }) => ({ flex: 1, padding: layout.compact ? 1.5 : 2, opacity: pressed ? 0.7 : 1 })}
+                    >
                       <View
                         style={{
                           flex: 1,
                           borderRadius: layout.compact ? 5 : 6,
                           backgroundColor: v ? BLOCK_COLORS[v - 1] : ghost ? ghostBg : emptyCell,
-                          borderWidth: v ? 0 : 1,
-                          borderColor: ghost ? theme.color.primary : emptyBorder,
+                          borderWidth: validTapOrigin ? 2 : v ? 0 : 1,
+                          borderColor: ghost || validTapOrigin ? theme.color.primary : emptyBorder,
                           opacity: ghost && !v ? 0.5 : 1,
                           overflow: 'hidden',
                         }}
@@ -364,7 +452,7 @@ export default function Blocks() {
                           />
                         )}
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -375,23 +463,50 @@ export default function Blocks() {
           </View>
         </View>
 
+        <Text variant="caption" dim center style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xs }}>
+          {selectedPiece == null ? 'Drag a piece, or tap it then tap the board.' : 'Piece selected. Tap an outlined board square.'}
+        </Text>
+
         {/* Tray */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.sm : spacing.lg, minHeight: layout.compact ? 88 : 112, paddingBottom: layout.compact ? spacing.xs : spacing.md }}>
           {pieces.map((p, i) => {
             // A piece with no legal placement reads as clearly "stuck".
             const stuck = p != null && !canPlaceAnywhere(grid, p.shape);
+            const selected = selectedPiece === i;
             return (
-              <View key={i} style={{ width: layout.compact ? 92 : 112, height: layout.compact ? 92 : 112, alignItems: 'center', justifyContent: 'center' }}>
-                {p && !over && (
-                  <GestureDetector gesture={gestures[i]}>
+              <GestureDetector key={i} gesture={gestures[i]}>
+                <Pressable
+                  onPress={() => {
+                    if (!p || stuck || over) return;
+                    setSelectedPiece((current) => current === i ? null : i);
+                    Haptics.selectionAsync().catch(() => {});
+                  }}
+                  disabled={!p || stuck || over}
+                  accessibilityRole="button"
+                  accessibilityLabel={p ? `Tray piece ${i + 1}, ${p.shape.size} blocks` : `Empty tray slot ${i + 1}`}
+                  accessibilityHint={p && !stuck ? 'Tap to select it, then tap a board square. You can also drag it.' : undefined}
+                  accessibilityState={{ selected, disabled: !p || stuck || over }}
+                  style={({ pressed }) => ({
+                    width: layout.compact ? 92 : 112,
+                    height: layout.compact ? 92 : 112,
+                    borderRadius: radius.card,
+                    borderWidth: selected ? 2 : 0,
+                    borderColor: theme.color.primary,
+                    backgroundColor: selected ? theme.color.primarySoft : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.72 : 1,
+                  })}
+                >
+                  {p && !over && (
                     <View style={{ opacity: drag?.index === i ? 0.25 : stuck ? 0.3 : 1 }}>
                       <TrayPopIn key={p.id} index={i}>
                         <PiecePreview piece={p} cell={trayCell} />
                       </TrayPopIn>
                     </View>
-                  </GestureDetector>
-                )}
-              </View>
+                  )}
+                </Pressable>
+              </GestureDetector>
             );
           })}
         </View>
@@ -445,13 +560,18 @@ export default function Blocks() {
 
 /** New tray pieces spring in with a small stagger. */
 function TrayPopIn({ index, children }: { index: number; children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
   const scale = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
+    if (reduceMotion) {
+      scale.setValue(1);
+      return;
+    }
     Animated.spring(scale, {
       toValue: 1, useNativeDriver: true, damping: 13, stiffness: 220, delay: index * 60,
     }).start();
-  }, [scale, index]);
+  }, [scale, index, reduceMotion]);
 
   return <Animated.View style={{ transform: [{ scale }] }}>{children}</Animated.View>;
 }
@@ -482,11 +602,17 @@ function PiecePreview({ piece, cell, dim }: { piece: Piece; cell: number; dim?: 
 /** "+N" that drifts up from the board centre and fades. */
 function ScoreFloat({ amount }: { amount: number }) {
   const theme = useTheme();
+  const reduceMotion = useReducedMotion();
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (reduceMotion) {
+      anim.setValue(0.75);
+      const timeout = setTimeout(() => anim.setValue(1), 700);
+      return () => clearTimeout(timeout);
+    }
     Animated.timing(anim, { toValue: 1, duration: 800, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
-  }, [anim]);
+  }, [anim, reduceMotion]);
 
   return (
     <Animated.View
@@ -494,7 +620,7 @@ function ScoreFloat({ amount }: { amount: number }) {
       style={{
         position: 'absolute', left: 0, right: 0, top: '38%', alignItems: 'center',
         opacity: anim.interpolate({ inputRange: [0, 0.15, 0.75, 1], outputRange: [0, 1, 1, 0] }),
-        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -44] }) }],
+        transform: [{ translateY: reduceMotion ? 0 : anim.interpolate({ inputRange: [0, 1], outputRange: [0, -44] }) }],
       }}
     >
       <Text variant="title1" color={theme.color.primary} style={{ fontVariant: ['tabular-nums'] }}>

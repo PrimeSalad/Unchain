@@ -12,6 +12,9 @@ interface BackButtonProps {
   confirmExit?: boolean;
   title?: string;
   message?: string;
+  /** Lets active screens pause timers/AI while the blocking confirmation is
+   * visible. Existing callers can omit it. */
+  onConfirmVisibilityChange?: (visible: boolean) => void;
 }
 
 /**
@@ -27,11 +30,17 @@ export function BackButton({
   confirmExit = false,
   title = 'Quit game?',
   message = 'Your current round will stop. You can start a fresh one anytime.',
+  onConfirmVisibilityChange,
 }: BackButtonProps) {
   const router = useRouter();
   const theme = useTheme();
   const busy = useRef(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
+
+  const setConfirmation = (visible: boolean) => {
+    setConfirmVisible(visible);
+    onConfirmVisibilityChange?.(visible);
+  };
 
   const goBack = () => {
     if (busy.current) return; // swallow double-taps while a pop is in flight
@@ -55,7 +64,7 @@ export function BackButton({
 
   const requestBack = () => {
     if (confirmExit) {
-      setConfirmVisible(true);
+      setConfirmation(true);
       return;
     }
     goBack();
@@ -86,12 +95,12 @@ export function BackButton({
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={() => setConfirmVisible(false)}
+        onRequestClose={() => setConfirmation(false)}
       >
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg }}>
           <Pressable
             style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.58)' }]}
-            onPress={() => setConfirmVisible(false)}
+            onPress={() => setConfirmation(false)}
             accessibilityRole="button"
             accessibilityLabel="Stay in game"
           />
@@ -129,12 +138,12 @@ export function BackButton({
               </View>
             </View>
             <View style={{ gap: spacing.sm }}>
-              <Button label="Stay" kind="secondary" onPress={() => setConfirmVisible(false)} full />
+              <Button label="Stay" kind="secondary" onPress={() => setConfirmation(false)} full />
               <Button
                 label="Quit game"
                 kind="destructive"
                 onPress={() => {
-                  setConfirmVisible(false);
+                  setConfirmation(false);
                   goBack();
                 }}
                 full

@@ -60,6 +60,7 @@ import { domainsOverlap, normalizeDomain } from '@/domain/protection';
 import type { DailyMissionState, MissionId } from '@/domain/missions';
 import { missionById, missionDayKey } from '@/domain/missions';
 import { challengeDayNumber, dailyChallengeTarget } from '@/domain/games/inhibition';
+import { nextDailyStreak } from '@/domain/games/clarity';
 import { normalizeSelectedAddictions } from '@/domain/multiAddiction';
 import { journalCompletedToday } from '@/domain/addictionJournal';
 import {
@@ -69,6 +70,8 @@ import {
 import {
   RECOVERY_TRACK_SETUP_VERSION,
   createRecoverySetupSubmission,
+  isCompleteRecoveryTrackSetup,
+  isConfiguredRecoveryTrackSetup,
   recoveryProfileFromTrackSetup,
   recoveryProfilesFromSubmission,
   toLocalMidnight,
@@ -99,6 +102,8 @@ export interface GamesState {
   clarityStatus: 'playing' | 'won' | 'lost';
   clarityStreak: number;
   clarityBestStreak: number;
+  /** Last calendar challenge day won; separate from in-progress clarityDay. */
+  clarityLastWonDay: number;
   clarityPlayed: number;
   clarityWon: number;
   clarityPracticePlayed: number;
@@ -129,6 +134,7 @@ export const initialGames: GamesState = {
   clarityStatus: 'playing',
   clarityStreak: 0,
   clarityBestStreak: 0,
+  clarityLastWonDay: -1,
   clarityPlayed: 0,
   clarityWon: 0,
   clarityPracticePlayed: 0,
@@ -470,7 +476,18 @@ export interface RecoveryState {
   updateProfile: (patch: EditableProfilePatch) => void;
   submitCheckIn: (data: Omit<DailyCheckIn, 'id' | 'at'>) => void;
   logUrge: (data: Omit<UrgeLog, 'id' | 'at' | 'source'>) => string;
+  /** Save directly into one selected track without switching ambient state. */
+  logUrgeForTrack: (
+    addiction: AddictionType,
+    data: Omit<UrgeLog, 'id' | 'at' | 'source'>,
+  ) => string | null;
   updateUrge: (id: string, data: Omit<UrgeLog, 'id' | 'at' | 'source'>) => void;
+  /** Edit an urge in its owning track without switching ambient state. */
+  updateUrgeForTrack: (
+    addiction: AddictionType,
+    id: string,
+    data: Omit<UrgeLog, 'id' | 'at' | 'source'>,
+  ) => 'updated' | 'not_found';
   deleteUrge: (id: string) => void;
   logRelapse: (data: Omit<RelapseEvent, 'id' | 'at'>) => void;
   addJournal: (data: Omit<JournalEntry, 'id' | 'at'>) => void;
@@ -1575,7 +1592,8 @@ export const useStore = create<RecoveryState>()(
           if (alreadyDone) {
             return { games: { ...g, clarityGuesses: guesses } };
           }
-          const streak = won ? g.clarityStreak + 1 : 0;
+          const streakResult = nextDailyStreak(g.clarityStreak, g.clarityLastWonDay, day, won);
+          const streak = streakResult.streak;
           const games: GamesState = {
             ...g,
             clarityDay: day,
@@ -1585,6 +1603,7 @@ export const useStore = create<RecoveryState>()(
             clarityWon: g.clarityWon + (won ? 1 : 0),
             clarityStreak: streak,
             clarityBestStreak: Math.max(g.clarityBestStreak, streak),
+            clarityLastWonDay: streakResult.lastWonDay ?? -1,
           };
           const r = withGameEvent(s, games, {
             game: 'clarity', won, guessCount: guesses.length, daily: true,
@@ -2019,6 +2038,17 @@ export const useStore = create<RecoveryState>()(
           const current = captureAddictionSnapshot(s);
           const target = s.recoveryByAddiction[addiction];
           if (!target) return s;
+          const activeTrackEligible = selections.includes(addiction)
+            && isCompleteRecoveryTrackSetup(target.setup);
+          // Today's journal membership is intentionally frozen. If a fully
+          // configured track was archived after that plan began, allow this
+          // internal switch only long enough for addJournalForAddiction to
+          // finish the promised entry; normal UI activation remains blocked.
+          const frozenJournalEligible = !selections.includes(addiction)
+            && requiredToday.includes(addiction)
+            && target.setup.setupStatus === 'archived'
+            && isConfiguredRecoveryTrackSetup(target.setup);
+          if (!activeTrackEligible && !frozenJournalEligible) return s;
           const today = missionDayKey();
           return {
             ...activeStateFromSnapshot(target),
@@ -2167,9 +2197,81 @@ export const useStore = create<RecoveryState>()(
         return entry.id;
       },
 
+      logUrgeForTrack: (addiction, data) => {
+        const now = Date.now();
+        const entry: UrgeLog = { ...data, id: uid(), at: now, source: 'manual' };
+        const timelineEvent: TimelineEvent = {
+          id: uid(),
+          at: now,
+          type: 'urge',
+          label: `Logged urge - intensity ${data.intensity}/10`,
+        };
+        let logged = false;
+
+        set((s) => {
+          if (!s.profile || !selectedAddictions(s.profile).includes(addiction)) return s;
+
+          const target = s.recoveryByAddiction[addiction];
+          if (!target || !isCompleteRecoveryTrackSetup(target.setup)) return s;
+
+          if (s.profile.addictionType === addiction) {
+            logged = true;
+            return {
+              urges: [entry, ...s.urges],
+              points: s.points + 5,
+              ...(data.resisted ? resistedCounterPatch(s, now) : {}),
+              timeline: [timelineEvent, ...s.timeline],
+            };
+          }
+
+          logged = true;
+          return {
+            recoveryByAddiction: {
+              ...s.recoveryByAddiction,
+              [addiction]: {
+                ...target,
+                urges: [entry, ...target.urges],
+                points: target.points + 5,
+                ...(data.resisted ? resistedCounterPatch(target, now) : {}),
+                timeline: [timelineEvent, ...target.timeline],
+              },
+            },
+          };
+        });
+
+        return logged ? entry.id : null;
+      },
+
       updateUrge: (id, data) => set((s) => ({
         urges: s.urges.map((urge) => urge.id === id ? { ...urge, ...data } : urge),
       })),
+
+      updateUrgeForTrack: (addiction, id, data) => {
+        let updated = false;
+        set((s) => {
+          if (s.profile?.addictionType === addiction) {
+            if (!s.urges.some((urge) => urge.id === id)) return s;
+            updated = true;
+            return {
+              urges: s.urges.map((urge) => urge.id === id ? { ...urge, ...data } : urge),
+            };
+          }
+
+          const target = s.recoveryByAddiction[addiction];
+          if (!target || !target.urges.some((urge) => urge.id === id)) return s;
+          updated = true;
+          return {
+            recoveryByAddiction: {
+              ...s.recoveryByAddiction,
+              [addiction]: {
+                ...target,
+                urges: target.urges.map((urge) => urge.id === id ? { ...urge, ...data } : urge),
+              },
+            },
+          };
+        });
+        return updated ? 'updated' : 'not_found';
+      },
 
       deleteUrge: (id) => set((s) => ({
         urges: s.urges.filter((urge) => urge.id !== id),

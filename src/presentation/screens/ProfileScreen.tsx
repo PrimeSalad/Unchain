@@ -22,6 +22,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
+import { ActionSheet } from '../components/ActionSheet';
 import { elevation, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -40,6 +41,7 @@ import {
 } from '@/domain/gambling';
 import { PORN_TRIGGERS } from '@/domain/pornRecovery';
 import { normalizeSelectedAddictions } from '@/domain/multiAddiction';
+import { isCompleteRecoveryTrackSetup } from '@/domain/recoveryTrackSetup';
 import { RECOVERY_STATE_SCHEMA_VERSION, migrateRecoveryState } from '@/domain/recoveryStateMigration';
 
 const BACKUP_MARKER = 'unchainly-backup';
@@ -69,6 +71,11 @@ type ModalConfig = {
 type ToastConfig = {
   message: string;
   type: 'success' | 'error';
+};
+
+type PendingTrackSwitch = {
+  source: AddictionType;
+  target: AddictionType;
 };
 
 
@@ -110,16 +117,23 @@ export function ProfileScreen() {
   // Triggers draft state — keeps edits local until explicitly saved
   const [triggersDraft, setTriggersDraft] = useState<string[]>(() => profile?.triggers ?? []);
   const [savingTriggers, setSavingTriggers] = useState(false);
+  const [pendingSwitch, setPendingSwitch] = useState<PendingTrackSwitch | null>(null);
 
   // Sync draft if profile triggers change externally (e.g. backup restore)
   useEffect(() => {
     if (profile) setTriggersDraft(profile.triggers);
-  }, [profile?.triggers]);
+  }, [profile?.addictionType, profile?.triggers]);
 
   // Dirty check: compare sorted arrays by content
   const triggersDirty = profile
     ? [...triggersDraft].sort().join('\0') !== [...profile.triggers].sort().join('\0')
     : false;
+  const reasonDirty = Boolean(
+    profile
+    && editingReason
+    && reasonValue.trim() !== (profile.reason ?? '').trim(),
+  );
+  const trackEditsDirty = triggersDirty || reasonDirty;
 
   // Modal state
   const [modal, setModal] = useState<ModalConfig | null>(null);
@@ -140,12 +154,12 @@ export function ProfileScreen() {
   // Guard navigation away when there are unsaved trigger changes
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
-      if (!triggersDirty) return;
+      if (!trackEditsDirty) return;
       // Prevent the default back action
       e.preventDefault();
       Alert.alert(
-        'Unsaved trigger changes',
-        'You have unsaved trigger changes. Discard them and leave?',
+        'Unsaved recovery changes',
+        'You have unsaved changes to this recovery track. Discard them and leave?',
         [
           {
             text: 'Keep editing',
@@ -161,7 +175,16 @@ export function ProfileScreen() {
       );
     });
     return unsubscribe;
-  }, [navigation, triggersDirty]);
+  }, [navigation, trackEditsDirty]);
+
+  // A store restore or another screen can change the active track while the
+  // sheet is open. Close the stale prompt instead of applying its draft to a
+  // different source track.
+  useEffect(() => {
+    if (pendingSwitch && profile?.addictionType !== pendingSwitch.source) {
+      setPendingSwitch(null);
+    }
+  }, [pendingSwitch, profile?.addictionType]);
 
   if (!profile) return null;
 
@@ -239,56 +262,134 @@ export function ProfileScreen() {
     router.push(`/recovery-track-setup${query}` as Href);
   };
 
+  const performRecoveryTrackSwitch = (
+    addiction: AddictionType,
+    expectedSource?: AddictionType,
+  ): boolean => {
+    const before = useStore.getState();
+    const currentProfile = before.profile;
+    if (!currentProfile) {
+      setPendingSwitch(null);
+      showToast('Could not switch recovery tracks', 'error');
+      return false;
+    }
+    if (currentProfile.addictionType === addiction) {
+      setPendingSwitch(null);
+      return true;
+    }
+    if (expectedSource && currentProfile.addictionType !== expectedSource) {
+      setPendingSwitch(null);
+      setTriggersDraft(currentProfile.triggers);
+      setReasonValue(currentProfile.reason ?? '');
+      setEditingReason(false);
+      showToast('The active track changed. Review it before editing.', 'error');
+      return false;
+    }
+
+    const target = before.recoveryByAddiction[addiction];
+    if (!target) {
+      setPendingSwitch(null);
+      showToast(`${addictionMeta(addiction).label} setup data is unavailable`, 'error');
+      return false;
+    }
+    if (!isCompleteRecoveryTrackSetup(target.setup)) {
+      setPendingSwitch(null);
+      openRecoveryTrackSetup('review', addiction);
+      return false;
+    }
+
+    Keyboard.dismiss();
+    setActiveAddiction(addiction);
+    const switchedProfile = useStore.getState().profile;
+    if (switchedProfile?.addictionType !== addiction) {
+      setPendingSwitch(null);
+      showToast(`Could not switch to ${addictionMeta(addiction).label}`, 'error');
+      return false;
+    }
+
+    // Update local editors immediately as well as through the profile effect,
+    // so no frame can show the previous track's reason or trigger draft.
+    setPendingSwitch(null);
+    setEditingReason(false);
+    setReasonValue(switchedProfile.reason ?? '');
+    setTriggersDraft(switchedProfile.triggers);
+    showToast(`${addictionMeta(addiction).label} is now active`);
+    return true;
+  };
+
   const switchRecoveryTrack = (addiction: AddictionType) => {
-    if (addiction === profile.addictionType) return;
-    const performSwitch = () => {
-      Keyboard.dismiss();
-      setActiveAddiction(addiction);
-      const switched = useStore.getState().profile?.addictionType === addiction;
-      if (switched) {
-        showToast(`${addictionMeta(addiction).label} is now active`);
-      } else {
-        showToast('Could not switch recovery tracks', 'error');
-      }
-    };
-    if (!triggersDirty && !editingReason) {
-      performSwitch();
+    const current = useStore.getState().profile;
+    if (!current || addiction === current.addictionType) return;
+
+    if (!trackEditsDirty) {
+      setEditingReason(false);
+      performRecoveryTrackSwitch(addiction, current.addictionType);
       return;
     }
-    Alert.alert(
-      'Save changes before switching?',
-      'Your reason and triggers belong to the active recovery track.',
-      [
-        { text: 'Keep editing', style: 'cancel' },
-        {
-          text: 'Discard & switch',
-          style: 'destructive',
-          onPress: () => {
-            setTriggersDraft(profile.triggers);
-            setEditingReason(false);
-            performSwitch();
-          },
-        },
-        {
-          text: 'Save & switch',
-          onPress: () => {
-            const nextReason = editingReason ? reasonValue.trim() : profile.reason;
-            if (!nextReason) {
-              AccessibilityInfo.announceForAccessibility('Add a recovery reason before switching.');
-              reasonRef.current?.focus();
-              showToast('Add a recovery reason before switching', 'error');
-              return;
-            }
-            update({
-              ...(editingReason ? { reason: nextReason } : {}),
-              ...(triggersDirty ? { triggers: triggersDraft } : {}),
-            });
-            setEditingReason(false);
-            performSwitch();
-          },
-        },
-      ],
-    );
+
+    // Dismiss first so iOS does not present the sheet against a keyboard-
+    // reduced viewport. The ActionSheet itself owns the modal safe areas.
+    Keyboard.dismiss();
+    setPendingSwitch({ source: current.addictionType, target: addiction });
+  };
+
+  const discardAndSwitchRecoveryTrack = () => {
+    if (!pendingSwitch) return;
+    const current = useStore.getState().profile;
+    if (!current || current.addictionType !== pendingSwitch.source) {
+      setPendingSwitch(null);
+      if (current) {
+        setTriggersDraft(current.triggers);
+        setReasonValue(current.reason ?? '');
+      }
+      setEditingReason(false);
+      showToast('The active track changed. Nothing was discarded.', 'error');
+      return;
+    }
+
+    const target = pendingSwitch.target;
+    setTriggersDraft(current.triggers);
+    setReasonValue(current.reason ?? '');
+    setEditingReason(false);
+    performRecoveryTrackSwitch(target, pendingSwitch.source);
+  };
+
+  const saveAndSwitchRecoveryTrack = () => {
+    if (!pendingSwitch) return;
+    const current = useStore.getState().profile;
+    if (!current || current.addictionType !== pendingSwitch.source) {
+      setPendingSwitch(null);
+      if (current) {
+        setTriggersDraft(current.triggers);
+        setReasonValue(current.reason ?? '');
+      }
+      setEditingReason(false);
+      showToast('The active track changed. Review it before saving.', 'error');
+      return;
+    }
+
+    const nextReason = editingReason ? reasonValue.trim() : current.reason.trim();
+    if (!nextReason) {
+      setPendingSwitch(null);
+      AccessibilityInfo.announceForAccessibility('Add a recovery reason before switching.');
+      showToast('Add a recovery reason before switching', 'error');
+      setTimeout(() => reasonRef.current?.focus(), 180);
+      return;
+    }
+
+    const target = pendingSwitch.target;
+    try {
+      update({
+        ...(reasonDirty ? { reason: nextReason } : {}),
+        ...(triggersDirty ? { triggers: [...triggersDraft] } : {}),
+      });
+    } catch {
+      setPendingSwitch(null);
+      showToast('Could not save this recovery track', 'error');
+      return;
+    }
+    setEditingReason(false);
+    performRecoveryTrackSwitch(target, pendingSwitch.source);
   };
 
   const confirmArchiveRecoveryTrack = (addiction: AddictionType) => {
@@ -761,8 +862,7 @@ export function ProfileScreen() {
               const active = addiction === profile.addictionType;
               const trackProfile = active ? profile : snapshot?.profile;
               const needsReview = snapshot == null
-                || snapshot.setup.setupStatus === 'needs_review'
-                || snapshot.setup.setupCompletedAt == null;
+                || !isCompleteRecoveryTrackSetup(snapshot.setup);
               return (
                 <RecoveryTrackCard
                   key={addiction}
@@ -771,7 +871,9 @@ export function ProfileScreen() {
                   active={active}
                   needsReview={needsReview}
                   canArchive={!active && selectedTracks.length > 1}
-                  onSelect={() => switchRecoveryTrack(addiction)}
+                  onSelect={() => needsReview
+                    ? openRecoveryTrackSetup('review', addiction)
+                    : switchRecoveryTrack(addiction)}
                   onFinishSetup={() => openRecoveryTrackSetup('review', addiction)}
                   onArchive={() => confirmArchiveRecoveryTrack(addiction)}
                 />
@@ -794,8 +896,10 @@ export function ProfileScreen() {
             <View style={{ gap: spacing.sm }}>
               {archivedTracks.map((addiction) => {
                 const snapshot = recoveryByAddiction[addiction.key]!;
-                const needsReview = snapshot.setup.setupStatus === 'needs_review'
-                  || snapshot.setup.setupCompletedAt == null;
+                const needsReview = !isCompleteRecoveryTrackSetup({
+                  ...snapshot.setup,
+                  setupStatus: 'complete',
+                });
                 return (
                   <ArchivedRecoveryTrackRow
                     key={addiction.key}
@@ -1028,6 +1132,63 @@ export function ProfileScreen() {
         </Text>
       </Screen>
 
+      {/* ── Unsaved recovery-track switch ── */}
+      <ActionSheet
+        visible={pendingSwitch !== null}
+        onClose={() => setPendingSwitch(null)}
+        closeLabel="Keep editing"
+        title={pendingSwitch
+          ? `Switch to ${addictionMeta(pendingSwitch.target).label}?`
+          : 'Switch recovery track?'}
+        description={pendingSwitch
+          ? `Your unsaved reason or triggers belong to ${addictionMeta(pendingSwitch.source).label}. Choose what to do before switching.`
+          : undefined}
+      >
+        <View style={{ gap: spacing.sm }}>
+          <Pressable
+            onPress={saveAndSwitchRecoveryTrack}
+            accessibilityRole="button"
+            accessibilityLabel="Save changes and switch recovery track"
+            accessibilityHint="Saves this track’s reason and triggers, then makes the selected track active"
+            style={({ pressed }) => ({
+              minHeight: 52,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.md,
+              borderRadius: radius.input,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: theme.color.primary,
+              opacity: pressed ? 0.78 : 1,
+            })}
+          >
+            <Text variant="headline" color={theme.color.onPrimary} center>
+              Save changes and switch
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={discardAndSwitchRecoveryTrack}
+            accessibilityRole="button"
+            accessibilityLabel="Discard changes and switch recovery track"
+            accessibilityHint="Discards only the unsaved reason and trigger changes for the current track"
+            style={({ pressed }) => ({
+              minHeight: 52,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.md,
+              borderRadius: radius.input,
+              borderWidth: 1,
+              borderColor: theme.color.danger,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.68 : 1,
+            })}
+          >
+            <Text variant="headline" color={theme.color.danger} center>
+              Discard changes and switch
+            </Text>
+          </Pressable>
+        </View>
+      </ActionSheet>
+
       {/* ── Confirmation modal ── */}
       <Modal
         visible={modal !== null}
@@ -1106,7 +1267,7 @@ export function ProfileScreen() {
       </Modal>
 
       {/* ── Toast ── */}
-      {toast && modal === null && (
+      {toast && modal === null && pendingSwitch === null && (
         <Animated.View
           pointerEvents="none"
           accessibilityLiveRegion="polite"
@@ -1236,8 +1397,12 @@ function RecoveryTrackCard({
         onPress={onSelect}
         disabled={active}
         accessibilityRole="button"
-        accessibilityLabel={`${label} recovery track${active ? ', active' : ''}`}
-        accessibilityHint={active ? 'This is your active recovery track' : `Makes ${label} your active recovery track`}
+        accessibilityLabel={`${label} recovery track${active ? ', active' : needsReview ? ', setup required' : ''}`}
+        accessibilityHint={active
+          ? 'This is your active recovery track'
+          : needsReview
+            ? `Opens the remaining setup questions for ${label}`
+            : `Makes ${label} your active recovery track`}
         accessibilityState={{ selected: active, disabled: active }}
         style={({ pressed }) => ({
           minHeight: 68,
@@ -1271,8 +1436,12 @@ function RecoveryTrackCard({
           <Text variant="callout" color={active ? theme.color.primary : theme.color.text}>
             {label}
           </Text>
-          <Text variant="caption" dim numberOfLines={2} style={{ marginTop: 2 }}>
-            {detail?.trim() || (active ? 'Currently active' : 'Tap to make active')}
+          <Text variant="caption" dim style={{ marginTop: 2 }}>
+            {detail?.trim() || (active
+              ? 'Currently active'
+              : needsReview
+                ? 'Finish setup before making active'
+                : 'Tap to make active')}
           </Text>
         </View>
         {active ? (
@@ -1288,7 +1457,11 @@ function RecoveryTrackCard({
             <Text variant="caption" color={theme.color.onPrimary}>Active</Text>
           </View>
         ) : (
-          <Ionicons name="chevron-forward" size={19} color={theme.color.textDim} />
+          <Ionicons
+            name={needsReview ? 'clipboard-outline' : 'chevron-forward'}
+            size={19}
+            color={needsReview ? theme.color.accentText : theme.color.textDim}
+          />
         )}
       </Pressable>
 

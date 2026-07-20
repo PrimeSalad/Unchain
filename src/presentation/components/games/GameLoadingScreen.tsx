@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,15 +6,11 @@ import { Text } from '../Text';
 import { radius, spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeProvider';
 
-export function useGameLoading(delayMs = 420) {
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), delayMs);
-    return () => clearTimeout(timer);
-  }, [delayMs]);
-
-  return loading;
+export function useGameLoading() {
+  // Every current game is fully local and synchronously ready. A cosmetic
+  // timeout delayed every launch and could leave lifecycle timers running
+  // behind a screen that only looked like loading.
+  return false;
 }
 
 export function GameLoadingScreen({

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, AppState, Easing, Pressable, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
@@ -14,6 +14,7 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import { playSound } from '@/application/sound';
 import { nextAchievementHint, type GameAchievement } from '@/domain/games/achievements';
+import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 import {
   MAX_GUESSES,
   WORD_LENGTH,
@@ -69,7 +70,7 @@ function useClarityLayout() {
   const tileGap = compact ? 4 : 5;
   const rowGap = tiny ? 3 : compact ? 4 : Math.round(Math.max(5, Math.min(height * 0.008, 7)));
   const keyHeight = Math.round(
-    Math.max(tiny ? 29 : 32, Math.min(height * (compact ? 0.055 : 0.058), compact ? 40 : 48)),
+    Math.max(44, Math.min(height * (compact ? 0.055 : 0.058), compact ? 44 : 48)),
   );
   const keyGap = compact ? 3 : 4;
   const keyboardHeight = keyHeight * 3 + keyGap * 2 + (compact ? 10 : 16);
@@ -96,9 +97,10 @@ export default function Clarity() {
   const completeMission = useStore((s) => s.completeMission);
   const layout = useClarityLayout();
   const tutorial = useGameTutorial('clarity');
+  const reduceMotion = useReducedMotion();
 
   const [mode, setMode] = useState<'daily' | 'practice'>('daily');
-  const daily = useMemo(() => dailyAnswer(), []);
+  const [daily, setDaily] = useState(() => dailyAnswer());
 
   const [answer, setAnswer] = useState(daily.word);
   const [guesses, setGuesses] = useState<string[]>([]);
@@ -107,11 +109,109 @@ export default function Clarity() {
   const [message, setMessage] = useState('');
   const [celebrate, setCelebrate] = useState(false);
   const [unlocked, setUnlocked] = useState<GameAchievement[]>([]);
+  const [revealing, setRevealing] = useState(false);
   const recorded = useRef(false);
+  const revealingRef = useRef(false);
+  const generationRef = useRef(0);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const guessesRef = useRef<string[]>([]);
+  const answerRef = useRef(answer);
+  const routeFocusedRef = useRef(false);
+  const appActiveRef = useRef(AppState.currentState === 'active');
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  guessesRef.current = guesses;
+  answerRef.current = answer;
+
+  const cancelRoundTasks = useCallback((settlePendingReveal = false) => {
+    const hadPendingReveal = revealingRef.current;
+    generationRef.current += 1;
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    revealingRef.current = false;
+    setRevealing(false);
+    if (!settlePendingReveal || !hadPendingReveal) return;
+
+    // A hidden screen must not keep animating, announcing, playing sounds, or
+    // mutating itself later. Settle the already-recorded guess silently so the
+    // board is coherent when the player returns.
+    const pendingGuesses = guessesRef.current;
+    setRevealed(pendingGuesses.length);
+    const lastGuess = pendingGuesses[pendingGuesses.length - 1];
+    if (lastGuess === answerRef.current) {
+      setMessage(pickWinLine(pendingGuesses.length));
+    } else if (pendingGuesses.length >= MAX_GUESSES) {
+      setMessage(`The word was ${answerRef.current.toUpperCase()}`);
+    }
+  }, []);
+
+  const refreshDaily = useCallback(() => {
+    const next = dailyAnswer();
+    setDaily((currentDay) => currentDay.day === next.day ? currentDay : next);
+  }, []);
+
+  const after = (generation: number, delay: number, callback: () => void) => {
+    const timer = setTimeout(() => {
+      timersRef.current = timersRef.current.filter((item) => item !== timer);
+      if (generation === generationRef.current) callback();
+    }, delay);
+    timersRef.current.push(timer);
+  };
+
+  useEffect(() => () => {
+    generationRef.current += 1;
+    timersRef.current.forEach(clearTimeout);
+  }, []);
+
+  // Refresh while the route remains mounted across local midnight. The
+  // action-time check in onEnter closes the tiny timer scheduling window.
+  useEffect(() => {
+    let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+    const armMidnightRefresh = () => {
+      const now = new Date();
+      const nextMidnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+      ).getTime();
+      midnightTimer = setTimeout(() => {
+        refreshDaily();
+        armMidnightRefresh();
+      }, Math.max(1_000, nextMidnight - Date.now() + 250));
+    };
+    refreshDaily();
+    armMidnightRefresh();
+    return () => {
+      if (midnightTimer) clearTimeout(midnightTimer);
+    };
+  }, [refreshDaily]);
+
+  useFocusEffect(
+    useCallback(() => {
+      routeFocusedRef.current = true;
+      refreshDaily();
+      return () => {
+        routeFocusedRef.current = false;
+        cancelRoundTasks(true);
+      };
+    }, [cancelRoundTasks, refreshDaily]),
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      appActiveRef.current = next === 'active';
+      if (next === 'active') {
+        refreshDaily();
+      } else {
+        cancelRoundTasks(true);
+      }
+    });
+    return () => subscription.remove();
+  }, [cancelRoundTasks, refreshDaily]);
 
   // Initialise per mode (and resume the daily from storage, fully revealed).
+  const activeDailyDay = mode === 'daily' ? daily.day : null;
   useEffect(() => {
+    cancelRoundTasks(false);
     if (mode === 'daily') {
       setAnswer(daily.word);
       if (games.clarityDay === daily.day) {
@@ -133,7 +233,7 @@ export default function Clarity() {
     setMessage('');
     setCelebrate(false);
     setUnlocked([]);
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, activeDailyDay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(
     () => guesses.map((g) => ({ word: g, states: evaluate(g, answer) })),
@@ -152,6 +252,7 @@ export default function Clarity() {
   const doneRevealed = done && revealed >= guesses.length;
 
   const shake = () => {
+    if (reduceMotion) return;
     shakeAnim.setValue(0);
     Animated.timing(shakeAnim, {
       toValue: 1, duration: 420, easing: Easing.linear, useNativeDriver: true,
@@ -162,29 +263,42 @@ export default function Clarity() {
     setMessage(msg);
     shake();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-    setTimeout(() => setMessage(''), 1600);
+    after(generationRef.current, 1600, () => setMessage(''));
   };
 
   const onKey = (k: string) => {
-    if (done || current.length >= WORD_LENGTH) return;
+    if (done || revealingRef.current || tutorial.visible || !routeFocusedRef.current || !appActiveRef.current) return;
     playSound('tap', 0.3);
     Haptics.selectionAsync().catch(() => {});
-    setCurrent((c) => c + k);
+    setCurrent((c) => (c.length >= WORD_LENGTH ? c : c + k));
   };
   const onDelete = () => {
-    if (done) return;
+    if (done || revealingRef.current || tutorial.visible || !routeFocusedRef.current || !appActiveRef.current) return;
     playSound('tap', 0.2);
     setCurrent((c) => c.slice(0, -1));
   };
 
   const onEnter = () => {
-    if (done) return;
+    if (done || revealingRef.current || tutorial.visible || !routeFocusedRef.current || !appActiveRef.current) return;
+    if (mode === 'daily') {
+      const today = dailyAnswer();
+      if (today.day !== daily.day) {
+        setDaily(today);
+        AccessibilityInfo.announceForAccessibility('A new daily puzzle is ready.');
+        return;
+      }
+    }
     if (current.length < WORD_LENGTH) return flash('Not enough letters');
     if (!isValidWord(current)) return flash('Not in word list');
+
+    revealingRef.current = true;
+    setRevealing(true);
+    const generation = generationRef.current;
 
     const next = [...guesses, current];
     const didWin = current === answer;
     const didLose = !didWin && next.length >= MAX_GUESSES;
+    guessesRef.current = next;
     setGuesses(next);
     setCurrent('');
     playSound('flip', 0.5);
@@ -206,23 +320,29 @@ export default function Clarity() {
     if (newly.length) setUnlocked(newly);
 
     // …but let the player watch the flip before the outcome lands.
-    setTimeout(() => {
+    after(generation, reduceMotion ? 0 : REVEAL_TOTAL, () => {
       setRevealed(next.length);
+      revealingRef.current = false;
+      setRevealing(false);
+      AccessibilityInfo.announceForAccessibility(
+        didWin ? `Correct. ${answer.toUpperCase()} solved in ${next.length} guesses.` : `Guess ${next.length} revealed.`,
+      );
       if (didWin) {
         playSound('win', 0.8);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         setMessage(pickWinLine(next.length));
-        setTimeout(() => setCelebrate(true), 500);
+        after(generation, reduceMotion ? 0 : 500, () => setCelebrate(true));
       } else if (didLose) {
         playSound('lose', 0.6);
         setMessage(`The word was ${answer.toUpperCase()}`);
-        setTimeout(() => setCelebrate(true), 500);
+        after(generation, reduceMotion ? 0 : 500, () => setCelebrate(true));
       }
-    }, REVEAL_TOTAL);
+    });
   };
 
   /** Restart - only offered once the round is complete; never repeats the word. */
   const newRound = () => {
+    cancelRoundTasks();
     const fresh = randomAnswer(answer);
     setAnswer(fresh);
     setGuesses([]);
@@ -257,7 +377,12 @@ export default function Clarity() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? 2 : spacing.sm }}>
           <BackButton fallback="/games" confirmExit />
           <Text variant="headline" style={{ flex: 1 }}>Clarity</Text>
-          <TutorialInfoButton onPress={tutorial.open} />
+          <TutorialInfoButton onPress={() => {
+            if (!revealingRef.current) {
+              cancelRoundTasks(false);
+              tutorial.open();
+            }
+          }} />
         </View>
 
         {/* Stats bar */}
@@ -341,11 +466,17 @@ export default function Clarity() {
             return (
               <Pressable
                 key={m}
-                onPress={() => mode !== m && setMode(m)}
+                onPress={() => {
+                  if (!revealingRef.current && mode !== m) setMode(m);
+                }}
+                disabled={revealing}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on, disabled: revealing }}
                 style={({ pressed }) => ({
-                  flex: 1, height: layout.compact ? 34 : 38, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
+                  flex: 1, minHeight: 44, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
-                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                  opacity: revealing ? 0.5 : 1,
+                  transform: [{ scale: pressed && !revealing ? 0.97 : 1 }],
                 })}
               >
                 <Text variant="footnote" color={on ? theme.color.onPrimary : theme.color.text}>
@@ -367,6 +498,8 @@ export default function Clarity() {
               return (
                 <Animated.View
                   key={r}
+                  accessible
+                  accessibilityLabel={submitted ? `${submitted.word.toUpperCase()}: ${submitted.states.join(', ')}` : isCurrentRow ? `Current guess ${current.toUpperCase() || 'empty'}` : `Empty row ${r + 1}`}
                   style={{
                     flexDirection: 'row', gap: layout.tileGap,
                     transform: [{ translateX: isCurrentRow ? shakeX : 0 }],
@@ -380,8 +513,8 @@ export default function Clarity() {
                           letter={submitted.word[c]}
                           state={submitted.states[c]}
                           delay={c * FLIP_STAGGER}
-                          instant={rowRevealed}
-                          bounce={isWinRow ? c : null}
+                          instant={rowRevealed || reduceMotion}
+                          bounce={isWinRow && !reduceMotion ? c : null}
                           fontSize={layout.tileFontSize}
                         />
                       );
@@ -484,16 +617,19 @@ function tileBg(state: TileState, dark: boolean): string {
 /** Empty/typing tile - pops softly when a letter lands in it. */
 function TypeTile({ letter, fontSize }: { letter: string; fontSize: number }) {
   const theme = useTheme();
+  const reduceMotion = useReducedMotion();
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (!letter) return;
+    if (!letter || reduceMotion) return;
     scale.setValue(1);
-    Animated.sequence([
+    const animation = Animated.sequence([
       Animated.timing(scale, { toValue: 1.09, duration: 70, useNativeDriver: true }),
       Animated.timing(scale, { toValue: 1, duration: 90, useNativeDriver: true }),
-    ]).start();
-  }, [letter, scale]);
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [letter, scale, reduceMotion]);
 
   return (
     <Animated.View
@@ -530,6 +666,7 @@ function FlipTile({
   fontSize: number;
 }) {
   const theme = useTheme();
+  const reduceMotion = useReducedMotion();
   const dark = theme.mode === 'dark';
   const [shown, setShown] = useState(instant);
   const flip = useRef(new Animated.Value(instant ? 1 : 0)).current;
@@ -537,29 +674,46 @@ function FlipTile({
   const bounced = useRef(false);
 
   useEffect(() => {
-    if (instant || shown) return;
-    Animated.timing(flip, {
+    if (instant || reduceMotion) {
+      flip.stopAnimation();
+      flip.setValue(1);
+      setShown(true);
+      return;
+    }
+    let cancelled = false;
+    let secondHalf: Animated.CompositeAnimation | null = null;
+    const firstHalf = Animated.timing(flip, {
       toValue: 0.5, duration: FLIP_DURATION / 2, delay,
       easing: Easing.in(Easing.quad), useNativeDriver: true,
-    }).start(() => {
+    });
+    firstHalf.start(({ finished }) => {
+      if (!finished || cancelled) return;
       setShown(true);
-      Animated.timing(flip, {
+      secondHalf = Animated.timing(flip, {
         toValue: 1, duration: FLIP_DURATION / 2,
         easing: Easing.out(Easing.quad), useNativeDriver: true,
-      }).start();
+      });
+      secondHalf.start();
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+      firstHalf.stop();
+      secondHalf?.stop();
+    };
+  }, [delay, flip, instant, reduceMotion]);
 
   // Gentle staggered hop for the winning row.
   useEffect(() => {
-    if (bounce == null || bounced.current) return;
+    if (bounce == null || bounced.current || reduceMotion) return;
     bounced.current = true;
-    Animated.sequence([
+    const animation = Animated.sequence([
       Animated.delay(120 + bounce * 90),
       Animated.timing(jump, { toValue: -12, duration: 130, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(jump, { toValue: 0, duration: 200, easing: Easing.bounce, useNativeDriver: true }),
-    ]).start();
-  }, [bounce, jump]);
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [bounce, jump, reduceMotion]);
 
   const rotateX = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '90deg', '0deg'] });
 
@@ -601,8 +755,11 @@ function Key({ label, state, onPress, flex = 1, height = 52 }: { label: string; 
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label === '⌫' ? 'Delete letter' : label === 'ENTER' ? 'Submit guess' : `Letter ${label.toUpperCase()}`}
+      accessibilityState={{ disabled: false }}
       style={({ pressed }) => ({
-        flex, height, borderRadius: 8, backgroundColor: bg,
+        flex, minHeight: Math.max(44, height), borderRadius: 8, backgroundColor: bg,
         alignItems: 'center', justifyContent: 'center',
         opacity: pressed ? 0.6 : 1,
         transform: [{ scale: pressed ? 0.94 : 1 }],

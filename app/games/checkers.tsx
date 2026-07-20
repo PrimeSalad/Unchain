@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Pressable, View } from 'react-native';
+import { AppState, Animated, Easing, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { Ionicons, Foundation } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
 import { BackButton } from '@/presentation/components/BackButton';
+import { ActionSheet } from '@/presentation/components/ActionSheet';
 import { GameCelebration } from '@/presentation/components/games/GameCelebration';
 import { GameLoadingScreen, useGameLoading } from '@/presentation/components/games/GameLoadingScreen';
 import { GameTutorial, TutorialInfoButton, useGameTutorial } from '@/presentation/components/games/GameTutorial';
@@ -15,15 +17,20 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import { playSound } from '@/application/sound';
 import { nextAchievementHint, type GameAchievement } from '@/domain/games/achievements';
+import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 import {
   applyMove,
-  chooseMove,
+  advanceCheckersDrawTracker,
+  chooseMoveAsync,
+  createCheckersDrawTracker,
   initialBoard,
   legalMoves,
+  moveResetsCheckersDrawClock,
   movesFrom,
   rc,
   status,
   type Board,
+  type CheckersDrawReason,
   type Difficulty,
   type Move,
   type Piece,
@@ -46,14 +53,20 @@ interface Flight {
   landingPiece: Piece;
 }
 
+type BlockingConfirmation =
+  | { kind: 'surrender' }
+  | { kind: 'difficulty'; next: Difficulty };
+
 export default function Checkers() {
   const theme = useTheme();
   const router = useRouter();
   const games = useStore((s) => s.games);
   const recordCheckers = useStore((s) => s.recordCheckers);
   const completeMission = useStore((s) => s.completeMission);
+  const isFocused = useIsFocused();
 
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
+  const [roundDifficulty, setRoundDifficulty] = useState<Difficulty>('medium');
   const [board, setBoard] = useState<Board>(() => initialBoard());
   const [turn, setTurn] = useState<Player>('r');
   const [selected, setSelected] = useState<number | null>(null);
@@ -65,10 +78,17 @@ export default function Checkers() {
   const [celebrate, setCelebrate] = useState(false);
   const [unlocked, setUnlocked] = useState<GameAchievement[]>([]);
   const [thinking, setThinking] = useState(false);
+  const [drawReason, setDrawReason] = useState<CheckersDrawReason | null>(null);
+  const [confirmation, setConfirmation] = useState<BlockingConfirmation | null>(null);
+  const [exitConfirmationVisible, setExitConfirmationVisible] = useState(false);
+  const [appActive, setAppActive] = useState(
+    AppState.currentState == null || AppState.currentState === 'active',
+  );
   const [boardW, setBoardW] = useState(0);
   const recorded = useRef(false);
   const cell = boardW / 8;
   const tutorial = useGameTutorial('checkers');
+  const reduceMotion = useReducedMotion();
   const layout = useSquareBoardSize({ reservedHeight: 352, horizontalPadding: spacing.lg * 2, max: 332 });
 
   // Stable animation plumbing - values are created once and reused for every
@@ -80,10 +100,37 @@ export default function Checkers() {
   /** false while a flight is uncommitted - makes the commit idempotent. */
   const committedRef = useRef(true);
   const mountedRef = useRef(true);
+  const aiGenerationRef = useRef(0);
+  const drawTrackerRef = useRef(createCheckersDrawTracker(board, 'r'));
+
+  const cancelAiSearch = () => {
+    aiGenerationRef.current += 1;
+    if (mountedRef.current) setThinking(false);
+  };
+
+  /** Cancel an animation without committing its prepared next board. The
+   * unchanged turn will restart normally when the app/screen becomes active. */
+  const cancelUncommittedFlight = () => {
+    if (committedRef.current) return;
+    genRef.current += 1;
+    committedRef.current = true;
+    try {
+      flightPos.stopAnimation();
+      captureFade.stopAnimation();
+      captureFade.setValue(1);
+    } catch { /* nothing to stop */ }
+    if (mountedRef.current) setFlight(null);
+  };
+
+  const pauseGameWork = () => {
+    cancelAiSearch();
+    cancelUncommittedFlight();
+  };
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      aiGenerationRef.current += 1;
       genRef.current += 1;
       try {
         flightPos.stopAnimation();
@@ -92,6 +139,19 @@ export default function Checkers() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const active = nextState === 'active';
+      if (!active) pauseGameWork();
+      if (mountedRef.current) setAppActive(active);
+    });
+    return () => subscription.remove();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isFocused) pauseGameWork();
+  }, [isFocused]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const selectedMoves = useMemo(
     () => (selected != null ? movesFrom(board, selected) : []),
     [selected, board],
@@ -99,11 +159,32 @@ export default function Checkers() {
   const destinations = useMemo(() => new Set(selectedMoves.map((m) => m.to)), [selectedMoves]);
 
   const movable = useMemo(() => {
-    if (turn !== 'r' || over || flight) return new Set<number>();
+    if (
+      turn !== 'r'
+      || over
+      || flight
+      || confirmation
+      || exitConfirmationVisible
+      || tutorial.visible
+      || !isFocused
+      || !appActive
+    ) return new Set<number>();
     return new Set(legalMoves(board, 'r').map((m) => m.from));
-  }, [board, turn, over, flight]);
+  }, [
+    appActive,
+    board,
+    confirmation,
+    exitConfirmationVisible,
+    flight,
+    isFocused,
+    over,
+    turn,
+    tutorial.visible,
+  ]);
 
-  const newGame = () => {
+  const newGame = (nextDifficulty?: Difficulty) => {
+    const selectedDifficulty = nextDifficulty ?? difficulty;
+    cancelAiSearch();
     // Invalidate any in-flight animation so its callbacks can't touch the new game.
     genRef.current += 1;
     committedRef.current = true;
@@ -111,35 +192,57 @@ export default function Checkers() {
       flightPos.stopAnimation();
       captureFade.stopAnimation();
     } catch { /* nothing to stop */ }
-    setBoard(initialBoard());
+    const freshBoard = initialBoard();
+    drawTrackerRef.current = createCheckersDrawTracker(freshBoard, 'r');
+    setBoard(freshBoard);
     setTurn('r');
     setSelected(null);
     setLastMove(null);
     setFlight(null);
     setPopIdx(null);
     setWinner(null);
+    setDrawReason(null);
     setOver(false);
     setCelebrate(false);
     setUnlocked([]);
     setThinking(false);
+    setConfirmation(null);
+    setDifficulty(selectedDifficulty);
+    setRoundDifficulty(selectedDifficulty);
     recorded.current = false;
     playSound('tap', 0.4);
   };
 
-  const finish = (w: Player | null, finalBoard: Board) => {
+  const finish = (
+    w: Player | null,
+    finalBoard: Board,
+    reason: CheckersDrawReason | null = null,
+  ) => {
+    cancelAiSearch();
     setOver(true);
     setWinner(w);
+    setDrawReason(w == null ? reason : null);
+    setConfirmation(null);
     if (!recorded.current) {
       recorded.current = true;
       const piecesLeft = finalBoard.filter((p) => p?.player === 'r').length;
-      const newly = recordCheckers(w === 'r' ? 'win' : 'loss', { difficulty, piecesLeft });
+      const newly = w == null
+        ? []
+        : recordCheckers(w === 'r' ? 'win' : 'loss', { difficulty: roundDifficulty, piecesLeft });
       setUnlocked(newly);
       completeMission('play_game');
-      playSound(w === 'r' ? 'win' : 'lose', 0.8);
+      playSound(w == null ? 'clear' : w === 'r' ? 'win' : 'lose', 0.8);
       Haptics.notificationAsync(
-        w === 'r' ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,
+        w == null
+          ? Haptics.NotificationFeedbackType.Warning
+          : w === 'r'
+            ? Haptics.NotificationFeedbackType.Success
+            : Haptics.NotificationFeedbackType.Error,
       ).catch(() => {});
-      setTimeout(() => setCelebrate(true), 650);
+      const generation = genRef.current;
+      setTimeout(() => {
+        if (mountedRef.current && generation === genRef.current) setCelebrate(true);
+      }, reduceMotion ? 0 : 650);
     }
   };
 
@@ -160,12 +263,23 @@ export default function Checkers() {
       if (promoted) {
         setPopIdx(move.to);
         playSound('clear', 0.5);
-        setTimeout(() => { if (mountedRef.current) setPopIdx(null); }, 700);
+        const generation = genRef.current;
+        setTimeout(() => {
+          if (mountedRef.current && generation === genRef.current) setPopIdx(null);
+        }, reduceMotion ? 0 : 700);
       }
 
       const opponentOf: Player = mover === 'r' ? 'b' : 'r';
       const st = status(nextBoard, opponentOf);
       if (st.over) return finish(st.winner, nextBoard);
+      const drawUpdate = advanceCheckersDrawTracker(
+        drawTrackerRef.current,
+        nextBoard,
+        opponentOf,
+        moveResetsCheckersDrawClock(board, move, nextBoard),
+      );
+      drawTrackerRef.current = drawUpdate.tracker;
+      if (drawUpdate.reason) return finish(null, nextBoard, drawUpdate.reason);
       setTurn(opponentOf);
     } catch {
       // Force a consistent state rather than leaving a half-applied move.
@@ -188,6 +302,11 @@ export default function Checkers() {
     committedRef.current = false;
     setSelected(null);
 
+    if (reduceMotion) {
+      commitFlight(gen, move, nextBoard, mover, promoted);
+      return;
+    }
+
     try {
       if (cell <= 0) throw new Error('board not measured yet');
       const [fr, fc] = rc(move.from);
@@ -206,7 +325,9 @@ export default function Checkers() {
         });
       });
       if (move.captures.length > 0) {
-        setTimeout(() => playSound('capture', 0.7), HOP_MS / 2);
+        setTimeout(() => {
+          if (mountedRef.current && gen === genRef.current) playSound('capture', 0.7);
+        }, HOP_MS / 2);
         Animated.timing(captureFade, {
           toValue: 0,
           duration: HOP_MS * move.path.length,
@@ -226,29 +347,80 @@ export default function Checkers() {
   /** Concede the game - recorded as a real loss, behind a confirmation.
    *  Guarded against a mid-flight animation so the board can't half-commit. */
   const surrender = () => {
-    if (over || flight) return;
+    if (over || flight || confirmation || exitConfirmationVisible) return;
+    cancelAiSearch();
     Haptics.selectionAsync().catch(() => {});
-    Alert.alert('Surrender this game?', 'The AI takes the win and it counts as a loss.', [
-      { text: 'Keep playing', style: 'cancel' },
-      { text: 'Surrender', style: 'destructive', onPress: () => finish('b', board) },
-    ]);
+    setConfirmation({ kind: 'surrender' });
   };
 
-  // AI turn - brief natural "thinking" beat, then an animated reply.
+  // AI turn - brief natural "thinking" beat, then cancellable root chunks.
   useEffect(() => {
-    if (turn !== 'b' || over || flight) return;
+    if (
+      turn !== 'b'
+      || over
+      || flight
+      || tutorial.visible
+      || confirmation
+      || exitConfirmationVisible
+      || !isFocused
+      || !appActive
+    ) return;
+
+    let disposed = false;
+    const run = ++aiGenerationRef.current;
+    const isCancelled = () => (
+      disposed
+      || !mountedRef.current
+      || run !== aiGenerationRef.current
+    );
     setThinking(true);
-    const t = setTimeout(() => {
-      const move = chooseMove(board, 'b', difficulty);
-      setThinking(false);
-      if (!move) return finish('r', board);
-      doMove(move, 'b');
+    const timer = setTimeout(() => {
+      void (async () => {
+        let move: Move | null;
+        try {
+          move = await chooseMoveAsync(board, 'b', roundDifficulty, { isCancelled });
+        } catch {
+          // A search failure must not strand the board. Use the first legal
+          // move, but only if this run still owns the turn.
+          move = legalMoves(board, 'b')[0] ?? null;
+        }
+        if (isCancelled()) return;
+        setThinking(false);
+        if (!move) return finish('r', board);
+        doMove(move, 'b');
+      })();
     }, 550);
-    return () => clearTimeout(t);
-  }, [turn, over, flight]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+      if (aiGenerationRef.current === run) aiGenerationRef.current += 1;
+      if (mountedRef.current) setThinking(false);
+    };
+  }, [
+    appActive,
+    board,
+    confirmation,
+    exitConfirmationVisible,
+    flight,
+    isFocused,
+    over,
+    roundDifficulty,
+    turn,
+    tutorial.visible,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onCell = (idx: number) => {
-    if (over || turn !== 'r' || thinking || flight) return;
+    if (
+      over
+      || turn !== 'r'
+      || thinking
+      || flight
+      || tutorial.visible
+      || confirmation
+      || exitConfirmationVisible
+      || !isFocused
+      || !appActive
+    ) return;
     const piece = board[idx];
     if (selected != null && destinations.has(idx)) {
       const move = selectedMoves
@@ -267,11 +439,31 @@ export default function Checkers() {
     }
   };
 
+  const selectDifficulty = (next: Difficulty) => {
+    if (next === difficulty) return;
+    const started = lastMove != null || turn !== 'r' || thinking || flight != null;
+    if (!started || over) {
+      setDifficulty(next);
+      setRoundDifficulty(next);
+      return;
+    }
+    if (flight || confirmation || exitConfirmationVisible) return;
+    cancelAiSearch();
+    setConfirmation({ kind: 'difficulty', next });
+  };
+
   const played = games.checkersWins + games.checkersLosses;
   const winRate = played ? Math.round((games.checkersWins / played) * 100) : 0;
   const loading = useGameLoading();
   const lightSquare = theme.mode === 'dark' ? '#201828' : '#F3EAF8';
   const darkSquare = theme.mode === 'dark' ? '#3A2B47' : '#B995D0';
+  const controlsBlocked = Boolean(
+    flight
+    || confirmation
+    || exitConfirmationVisible
+    || !isFocused
+    || !appActive,
+  );
 
   if (loading) {
     return <GameLoadingScreen title="Checkers" subtitle="Setting up the board" />;
@@ -282,9 +474,21 @@ export default function Checkers() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: layout.compact ? 2 : spacing.sm }}>
-          <BackButton fallback="/games" confirmExit />
+          <BackButton
+            fallback="/games"
+            confirmExit
+            onConfirmVisibilityChange={(visible) => {
+              if (visible) pauseGameWork();
+              setExitConfirmationVisible(visible);
+            }}
+          />
           <Text variant="headline" style={{ flex: 1 }}>Checkers</Text>
-          <TutorialInfoButton onPress={tutorial.open} />
+          <TutorialInfoButton
+            onPress={() => {
+              pauseGameWork();
+              tutorial.open();
+            }}
+          />
         </View>
 
         {/* Difficulty */}
@@ -294,11 +498,16 @@ export default function Checkers() {
             return (
               <Pressable
                 key={d}
-                onPress={() => setDifficulty(d)}
+                onPress={() => selectDifficulty(d)}
+                disabled={controlsBlocked}
+                accessibilityRole="button"
+                accessibilityLabel={`${d} difficulty`}
+                accessibilityState={{ selected: on, disabled: controlsBlocked }}
                 style={({ pressed }) => ({
-                  flex: 1, height: layout.compact ? 32 : 36, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
+                  flex: 1, minHeight: 44, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt,
-                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                  opacity: controlsBlocked ? 0.5 : 1,
+                  transform: [{ scale: pressed && !controlsBlocked ? 0.97 : 1 }],
                 })}
               >
                 <Text variant="footnote" color={on ? theme.color.onPrimary : theme.color.text} style={{ textTransform: 'capitalize' }}>{d}</Text>
@@ -363,6 +572,11 @@ export default function Checkers() {
                     <Pressable
                       key={c}
                       onPress={() => onCell(idx)}
+                      accessible={dark}
+                      accessibilityRole="button"
+                      accessibilityLabel={dark ? `Row ${r + 1}, column ${c + 1}, ${piece ? `${piece.player === 'r' ? 'your' : 'AI'} ${piece.king ? 'king' : 'piece'}` : isDest ? 'available destination' : 'empty'}` : undefined}
+                      accessibilityHint={isDest ? 'Moves the selected piece here.' : canMove ? 'Selects this piece.' : undefined}
+                      accessibilityState={{ selected: isSel, disabled: !isDest && !canMove }}
                       style={{
                         flex: 1, alignItems: 'center', justifyContent: 'center',
                         backgroundColor: dark ? darkSquare : lightSquare,
@@ -410,9 +624,17 @@ export default function Checkers() {
         </View>
 
         {/* Status line */}
-        <View style={{ alignItems: 'center', paddingVertical: layout.compact ? spacing.xs : spacing.sm, minHeight: layout.compact ? 30 : 36, justifyContent: 'center' }}>
+        <View accessibilityLiveRegion="polite" style={{ alignItems: 'center', paddingVertical: layout.compact ? spacing.xs : spacing.sm, minHeight: layout.compact ? 30 : 36, justifyContent: 'center' }}>
           {over ? (
-            <Text variant="callout" dim>{winner === 'r' ? 'You win.' : 'AI wins - rematch?'}</Text>
+            <Text variant="callout" dim>
+              {winner === 'r'
+                ? 'You win.'
+                : winner === 'b'
+                  ? 'AI wins - rematch?'
+                  : drawReason === 'threefold_repetition'
+                    ? 'Draw by repetition.'
+                    : 'Draw — no progress.'}
+            </Text>
           ) : thinking ? (
             <ThinkingDots />
           ) : popIdx != null ? (
@@ -437,8 +659,10 @@ export default function Checkers() {
           {!over && (
             <Pressable
               onPress={surrender}
+              disabled={controlsBlocked}
               accessibilityRole="button"
               accessibilityLabel="Surrender this game"
+              accessibilityState={{ disabled: controlsBlocked }}
               style={({ pressed }) => ({
                 flex: 1,
                 height: 44,
@@ -449,7 +673,7 @@ export default function Checkers() {
                 justifyContent: 'center',
                 flexDirection: 'row',
                 gap: spacing.xs,
-                opacity: pressed ? 0.7 : 1,
+                opacity: controlsBlocked ? 0.45 : pressed ? 0.7 : 1,
                 backgroundColor: theme.color.surface,
               })}
             >
@@ -459,7 +683,7 @@ export default function Checkers() {
           )}
           {/* New game — always available */}
           <Pressable
-            onPress={newGame}
+            onPress={() => newGame()}
             accessibilityRole="button"
             accessibilityLabel="Start a new game"
             style={({ pressed }) => ({
@@ -483,15 +707,67 @@ export default function Checkers() {
       {/* How to play */}
       <GameTutorial game="checkers" visible={tutorial.visible} showOptOut={tutorial.auto} onClose={tutorial.close} />
 
+      {/* Blocking game decisions. Unlike a native Alert, opening this sheet
+          cancels the current AI generation before any action can be hidden
+          behind the confirmation. */}
+      <ActionSheet
+        visible={confirmation !== null}
+        onClose={() => setConfirmation(null)}
+        closeLabel="Keep playing"
+        title={confirmation?.kind === 'difficulty'
+          ? `Restart on ${confirmation.next}?`
+          : 'Surrender this game?'}
+        description={confirmation?.kind === 'difficulty'
+          ? `This ${roundDifficulty} round will end without being recorded.`
+          : 'The AI takes the win and it counts as a loss.'}
+      >
+        <Pressable
+          onPress={() => {
+            if (!confirmation) return;
+            if (confirmation.kind === 'difficulty') {
+              newGame(confirmation.next);
+            } else {
+              finish('b', board);
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={confirmation?.kind === 'difficulty'
+            ? `Restart on ${confirmation.next}`
+            : 'Confirm surrender'}
+          style={({ pressed }) => ({
+            minHeight: 52,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.md,
+            borderRadius: radius.input,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: confirmation?.kind === 'surrender'
+              ? theme.color.danger
+              : theme.color.primary,
+            opacity: pressed ? 0.76 : 1,
+          })}
+        >
+          <Text variant="headline" color={theme.color.onPrimary} center>
+            {confirmation?.kind === 'difficulty'
+              ? `Restart on ${confirmation.next}`
+              : 'Surrender'}
+          </Text>
+        </Pressable>
+      </ActionSheet>
+
       {/* Victory / defeat celebration */}
       <GameCelebration
         visible={celebrate}
-        tone={winner === 'r' ? 'win' : 'lose'}
-        title={winner === 'r' ? 'Victory!' : 'The AI takes it'}
+        tone={winner === 'r' ? 'win' : winner === 'b' ? 'lose' : 'neutral'}
+        title={winner === 'r' ? 'Victory!' : winner === 'b' ? 'The AI takes it' : 'Draw'}
         subtitle={
           winner === 'r'
-            ? `You beat the ${difficulty} AI. Well played.`
-            : 'A calm rematch is one tap away.'
+            ? `You beat the ${roundDifficulty} AI. Well played.`
+            : winner === 'b'
+              ? 'A calm rematch is one tap away.'
+              : drawReason === 'threefold_repetition'
+                ? 'The same position appeared three times. A fresh round is ready.'
+                : 'No capture or promotion happened for 40 moves each. A fresh round is ready.'
         }
         stats={[
           { label: 'Wins', value: `${games.checkersWins}` },
@@ -500,7 +776,7 @@ export default function Checkers() {
         ]}
         unlocked={unlocked}
         hint={nextAchievementHint('checkers', games, games.achievements)}
-        primary={{ label: 'Play again', onPress: newGame }}
+        primary={{ label: 'Play again', onPress: () => newGame() }}
         secondary={{ label: 'View board', onPress: () => setCelebrate(false) }}
         onShareAchievement={(a) => {
           setCelebrate(false);

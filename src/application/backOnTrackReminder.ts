@@ -8,6 +8,7 @@
 
 import { Platform } from 'react-native';
 import { BACK_ON_TRACK_INTERVAL_MS } from '@/domain/backOnTrack';
+import { privateNotificationContent } from '@/domain/notificationPrivacy';
 
 // ── Lazy expo-notifications loader ────────────────────────────────────────
 
@@ -38,7 +39,7 @@ async function ensureChannel(notifs: ExpoNotifications): Promise<void> {
   if (Platform.OS !== 'android' || channelSetup) return;
   try {
     await notifs.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Recovery Check-in Reminders',
+      name: 'Unchainly Reminders',
       importance: notifs.AndroidImportance.DEFAULT,
       sound: 'default',
     });
@@ -61,10 +62,7 @@ export async function scheduleBackOnTrackReminder(
   if (!notifs) return;
 
   try {
-    let { status } = await notifs.getPermissionsAsync();
-    if (status === 'undetermined') {
-      status = (await notifs.requestPermissionsAsync()).status;
-    }
+    const { status } = await notifs.getPermissionsAsync();
     if (status !== 'granted') return;
 
     await ensureChannel(notifs);
@@ -76,10 +74,11 @@ export async function scheduleBackOnTrackReminder(
 
     if (nextAvailableAt <= Date.now()) return;
 
+    const notification = privateNotificationContent();
     await notifs.scheduleNotificationAsync({
       content: {
-        title: 'Time for your weekly Back on Track check-in',
-        body: 'Take a couple of minutes to reflect on your recovery this week.',
+        title: notification.title,
+        body: notification.body,
         sound: true,
         data: {
           tag: NOTIF_TAG,

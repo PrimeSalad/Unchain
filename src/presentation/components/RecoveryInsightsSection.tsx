@@ -637,6 +637,7 @@ export function RecoveryInsightsSection() {
   const theme = useTheme();
   const router = useRouter();
   const urges = useStore((s) => s.urges);
+  const activeTrack = useStore((s) => s.profile?.addictionType);
   const deleteUrge = useStore((s) => s.deleteUrge);
 
   // Collapse state for sub-sections
@@ -803,13 +804,38 @@ export function RecoveryInsightsSection() {
                 <Text variant="callout">{urge.intensity}/10 urge</Text>
                 <Text variant="caption" dim>{new Date(urge.at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</Text>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Edit urge" hitSlop={10} onPress={() => router.push({ pathname: '/log-urge', params: { id: urge.id } })}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Edit urge"
+                style={({ pressed }) => ({
+                  width: 44,
+                  minHeight: 44,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.65 : 1,
+                })}
+                onPress={() => router.push({
+                  pathname: '/log-urge',
+                  params: { id: urge.id, ...(activeTrack ? { track: activeTrack } : {}) },
+                })}
+              >
                 <Ionicons name="create-outline" size={20} color={theme.color.primary} />
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Delete urge" hitSlop={10} onPress={() => Alert.alert('Delete urge?', 'This will update your analytics and predictions.', [
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Delete urge"
+                style={({ pressed }) => ({
+                  width: 44,
+                  minHeight: 44,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.65 : 1,
+                })}
+                onPress={() => Alert.alert('Delete urge?', 'This will update your analytics and predictions.', [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Delete', style: 'destructive', onPress: () => deleteUrge(urge.id) },
-              ])}>
+              ])}
+              >
                 <Ionicons name="trash-outline" size={20} color={theme.color.danger} />
               </Pressable>
             </View>

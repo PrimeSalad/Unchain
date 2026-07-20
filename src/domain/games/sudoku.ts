@@ -6,11 +6,35 @@
 export type Grid = number[];
 export type SudokuLevel = 'easy' | 'medium' | 'hard' | 'expert';
 
-const GIVENS: Record<SudokuLevel, number> = {
-  easy: 42,
-  medium: 34,
-  hard: 30,
-  expert: 26,
+/** Return the committed hint count, or null when another hint is not allowed. */
+export function nextSudokuHintCount(current: number, limit: number): number | null {
+  if (!Number.isInteger(current) || !Number.isInteger(limit) || current < 0 || limit < 1) return null;
+  return current >= limit ? null : current + 1;
+}
+
+/**
+ * Prevalidated, uniquely solvable seeds. Runtime generation used to perform
+ * recursive uniqueness checks on the input path (especially slow for Expert).
+ * Symmetry and digit transforms below create many equivalent puzzles in
+ * bounded O(81) time while preserving both validity and uniqueness.
+ */
+const PUZZLE_BANK: Record<SudokuLevel, { puzzle: string; solution: string }> = {
+  easy: {
+    puzzle: '530078000670195008098002060800760003420803091700024006060500280200419035000280079',
+    solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
+  },
+  medium: {
+    puzzle: '000260701680070090190004500820100040004602900050003028009300074040050036703018000',
+    solution: '435269781682571493197834562826195347374682915951743628519326874248957136763418259',
+  },
+  hard: {
+    puzzle: '000000907000420180000705026100904000050000040000507009920108000034059000507000000',
+    solution: '462831957795426183381795426173984265659312748248567319926178534834259671517643892',
+  },
+  expert: {
+    puzzle: '005300000800000020070010500400005300010070006003200080060500009004000030000009700',
+    solution: '145327698839654127672918543496185372218473956753296481367542819984761235521839764',
+  },
 };
 
 const rowOf = (i: number) => Math.floor(i / 9);
@@ -65,6 +89,11 @@ function countSolutions(grid: Grid, limit = 2): number {
   return count;
 }
 
+/** Number of solutions, capped at `limit`, without mutating the input. */
+export function solutionCount(grid: Grid, limit = 2): number {
+  return countSolutions(grid.slice(), limit);
+}
+
 /** Solve a grid (returns a completed copy, or null if unsolvable). */
 export function solve(grid: Grid): Grid | null {
   const g = grid.slice();
@@ -76,29 +105,31 @@ export interface Puzzle {
   solution: Grid;
 }
 
-export function generate(level: SudokuLevel): Puzzle {
-  const solution = new Array(81).fill(0);
-  fillSolution(solution);
+const parseGrid = (encoded: string): Grid => Array.from(encoded, Number);
 
-  const puzzle = solution.slice();
-  const target = GIVENS[level];
-  let givens = 81;
-
-  // Dig holes symmetrically-ish while keeping a unique solution.
-  for (const i of shuffle([...Array(81).keys()])) {
-    if (givens <= target) break;
-    if (puzzle[i] === 0) continue;
-    const backup = puzzle[i];
-    puzzle[i] = 0;
-    // Uniqueness check on a copy so we don't mutate `puzzle`'s zeros away.
-    if (countSolutions(puzzle.slice(), 2) !== 1) {
-      puzzle[i] = backup; // removing broke uniqueness - keep it
-    } else {
-      givens--;
+function transformGrid(grid: Grid, orientation: number, digitShift: number): Grid {
+  const out = new Array<number>(81).fill(0);
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      let r = row;
+      let c = orientation >= 4 ? 8 - col : col;
+      for (let turn = 0; turn < orientation % 4; turn++) [r, c] = [c, 8 - r];
+      const value = grid[row * 9 + col];
+      out[r * 9 + c] = value === 0 ? 0 : ((value - 1 + digitShift) % 9) + 1;
     }
   }
+  return out;
+}
 
-  return { puzzle, solution };
+export function generate(level: SudokuLevel): Puzzle {
+  const seed = PUZZLE_BANK[level];
+  const variant = Math.floor(Math.random() * 72);
+  const orientation = variant % 8;
+  const digitShift = Math.floor(variant / 8);
+  return {
+    puzzle: transformGrid(parseGrid(seed.puzzle), orientation, digitShift),
+    solution: transformGrid(parseGrid(seed.solution), orientation, digitShift),
+  };
 }
 
 /** Indices that conflict with another filled cell of the same value. */

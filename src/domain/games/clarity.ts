@@ -4,6 +4,7 @@
  */
 
 import { ANSWERS as RAW_ANSWERS, EXTRA as RAW_EXTRA } from './clarity-words';
+import { challengeDayFromLocalDate } from './calendar';
 
 export type TileState = 'correct' | 'present' | 'absent' | 'empty';
 export const WORD_LENGTH = 5;
@@ -70,14 +71,22 @@ export function mergeKeyStates(
   return next;
 }
 
-const DAY_MS = 86_400_000;
-// Epoch: 2024-01-01. Daily puzzle advances one word per local calendar day.
-const EPOCH = new Date(2024, 0, 1).getTime();
-
 export function dailyNumber(now = Date.now()): number {
-  const today = new Date(now);
-  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  return Math.floor((midnight - EPOCH) / DAY_MS);
+  return challengeDayFromLocalDate(now);
+}
+
+/** Consecutive daily wins only: a skipped day starts a new streak. */
+export function nextDailyStreak(
+  current: number,
+  lastWonDay: number | null | undefined,
+  day: number,
+  won: boolean,
+): { streak: number; lastWonDay: number | null } {
+  if (!won) return { streak: 0, lastWonDay: lastWonDay ?? null };
+  return {
+    streak: lastWonDay === day - 1 ? current + 1 : 1,
+    lastWonDay: day,
+  };
 }
 
 /** Deterministic daily answer + its puzzle number. */

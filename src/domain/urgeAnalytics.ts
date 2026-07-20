@@ -6,6 +6,7 @@
  */
 
 import type { UrgeLog } from './records';
+import { privateNotificationContent } from './notificationPrivacy';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -524,27 +525,11 @@ export function analyzeUrges(urges: UrgeLog[]): AnalyticsResult {
 // Notification message generator (used by the scheduler)
 // ---------------------------------------------------------------------------
 
-export function predictionNotificationMessage(window: PredictionWindow): {
+export function predictionNotificationMessage(_window: PredictionWindow): {
   title: string;
   body: string;
 } {
-  const messages = [
-    {
-      title: 'Recovery Check-In',
-      body: `You usually experience stronger urges around ${formatHour(window.hour)}. Take a few minutes for a recovery activity.`,
-    },
-    {
-      title: 'Stay Strong',
-      body: `This is one of your higher-risk periods. Consider starting your favorite coping exercise.`,
-    },
-    {
-      title: 'Quick Check-In',
-      body: `A quick check-in now may help you stay on track. You've got this.`,
-    },
-  ];
-  // Rotate messages based on the hour so it doesn't feel repetitive
-  const msg = messages[window.hour % messages.length];
-  return msg;
+  return privateNotificationContent();
 }
 
 export { DAYS_SHORT, MIN_URGES_FOR_PREDICTION, formatHour, formatHourRange };

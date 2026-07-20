@@ -55,6 +55,20 @@ const LARGE: Shape[] = [
 
 export const COLOR_COUNT = 6;
 
+/** Advance the token used to invalidate callbacks queued by an old gesture. */
+export function nextInteractionGeneration(current: number): number {
+  return current >= Number.MAX_SAFE_INTEGER ? 0 : current + 1;
+}
+
+/** Only callbacks from the current, unblocked interaction session may mutate play. */
+export function acceptsInteractionCallback(
+  callbackGeneration: number,
+  currentGeneration: number,
+  blocked: boolean,
+): boolean {
+  return !blocked && callbackGeneration === currentGeneration;
+}
+
 export function emptyGrid(): Grid {
   return new Array(SIZE * SIZE).fill(0);
 }

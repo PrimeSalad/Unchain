@@ -11,6 +11,7 @@
 
 import { Platform } from 'react-native';
 import { NEED_OR_WANT_COOLDOWN_MS } from '@/domain/alternatives';
+import { privateNotificationContent } from '@/domain/notificationPrivacy';
 
 // ---------------------------------------------------------------------------
 // Lazy expo-notifications loader
@@ -45,7 +46,7 @@ async function ensureChannel(notifs: ExpoNotifications): Promise<void> {
   if (Platform.OS !== 'android' || channelSetup) return;
   try {
     await notifs.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Purchase Reminders',
+      name: 'Unchainly Reminders',
       importance: notifs.AndroidImportance.HIGH,
       sound: 'default',
     });
@@ -63,14 +64,13 @@ async function ensureChannel(notifs: ExpoNotifications): Promise<void> {
  * Schedule a reminder notification that fires after the 24-hour cooldown.
  * Cancels any existing need-or-want reminder before scheduling a new one.
  *
- * @param itemName - The item name to include in the notification body
- * @param itemPrice - The price string (e.g. "$49.99") to include
- * @param currency - The currency symbol
+ * The item arguments are retained for API compatibility, but never placed in
+ * lock-screen copy. The detail remains available after the app is unlocked.
  */
 export async function scheduleNeedOrWantReminder(
-  itemName: string,
-  itemPrice: string,
-  currency: string,
+  _itemName: string,
+  _itemPrice: string,
+  _currency: string,
 ): Promise<void> {
   const notifs = await getNotifs();
   if (!notifs) return;
@@ -87,13 +87,13 @@ export async function scheduleNeedOrWantReminder(
     // Cancel any existing reminder
     await cancelNeedOrWantReminder();
 
-    const priceDisplay = itemPrice ? ` (${currency}${itemPrice})` : '';
     const triggerDate = new Date(Date.now() + NEED_OR_WANT_COOLDOWN_MS);
+    const notification = privateNotificationContent();
 
     await notifs.scheduleNotificationAsync({
       content: {
-        title: '24 hours are up!',
-        body: `Did you buy "${itemName}"${priceDisplay}?`,
+        title: notification.title,
+        body: notification.body,
         sound: true,
         data: {
           tag: NOTIF_TAG,

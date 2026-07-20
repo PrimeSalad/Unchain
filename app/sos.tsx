@@ -210,7 +210,8 @@ export default function Sos() {
   const protectedCount = useStore((s) => s.blockedSites.length);
   const urgesResisted = useStore((s) => s.urges.filter((urge) => urge.resisted).length);
   const healthyHabits = useStore((s) => s.healthyHabitsCount);
-  const logUrge = useStore((s) => s.logUrge);
+  const logUrgeForTrack = useStore((s) => s.logUrgeForTrack);
+  const urgeLogLock = useRef(false);
 
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
@@ -336,15 +337,24 @@ export default function Sos() {
           {/* ── I'm having an urge - primary quick-log CTA ── */}
           <Pressable
             onPress={() => {
+              if (!profile || urgeLogLock.current) return;
+              urgeLogLock.current = true;
               Haptics.selectionAsync().catch(() => {});
-              const entryId = logUrge({
+              const entryId = logUrgeForTrack(profile.addictionType, {
                 intensity: 8,
                 trigger: 'SOS',
                 triggers: ['SOS'],
                 notes: 'Started from SOS.',
                 resisted: true,
               });
-              router.push(`/log-urge?id=${encodeURIComponent(entryId)}` as Href);
+              if (!entryId) {
+                urgeLogLock.current = false;
+                return;
+              }
+              router.push({
+                pathname: '/log-urge',
+                params: { id: entryId, track: profile.addictionType },
+              });
             }}
             accessibilityRole="button"
             accessibilityLabel="I'm having an urge — log it now"

@@ -5,6 +5,8 @@ import {
   createRecoverySetupSubmission,
   createRecoveryTrackDraft,
   finalizeRecoveryTrackDraft,
+  isCompleteRecoveryTrackSetup,
+  isConfiguredRecoveryTrackSetup,
   isLocalMidnight,
   localMidnightDaysAgo,
   normalizeRecoveryTrackDraft,
@@ -198,6 +200,21 @@ test('finalization adds explicit version/status/completion only after validation
     assert.equal(invalid.ok, false);
     assert.equal(codes(invalid.issues).includes('setup_completion_time_invalid'), true);
   }
+});
+
+test('runtime eligibility requires a fully valid completed track', () => {
+  const complete = completeTrack('smoking');
+  assert.equal(isCompleteRecoveryTrackSetup(complete, NOW), true);
+  assert.equal(isCompleteRecoveryTrackSetup({
+    ...complete,
+    setupStatus: 'needs_review',
+    setupCompletedAt: undefined,
+  }, NOW), false);
+  assert.equal(isCompleteRecoveryTrackSetup({ ...complete, reason: '' }, NOW), false);
+  assert.equal(isCompleteRecoveryTrackSetup(undefined, NOW), false);
+  const archived = { ...complete, setupStatus: 'archived' };
+  assert.equal(isCompleteRecoveryTrackSetup(archived, NOW), false);
+  assert.equal(isConfiguredRecoveryTrackSetup(archived, NOW), true);
 });
 
 test('atomic submission validates exact selected membership and converts independent legacy profiles', () => {

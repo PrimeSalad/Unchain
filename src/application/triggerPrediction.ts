@@ -15,7 +15,8 @@
  *
  * To enable native notifications:
  *   npm install expo-notifications
- *   Then grant permission in your app startup (requestPermissionsAsync).
+ *   Request permission only from an explicit reminder control; passive app
+ *   startup and hydration sync must never show the system prompt.
  *   The service will auto-detect the module and activate full scheduling.
  */
 
@@ -68,8 +69,8 @@ async function getNotifs(): Promise<ExpoNotifications | null> {
 // Permission helper
 // ---------------------------------------------------------------------------
 
-/** Request notification permissions. Call once during onboarding or app open.
- *  Returns true when the user granted permission. */
+/** Request notification permissions from an explicit, user-initiated reminder
+ *  control. Never call this from app launch, hydration, or passive sync. */
 export async function requestPredictionPermissions(): Promise<boolean> {
   const notifs = await getNotifs();
   if (!notifs) return false;
@@ -179,11 +180,8 @@ export async function syncPredictionNotifications(urges: UrgeLog[]): Promise<voi
   if (!notifs) return; // expo-notifications not installed - no-op
 
   try {
-    // Check permission without prompting (sync is called automatically)
-    let { status } = await notifs.getPermissionsAsync();
-    if (status === 'undetermined' && analyzeUrges(urges).hasSufficientData) {
-      status = (await notifs.requestPermissionsAsync()).status;
-    }
+    // Passive sync must never trigger a system permission prompt.
+    const { status } = await notifs.getPermissionsAsync();
     if (status !== 'granted') return;
 
     await ensureChannel(notifs);

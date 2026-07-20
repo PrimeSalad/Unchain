@@ -1,4 +1,5 @@
 import { useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function useGameMetrics() {
   const { width, height } = useWindowDimensions();
@@ -18,9 +19,11 @@ export function useSquareBoardSize({
   max?: number;
 }) {
   const metrics = useGameMetrics();
+  const insets = useSafeAreaInsets();
   const byWidth = metrics.width - horizontalPadding;
-  const byHeight = metrics.height - reservedHeight;
+  const usableHeight = metrics.height - insets.top - insets.bottom;
+  const byHeight = usableHeight - reservedHeight;
   const boardSize = Math.floor(Math.max(160, Math.min(max, byWidth, byHeight)));
 
-  return { ...metrics, boardSize };
+  return { ...metrics, boardSize, usableHeight, insets };
 }

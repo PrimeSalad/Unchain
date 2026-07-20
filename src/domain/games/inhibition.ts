@@ -8,6 +8,8 @@
  * clinical task. All functions here are deterministic and unit-testable.
  */
 
+import { challengeDayFromLocalDate } from './calendar';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared arcade tuning
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +71,18 @@ export function gonogoGapMs(level: number): number {
 /** Random extra delay so stimulus onset is never predictable. */
 export const GAP_JITTER_MS = 400;
 
+/**
+ * Decide how a paused round should resume. A final-life result is terminal
+ * even when the short game-over timer was cancelled by a tutorial or app
+ * background transition.
+ */
+export function pausedRoundResumeAction(
+  lives: number,
+  terminalResultPending: boolean,
+): 'finish' | 'countdown' {
+  return terminalResultPending || lives <= 0 ? 'finish' : 'countdown';
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Round summary
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,13 +124,8 @@ export function summarize(
 // the player's personal best, so it is always beatable but never trivial.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DAY_MS = 86_400_000;
-const EPOCH = new Date(2024, 0, 1).getTime();
-
 export function challengeDayNumber(now = Date.now()): number {
-  const d = new Date(now);
-  const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  return Math.floor((midnight - EPOCH) / DAY_MS);
+  return challengeDayFromLocalDate(now);
 }
 
 /** Today's target score. Fresh players get an entry-level goal; experienced

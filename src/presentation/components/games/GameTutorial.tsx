@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Text } from '../Text';
@@ -8,6 +9,7 @@ import { elevation, radius, spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import type { GameId } from '@/domain/games/achievements';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Per-game "How to play" content - short, concrete, no jargon.
@@ -46,7 +48,7 @@ const TUTORIALS: Record<GameId, { title: string; steps: TutorialStep[] }> = {
   blocks: {
     title: 'How to play Block Puzzle',
     steps: [
-      { icon: 'move', text: 'Drag pieces from the tray anywhere they fit on the board.' },
+      { icon: 'move', text: 'Drag a piece, or tap a piece then tap its board position.' },
       { icon: 'reorder-four', text: 'Fill a whole row or column to clear it and score.' },
       { icon: 'alert-circle-outline', text: 'The game ends when none of your pieces fit. Plan ahead.' },
     ],
@@ -82,6 +84,8 @@ interface GameTutorialProps {
  */
 export function GameTutorial({ game, visible, onClose, showOptOut = true }: GameTutorialProps) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const setTutorialHidden = useStore((s) => s.setTutorialHidden);
   const hidden = useStore((s) => !!s.games.tutorialsHidden[game]);
   const [dontShow, setDontShow] = useState(hidden);
@@ -107,13 +111,18 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={close}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={reduceMotion ? 'none' : 'slide'}
+      statusBarTranslucent
+      onRequestClose={close}
+    >
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.58)' }]}
           onPress={close}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss"
+          accessible={false}
         />
         <View
           style={{
@@ -128,9 +137,10 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
             borderColor: theme.color.hairline,
             paddingHorizontal: spacing.lg,
             paddingTop: spacing.sm,
-            paddingBottom: spacing.lg,
+            paddingBottom: Math.max(spacing.lg, insets.bottom + spacing.sm),
             ...elevation.e2,
           }}
+          accessibilityViewIsModal
         >
           <View style={{ alignItems: 'center', paddingBottom: spacing.sm }}>
             <View style={{ width: 42, height: 4, borderRadius: 2, backgroundColor: theme.color.hairline }} />
@@ -171,7 +181,12 @@ export function GameTutorial({ game, visible, onClose, showOptOut = true }: Game
             </Pressable>
           </View>
 
-          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            style={{ flexGrow: 0, flexShrink: 1 }}
+            contentContainerStyle={{ paddingBottom: spacing.xs }}
+          >
             <View style={{ gap: spacing.sm }}>
               {steps.map((s, i) => (
                 <View
@@ -271,7 +286,13 @@ export function TutorialInfoButton({ onPress }: { onPress: () => void }) {
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel="How to play"
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.6 : 1,
+      })}
     >
       <Ionicons name="information-circle-outline" size={22} color={theme.color.textDim} />
     </Pressable>

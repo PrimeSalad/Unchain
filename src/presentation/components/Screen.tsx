@@ -115,7 +115,10 @@ export function Screen({
       >
         <View
           style={[
-            { flex: 1, paddingBottom: bottomInset, overflow: 'hidden' },
+            // Child form shells may contain their own ScrollView or focused
+            // field affordances. Clipping here can hide them when the iPhone
+            // keyboard reduces the usable viewport.
+            { flex: 1, paddingBottom: bottomInset },
             hPad,
             contentStyle,
           ]}

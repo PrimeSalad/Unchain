@@ -507,6 +507,30 @@ export function validateRecoveryTrackSetup(
   return issues;
 }
 
+/**
+ * Runtime eligibility gate for actions that create data in, or activate, a
+ * recovery track. A persisted status flag alone is not sufficient: older or
+ * damaged snapshots can say `complete` while still missing required answers.
+ */
+export function isCompleteRecoveryTrackSetup(
+  setup: RecoveryTrackSetup | null | undefined,
+  now = Date.now(),
+): setup is RecoveryTrackSetup {
+  return setup?.setupStatus === 'complete'
+    && validateRecoveryTrackSetup(setup, now).length === 0;
+}
+
+/** A fully configured track may be active (`complete`) or retained as
+ * archived history. This broader predicate is reserved for frozen workflows
+ * such as finishing a daily-journal plan after the track was archived. */
+export function isConfiguredRecoveryTrackSetup(
+  setup: RecoveryTrackSetup | null | undefined,
+  now = Date.now(),
+): setup is RecoveryTrackSetup {
+  return (setup?.setupStatus === 'complete' || setup?.setupStatus === 'archived')
+    && validateRecoveryTrackSetup(setup, now).length === 0;
+}
+
 export function finalizeRecoveryTrackDraft(
   draft: RecoveryTrackDraft,
   completedAt = Date.now(),

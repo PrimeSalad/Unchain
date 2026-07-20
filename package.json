@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.test.json && node --test tests/protection.test.mjs tests/gambling.test.mjs tests/multi-addiction.test.mjs tests/recovery-track-setup.test.mjs tests/recovery-state-migration.test.mjs tests/pattern-insights.test.mjs"
+    "test": "tsc -p tsconfig.test.json && node --test tests/protection.test.mjs tests/gambling.test.mjs tests/multi-addiction.test.mjs tests/recovery-track-setup.test.mjs tests/recovery-state-migration.test.mjs tests/pattern-insights.test.mjs tests/urge-logging.test.mjs tests/games-hardening.test.mjs tests/notification-privacy.test.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/nunito": "^0.4.1",

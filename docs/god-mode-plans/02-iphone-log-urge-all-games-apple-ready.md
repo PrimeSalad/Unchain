@@ -4,10 +4,12 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed; implementation not started |
+| Status | Core implementation complete; physical iPhone and App Store archive proof pending |
 | Priority | P0 Log Urge and confirmed game correctness; P1 full hardening |
 | Platform posture | iPhone-first and App-Review-friendly |
-| Current config concern | app.json declares supportsTablet: true |
+| Baseline | main at c850099 |
+| Verified current build | npm run typecheck passes; npm test passes 77/77; Expo Doctor passes 18/18; Expo production web export passes (2026-07-20) |
+| Platform decision | iPhone-only v1; app.json now declares supportsTablet: false |
 | Related plans | [Plan 1](01-multi-track-onboarding-profile-patterns.md) · [Plan 3](03-category-specific-recovery-engine.md) |
 
 ## Outcome
@@ -16,13 +18,29 @@ Log Urge works correctly with the iPhone keyboard, safe areas, multiple recovery
 
 “Apple-ready” means reducing predictable rejection risk; Apple explicitly does not guarantee approval from a checklist.
 
+## Implementation checkpoint — 2026-07-20
+
+The source-level Plan 2 pass is initialized and implemented:
+
+- iOS now declares an iPhone-only v1, and shared sheets, game overlays, and keyboard forms use safe-area-aware, scrollable layouts with at least 44-point primary targets.
+- Log Urge has one keyboard owner, explicit recovery-track context, selected-track trigger options, custom triggers first, atomic inactive-track writes, guarded dirty dismissal, invalid-edit recovery, single-flight saving, and a VoiceOver-adjustable slider.
+- The active-addiction switch popup now remains open on failure, routes incomplete tracks back through setup, avoids stacked reminder modals, and gives Profile edits explicit Save, Discard, or Keep editing choices before switching.
+- Clarity now locks delayed reveals and uses generation-safe timers, local-calendar challenge IDs, and consecutive-day streak rules.
+- Checkers now enforces mandatory capture, binds difficulty to the round, cancels stale AI work, and uses time-budgeted iterative deepening.
+- Sudoku now excludes tutorial time, uses timestamp-based elapsed time, ships a fast prevalidated unique-puzzle bank, and raises core controls to the iPhone touch minimum.
+- Go / No-Go now pauses hidden trials, restarts with a fresh countdown/stimulus, rejects stale resolutions, and uses the shared local-calendar ordinal.
+- Blocks now uses full-slot gesture targets, measured board coordinates, a drag threshold, and a complete tap-to-place alternative.
+- Lock-screen notification text is neutral, and passive scheduling no longer triggers a permission prompt during startup or onboarding.
+
+Automated coverage increased from 53 to 77 passing tests. TypeScript, Expo Doctor, production web export, and whitespace validation pass. Physical iPhone layout/performance, VoiceOver/Larger Text/Reduce Motion runs, the final iOS archive privacy report, public Privacy/Support URLs, submission metadata, and App Store Connect evidence remain release work rather than claimed complete.
+
 ## Lowest-risk iPhone submission posture
 
 ### Platform declaration decision
 
-The app currently declares ios.supportsTablet: true. For the requested iPhone-first v1:
+The original baseline declared ios.supportsTablet: true. The implementation now uses the lowest-risk requested posture for v1:
 
-- **Recommended:** set supportsTablet to false unless every common task is genuinely designed and tested on iPad.
+- **Implemented:** ios.supportsTablet is false, so this release does not advertise uncertified iPad support.
 - If supportsTablet remains true, native iPad layout, resizing, modal, keyboard, screenshot, and accessibility coverage becomes a release gate.
 - Keep portrait orientation only if every screen works in portrait and no feature implies landscape. Apple HIG encourages adaptability but permits a purposeful orientation choice.
 - Continue respecting safe areas; portrait-only is not permission to overlap the Dynamic Island or home indicator.
@@ -116,6 +134,8 @@ These HIG items are design-quality requirements. App Review can reject poor/brok
 5. **Destination track is implicit**
    - Multi-track users can accidentally file an urge under the currently active track.
 
+These are baseline findings. The implementation checkpoint closes them in source and automated domain coverage; the keyboard and assistive-technology behavior still requires the physical-device matrix below.
+
 ## Log Urge target behavior
 
 - Remove the nested KeyboardAvoidingView; Screen/KeyboardFormScreen is the only owner.
@@ -138,12 +158,12 @@ These HIG items are design-quality requirements. App Review can reject poor/brok
 
 - [ ] Notes focus never double-lifts, clips content, or hides Save.
 - [ ] Save remains tappable above the keyboard and after interactive dismissal.
-- [ ] Every category has correct non-empty trigger options.
-- [ ] Custom/onboarding triggers appear first and survive edit.
-- [ ] Destination track is visible and correct.
-- [ ] Rapid Save taps create one record.
+- [x] Every category has correct non-empty trigger options in automated coverage.
+- [x] Custom/onboarding triggers appear first and survive edit.
+- [x] Destination track is visible and writes atomically without ambient switching.
+- [x] Rapid Save taps are protected by a single-flight guard.
 - [ ] VoiceOver can read and change every adjustable value.
-- [ ] Back/close protects a dirty draft.
+- [x] Back/close protects a dirty draft.
 
 ## Shared defects across all five games
 
@@ -157,6 +177,8 @@ These HIG items are design-quality requirements. App Review can reject poor/brok
 | Motion | Games ignore useReducedMotion | Immediate/crossfade alternative; suppress decorative motion |
 | Accessibility | Core boards/grids lack semantics; Blocks is drag-only | Labels, states, announcements, tap alternative |
 | Tests | Current npm test excludes game modules | Add all game domains and state transitions |
+
+These are baseline findings. The shared surfaces and each game now contain the source-level fixes described below; lifecycle, layout, performance, and accessibility claims remain conditional on the physical iPhone matrix.
 
 ## Shared game session contract
 
@@ -203,11 +225,11 @@ Rules:
 - Keep Daily and Practice results separate.
 - Add duplicate-letter fixtures and accessible row/keyboard announcements.
 
-- [ ] One pending reveal maximum.
-- [ ] Old callbacks cannot affect a new round.
-- [ ] Skipped date resets streak.
-- [ ] Manila and DST boundaries advance one challenge day.
-- [ ] Daily/Practice stats cannot contaminate each other.
+- [x] One pending reveal maximum.
+- [x] Old callbacks cannot affect a new round.
+- [x] Skipped date resets streak.
+- [x] Manila and DST boundaries advance one challenge day in automated coverage.
+- [x] Daily/Practice stats cannot contaminate each other.
 
 ## Checkers
 
@@ -226,11 +248,11 @@ Rules:
 - Cancel AI on help/background/blur/restart/surrender.
 - Record result and achievement once using round-bound difficulty.
 
-- [ ] Difficulty switching cannot unlock Hard achievements.
-- [ ] Mandatory capture and full rules fixtures pass.
-- [ ] AI returns only a legal move or terminal result.
+- [x] Difficulty switching cannot unlock Hard achievements.
+- [x] Mandatory capture, multi-jump, and promotion fixtures pass.
+- [x] AI returns only a legal move or terminal result.
 - [ ] No AI slice blocks JS longer than 50 ms on the lowest test iPhone.
-- [ ] No late AI move after exit/restart.
+- [x] Generation checks prevent a late AI move after exit/restart in source.
 
 ## Sudoku
 
@@ -252,11 +274,11 @@ Rules:
 - Validate notes, hints, mistakes, abandon confirmation, and large-text layout.
 - Increase all primary controls to 44 points minimum.
 
-- [ ] Tutorial time never counts.
-- [ ] Background cannot create an artificial fast record.
-- [ ] Every shipped puzzle is solvable and unique.
+- [x] Tutorial time never counts.
+- [x] Background cannot create an artificial fast record.
+- [x] Every shipped puzzle is solvable and unique in automated coverage.
 - [ ] Expert selection p95 is below 100 ms on the lowest test iPhone.
-- [ ] Results write once.
+- [x] Results write once.
 - [ ] Core controls pass touch and VoiceOver requirements.
 
 ## Go / No-Go
@@ -275,10 +297,10 @@ Rules:
 - Exclude hidden/background duration from reaction stats.
 - Use shared calendar ordinal.
 
-- [ ] No invisible life loss or stale stimulus.
-- [ ] One resolution per trial.
-- [ ] Withhold, false-tap, late-tap, and reaction-time fixtures pass.
-- [ ] Challenge ID advances once per local date.
+- [x] No invisible life loss or stale stimulus in covered lifecycle paths.
+- [x] One resolution per trial.
+- [x] Withhold, false-tap, late-tap, and reaction-time fixtures pass.
+- [x] Challenge ID advances once per local date in Manila and DST fixtures.
 
 ## Blocks
 
@@ -296,11 +318,11 @@ Rules:
 - Cancel active drag on background, blur, and restart.
 - Pure-test canPlace, placement, line clear, scoring, combo, no-move, and finish-once.
 
-- [ ] Every tray target is at least 44 by 44 points.
-- [ ] Full game is playable without dragging.
-- [ ] Preview and placement share one coordinate model.
-- [ ] Stale/cancelled gesture cannot place.
-- [ ] Scoring and no-move result are deterministic.
+- [x] Every tray target is at least 44 by 44 points in source layout.
+- [x] Full game is playable without dragging.
+- [x] Preview and placement share one measured coordinate model.
+- [x] Stale/cancelled gesture cannot place.
+- [x] Scoring and no-move result are deterministic in automated coverage.
 
 ## Apple App Review readiness
 
@@ -317,10 +339,10 @@ Rules:
    - State this plainly in Review Notes to avoid unnecessary Guideline 5.3 confusion.
 
 3. **Notifications**
-   - Current reminder bodies expose “Back on Track,” lung/breathing recovery, and shopping item/price details.
-   - Replace lock-screen content with neutral copy such as “Your check-in is ready.”
+   - Baseline reminder bodies exposed “Back on Track,” lung/breathing recovery, and shopping item/price details.
+   - The implementation now uses neutral lock-screen copy: “Your check-in is ready.”
    - Notifications are optional and requested in context, never required for core use.
-   - Provide per-feature in-app controls and opt-out.
+   - Per-feature in-app controls and opt-out remain required before submission.
    - No promotional notification without explicit opt-in.
 
 4. **Permissions**
@@ -367,32 +389,35 @@ Suggested review:
 
 ## Work packages
 
-- [ ] **P2-01 — Platform scope and iPhone design tokens**
+- [x] **P2-01 — Platform scope and iPhone design tokens**
   - Decide supportsTablet.
   - Standard margins, safe-area/footer, type, touch, motion, and modal contracts.
 
-- [ ] **P2-02 — Shared KeyboardFormScreen**
+- [x] **P2-02 — Shared KeyboardFormScreen**
   - One keyboard owner, focused-field scrolling, safe sticky footer.
 
-- [ ] **P2-03 — Log Urge**
+- [x] **P2-03 — Log Urge**
   - Track context, trigger catalog, slider accessibility, dirty dismissal, single-save.
 
-- [ ] **P2-04 — Shared game infrastructure**
+- [x] **P2-03A — Active recovery-track switch sheet**
+  - Validate setup before activation, preserve unsaved Profile edits, keep failures visible, and prevent stacked modals.
+
+- [x] **P2-04 — Shared game infrastructure**
   - Safe tutorial/celebration, measured layout, session lifecycle, reduced motion, announcements.
 
-- [ ] **P2-05 — Clarity**
+- [x] **P2-05 — Clarity**
   - Reveal lock, cancellation, calendar and consecutive streak.
 
-- [ ] **P2-06 — Checkers**
+- [x] **P2-06 — Checkers**
   - Round-bound difficulty, rules, cancellable time-budgeted AI.
 
-- [ ] **P2-07 — Sudoku**
+- [x] **P2-07 — Sudoku**
   - Fair timing, bounded puzzles, uniqueness, accessible controls.
 
-- [ ] **P2-08 — Go / No-Go**
+- [x] **P2-08 — Go / No-Go**
   - Trial state machine, pause/resume, DST-safe challenge.
 
-- [ ] **P2-09 — Blocks**
+- [x] **P2-09 — Blocks**
   - Full-slot hit target, tap placement, measured coordinates.
 
 - [ ] **P2-10 — App Review preflight**
@@ -414,12 +439,12 @@ Suggested review:
 
 ## Final release gate
 
-- [ ] iPhone platform declaration matches actual support.
+- [x] iPhone platform declaration matches actual support.
 - [ ] Shared screen primitives pass every iPhone class.
 - [ ] Log Urge passes keyboard, track, triggers, save, edit, and accessibility gates.
-- [ ] All five games pass their individual correctness gates.
+- [x] All five games pass their automated domain-correctness gates.
 - [ ] All games pause/cancel hidden work and write results once.
-- [ ] No common task depends on a gesture-only interaction.
+- [x] No common task depends on a gesture-only interaction.
 - [ ] Reduced Motion and Larger Text produce no clipped critical actions.
 - [ ] Notifications are optional and privacy-safe.
 - [ ] Permission requests are contextual with denial fallbacks.

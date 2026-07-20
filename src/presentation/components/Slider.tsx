@@ -11,6 +11,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { radius, spacing, motion } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Text } from './Text';
 
 interface SliderProps {
@@ -19,19 +20,6 @@ interface SliderProps {
   max?: number;
   label?: string;
   kind?: 'mood' | 'urge';
-}
-
-function moodEmoji(v: number): string {
-  if (v <= 1) return '😔';
-  if (v <= 2) return '😞';
-  if (v <= 3) return '😕';
-  if (v <= 4) return '😐';
-  if (v <= 5) return '🙂';
-  if (v <= 6) return '😊';
-  if (v <= 7) return '😄';
-  if (v <= 8) return '😁';
-  if (v <= 9) return '🥰';
-  return '🤩';
 }
 
 function moodLabel(v: number): string {
@@ -47,19 +35,6 @@ function moodColor(v: number, danger: string, celebrate: string, primary: string
   if (v <= 5) return celebrate;
   if (v <= 7) return primary;
   return success;
-}
-
-function urgeEmoji(v: number): string {
-  if (v <= 1) return '😌';
-  if (v <= 2) return '🙂';
-  if (v <= 3) return '😐';
-  if (v <= 4) return '😟';
-  if (v <= 5) return '😬';
-  if (v <= 6) return '😣';
-  if (v <= 7) return '😖';
-  if (v <= 8) return '😤';
-  if (v <= 9) return '😫';
-  return '😵';
 }
 
 function urgeLabel(v: number): string {
@@ -80,23 +55,32 @@ function urgeColor(v: number, danger: string, celebrate: string, primary: string
 interface SegmentProps {
   n: number;
   value: number;
-  label: string;
-  max: number;
   onChange: (v: number) => void;
   activeColor: string;
   inactiveColor: string;
+  reduceMotion: boolean;
 }
 
-function Segment({ n, value, label, max, onChange, activeColor, inactiveColor }: SegmentProps) {
+function Segment({ n, value, onChange, activeColor, inactiveColor, reduceMotion }: SegmentProps) {
   const pressed = useSharedValue(0);
   const isActive = n <= value;
   const isCurrent = n === value;
 
   const barStyle = useAnimatedStyle(() => ({
-    height: withSpring(isCurrent ? 18 : isActive ? 14 : 10, motion.spring),
-    backgroundColor: withTiming(isActive ? activeColor : inactiveColor, { duration: 200 }),
-    transform: [{ scaleY: withSpring(pressed.value ? 1.15 : 1, motion.spring) }],
-    opacity: withTiming(isActive ? 1 : 0.35, { duration: 200 }),
+    height: reduceMotion
+      ? (isCurrent ? 18 : isActive ? 14 : 10)
+      : withSpring(isCurrent ? 18 : isActive ? 14 : 10, motion.spring),
+    backgroundColor: reduceMotion
+      ? (isActive ? activeColor : inactiveColor)
+      : withTiming(isActive ? activeColor : inactiveColor, { duration: 200 }),
+    transform: [{
+      scaleY: reduceMotion
+        ? 1
+        : withSpring(pressed.value ? 1.15 : 1, motion.spring),
+    }],
+    opacity: reduceMotion
+      ? (isActive ? 1 : 0.35)
+      : withTiming(isActive ? 1 : 0.35, { duration: 200 }),
   }));
 
   const onIn  = useCallback(() => { pressed.value = 1; }, [pressed]);
@@ -111,8 +95,7 @@ function Segment({ n, value, label, max, onChange, activeColor, inactiveColor }:
       onPressIn={onIn}
       onPressOut={onOut}
       onPress={handle}
-      accessibilityRole="adjustable"
-      accessibilityLabel={`${label} ${n} of ${max}`}
+      accessible={false}
       style={{ flex: 1, height: 48, justifyContent: 'center', alignItems: 'center' }}
       hitSlop={2}
     >
@@ -140,6 +123,7 @@ function Segment({ n, value, label, max, onChange, activeColor, inactiveColor }:
  */
 export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: SliderProps) {
   const theme = useTheme();
+  const reduceMotion = useReducedMotion();
   const c = theme.color;
   const color = kind === 'urge'
     ? urgeColor(value, c.danger, c.celebrate, c.primary, c.success)
@@ -163,6 +147,13 @@ export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: Slid
     },
     [onChange],
   );
+
+  const changeBy = useCallback((delta: number) => {
+    const next = Math.max(1, Math.min(max, value + delta));
+    if (next !== value) emitValue(next);
+  }, [emitValue, max, value]);
+
+  const valueText = kind === 'urge' ? urgeLabel(value) : moodLabel(value);
 
   const panGesture = Gesture.Pan()
     .activeOffsetX([-6, 6])
@@ -209,22 +200,37 @@ export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: Slid
 
   return (
     <GestureDetector gesture={panGesture}>
-      <View collapsable={false}>
-        {/* Emoji + label — swiping here also works */}
+      <View
+        collapsable={false}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={label ?? (kind === 'urge' ? 'Urge intensity' : 'Mood')}
+        accessibilityHint="Swipe up or down to adjust the value."
+        accessibilityValue={{ min: 1, max, now: value, text: `${value} of ${max}, ${valueText}` }}
+        accessibilityActions={[
+          { name: 'increment', label: 'Increase' },
+          { name: 'decrement', label: 'Decrease' },
+        ]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'increment') changeBy(1);
+          if (event.nativeEvent.actionName === 'decrement') changeBy(-1);
+        }}
+      >
+        {/* Current value + label — swiping here also works. */}
         <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
-          {kind === 'mood' && <Text style={{ fontSize: 42, lineHeight: 48 }}>{moodEmoji(value)}</Text>}
-          {kind === 'urge' && <Text style={{ fontSize: 42, lineHeight: 48 }}>{urgeEmoji(value)}</Text>}
-          <Text variant="headline" color={color} style={{ marginTop: spacing.xs, fontFamily: 'Nunito_700Bold' }}>
+          <Text variant="headline" color={color} style={{ fontFamily: 'Nunito_700Bold' }}>
             {value} / {max}
           </Text>
           <Text variant="footnote" dim style={{ marginTop: spacing.xs }}>
-            {kind === 'urge' ? urgeLabel(value) : moodLabel(value)}
+            {valueText}
           </Text>
         </View>
 
         {/* Bars */}
         <View
           collapsable={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           onLayout={(e) => { barRowWidth.value = e.nativeEvent.layout.width; }}
           style={{ flexDirection: 'row', gap: 5, alignItems: 'flex-end' }}
         >
@@ -233,11 +239,10 @@ export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: Slid
               key={n}
               n={n}
               value={value}
-              label={label ?? (kind === 'urge' ? 'Urge intensity' : 'Mood')}
-              max={max}
               onChange={onChange}
               activeColor={color}
               inactiveColor={c.surfaceAlt}
+              reduceMotion={reduceMotion}
             />
           ))}
         </View>

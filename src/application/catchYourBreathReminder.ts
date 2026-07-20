@@ -11,6 +11,7 @@
 
 import { Platform } from 'react-native';
 import { CATCH_YOUR_BREATH_INTERVAL_MS } from '@/domain/catchYourBreath';
+import { privateNotificationContent } from '@/domain/notificationPrivacy';
 
 // ── Lazy expo-notifications loader ────────────────────────────────────────
 
@@ -42,7 +43,7 @@ async function ensureChannel(notifs: ExpoNotifications): Promise<void> {
   if (Platform.OS !== 'android' || channelSetup) return;
   try {
     await notifs.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Breathing Check-in Reminders',
+      name: 'Unchainly Reminders',
       importance: notifs.AndroidImportance.DEFAULT,
       sound: 'default',
     });
@@ -68,10 +69,7 @@ export async function scheduleCatchYourBreathReminder(
   if (!notifs) return;
 
   try {
-    let { status } = await notifs.getPermissionsAsync();
-    if (status === 'undetermined') {
-      status = (await notifs.requestPermissionsAsync()).status;
-    }
+    const { status } = await notifs.getPermissionsAsync();
     if (status !== 'granted') return;
 
     await ensureChannel(notifs);
@@ -87,10 +85,11 @@ export async function scheduleCatchYourBreathReminder(
     // Don't schedule if it's already past
     if (nextAvailableAt <= Date.now()) return;
 
+    const notification = privateNotificationContent();
     await notifs.scheduleNotificationAsync({
       content: {
-        title: 'Time for your weekly check-in',
-        body: 'Take two minutes to see how your breathing has changed this week.',
+        title: notification.title,
+        body: notification.body,
         sound: true,
         data: {
           tag: NOTIF_TAG,
@@ -131,10 +130,11 @@ export async function scheduleCatchYourBreathMissedReminder(
     );
     if (alreadyScheduled) return;
 
+    const notification = privateNotificationContent();
     await notifs.scheduleNotificationAsync({
       content: {
-        title: 'Your lungs miss you',
-        body: 'Your weekly breathing reflection is waiting. Take a moment to check in with yourself.',
+        title: notification.title,
+        body: notification.body,
         sound: true,
         data: {
           tag: MISSED_NOTIF_TAG,

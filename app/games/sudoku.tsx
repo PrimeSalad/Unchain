@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, View } from 'react-native';
+import { Alert, Animated, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +15,14 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import { playSound } from '@/application/sound';
 import { nextAchievementHint, type GameAchievement } from '@/domain/games/achievements';
-import { conflicts, generate, type Grid, type SudokuLevel } from '@/domain/games/sudoku';
+import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
+import {
+  conflicts,
+  generate,
+  nextSudokuHintCount,
+  type Grid,
+  type SudokuLevel,
+} from '@/domain/games/sudoku';
 
 // A crash inside the game must never take navigation down with it.
 export { GamesErrorBoundary as ErrorBoundary } from '@/presentation/components/games/GamesErrorBoundary';
@@ -52,21 +59,46 @@ export default function Sudoku() {
   const recorded = useRef(false);
   // Synchronous hint counter - state alone can be raced by rapid taps.
   const hintsRef = useRef(0);
+  const startedAtRef = useRef<number | null>(null);
+  const tutorialPauseStartedRef = useRef<number | null>(null);
+  const generationRef = useRef(0);
+  const celebrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tutorial = useGameTutorial('sudoku');
+  const reduceMotion = useReducedMotion();
   const loading = useGameLoading();
   const layout = useSquareBoardSize({ reservedHeight: 384, horizontalPadding: spacing.lg * 2, max: 328 });
 
   const givens = useMemo(() => new Set(puzzle.map((v, i) => (v !== 0 ? i : -1)).filter((i) => i >= 0)), [puzzle]);
   const bad = useMemo(() => conflicts(grid), [grid]);
 
-  // Timer.
+  // First-run tutorial time is excluded. Once play starts, elapsed time is
+  // timestamp-based, so iOS background timer suspension cannot create a fake
+  // fast record. Deliberately opening Help pauses the clock.
   useEffect(() => {
-    if (done || loading) return;
-    const id = setInterval(() => setSeconds((s) => s + 1), 1000);
+    if (tutorial.visible) {
+      if (startedAtRef.current != null && tutorialPauseStartedRef.current == null) {
+        tutorialPauseStartedRef.current = Date.now();
+      }
+    } else if (tutorialPauseStartedRef.current != null && startedAtRef.current != null) {
+      startedAtRef.current += Date.now() - tutorialPauseStartedRef.current;
+      tutorialPauseStartedRef.current = null;
+    }
+  }, [tutorial.visible]);
+
+  useEffect(() => {
+    if (done || loading || tutorial.visible) return;
+    if (startedAtRef.current == null) startedAtRef.current = Date.now() - seconds * 1000;
+    const tick = () => setSeconds(Math.floor((Date.now() - (startedAtRef.current as number)) / 1000));
+    tick();
+    const id = setInterval(tick, 500);
     return () => clearInterval(id);
-  }, [done, loading]);
+  }, [done, loading, tutorial.visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const newGame = (lvl: SudokuLevel) => {
+    generationRef.current += 1;
+    if (celebrationTimerRef.current) clearTimeout(celebrationTimerRef.current);
+    celebrationTimerRef.current = null;
+    unitFlashAnim.stopAnimation();
     const p = generate(lvl);
     setLevel(lvl);
     setPuzzle(p);
@@ -77,6 +109,8 @@ export default function Sudoku() {
     setHints(0);
     hintsRef.current = 0;
     setSeconds(0);
+    startedAtRef.current = null;
+    tutorialPauseStartedRef.current = null;
     setDone(false);
     setCelebrate(false);
     setUnlocked([]);
@@ -91,12 +125,22 @@ export default function Sudoku() {
     setDone(true);
     if (!recorded.current) {
       recorded.current = true;
-      const newly = recordSudoku(level, seconds * 1000, { mistakes, hints });
+      const pausedMs = tutorialPauseStartedRef.current == null ? 0 : Date.now() - tutorialPauseStartedRef.current;
+      const elapsedMs = startedAtRef.current == null
+        ? seconds * 1000
+        : Math.max(0, Date.now() - startedAtRef.current - pausedMs);
+      // The ref is synchronously committed before a hint fills the final cell;
+      // render state can still be one frame behind at this point.
+      const newly = recordSudoku(level, elapsedMs, { mistakes, hints: hintsRef.current });
       setUnlocked(newly);
       completeMission('play_game');
       playSound('win', 0.8);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      setTimeout(() => setCelebrate(true), 500);
+      const generation = generationRef.current;
+      celebrationTimerRef.current = setTimeout(() => {
+        celebrationTimerRef.current = null;
+        if (generation === generationRef.current) setCelebrate(true);
+      }, reduceMotion ? 0 : 500);
     }
   };
 
@@ -147,6 +191,7 @@ export default function Sudoku() {
     ];
     const completed = units.filter((u) => u.every((i) => g[i] === solution[i]));
     if (completed.length === 0) return;
+    if (reduceMotion) return;
     setUnitFlashCells(new Set(completed.flat()));
     playSound('clear', 0.45);
     unitFlashAnim.setValue(0.65);
@@ -156,20 +201,40 @@ export default function Sudoku() {
 
   const hintsLeft = HINT_LIMIT - hints;
 
+  useEffect(() => () => {
+    generationRef.current += 1;
+    if (celebrationTimerRef.current) clearTimeout(celebrationTimerRef.current);
+    unitFlashAnim.stopAnimation();
+  }, [unitFlashAnim]);
+
+  const requestNewGame = (nextLevel: SudokuLevel) => {
+    const hasProgress = grid.some((value, index) => value !== puzzle[index]) || hints > 0 || mistakes > 0;
+    if (done || !hasProgress) {
+      newGame(nextLevel);
+      return;
+    }
+    Alert.alert('Start a new puzzle?', 'Your progress on this puzzle will be discarded.', [
+      { text: 'Keep solving', style: 'cancel' },
+      { text: 'Start new puzzle', style: 'destructive', onPress: () => newGame(nextLevel) },
+    ]);
+  };
+
   const hint = () => {
     // Ref-based guard: immune to rapid-tap races that could exceed the cap.
-    if (done || hintsRef.current >= HINT_LIMIT) return;
+    if (done) return;
+    const nextHints = nextSudokuHintCount(hintsRef.current, HINT_LIMIT);
+    if (nextHints == null) return;
     const target =
       selected != null && grid[selected] === 0 && !givens.has(selected)
         ? selected
         : grid.findIndex((v, i) => v !== solution[i]);
     if (target < 0) return;
-    hintsRef.current += 1;
+    hintsRef.current = nextHints;
     const g = grid.slice();
     g[target] = solution[target];
     setGrid(g);
     setNotes((n) => { const next = n.slice(); next[target] = 0; return next; });
-    setHints(hintsRef.current);
+    setHints(nextHints);
     setSelected(target);
     setPopCell(target);
     playSound('flip', 0.5);
@@ -200,7 +265,14 @@ export default function Sudoku() {
           {LEVELS.map((l) => {
             const on = level === l;
             return (
-              <Pressable key={l} onPress={() => newGame(l)} style={{ flex: 1, height: layout.compact ? 30 : 34, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt }}>
+              <Pressable
+                key={l}
+                onPress={() => requestNewGame(l)}
+                accessibilityRole="button"
+                accessibilityLabel={`${l} difficulty`}
+                accessibilityState={{ selected: on }}
+                style={{ flex: 1, minHeight: 44, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? theme.color.primary : theme.color.surfaceAlt }}
+              >
                 <Text variant="caption" color={on ? theme.color.onPrimary : theme.color.text} style={{ textTransform: 'capitalize' }}>{l}</Text>
               </Pressable>
             );
@@ -260,6 +332,9 @@ export default function Sudoku() {
                     <Pressable
                       key={c}
                       onPress={() => setSelected(idx)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Row ${r + 1}, column ${c + 1}, ${v === 0 ? (noteMask ? 'notes entered' : 'empty') : `${given ? 'given ' : ''}${v}`}`}
+                      accessibilityState={{ selected: isSel }}
                       style={{
                         flex: 1, alignItems: 'center', justifyContent: 'center',
                         backgroundColor: isSel
@@ -289,6 +364,7 @@ export default function Sudoku() {
                           color={conflict ? theme.color.danger : given ? theme.color.text : theme.color.primary}
                           pop={popCell === idx && !given}
                           fontSize={Math.max(14, Math.min(22, layout.boardSize / 15))}
+                          reduceMotion={reduceMotion}
                         />
                       ) : noteMask ? (
                         <View style={{ width: '92%', height: '92%', flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -331,7 +407,13 @@ export default function Sudoku() {
           <View style={{ paddingHorizontal: spacing.lg, paddingTop: layout.compact ? spacing.xs : spacing.sm, paddingBottom: layout.compact ? spacing.xs : spacing.md, gap: layout.compact ? spacing.sm : spacing.md }}>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                <Pressable key={n} onPress={() => input(n)} style={({ pressed }) => ({ flex: 1, height: layout.compact ? 38 : 46, borderRadius: 8, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+                <Pressable
+                  key={n}
+                  onPress={() => input(n)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Enter ${n}`}
+                  style={({ pressed }) => ({ flex: 1, minHeight: 44, borderRadius: 8, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
+                >
                   <Text variant="title2" color={theme.color.text} style={{ fontSize: layout.compact ? 17 : 20 }}>{n}</Text>
                 </Pressable>
               ))}
@@ -346,7 +428,7 @@ export default function Sudoku() {
                 onPress={hint}
                 disabled={hintsLeft <= 0}
               />
-              <Control icon="refresh" label="New" compact={layout.compact} onPress={() => newGame(level)} />
+              <Control icon="refresh" label="New" compact={layout.compact} onPress={() => requestNewGame(level)} />
             </View>
           </View>
         )}
@@ -384,14 +466,14 @@ export default function Sudoku() {
 }
 
 /** Cell number that pops in when the player places it. */
-function CellValue({ value, color, pop, fontSize }: { value: number; color: string; pop: boolean; fontSize: number }) {
+function CellValue({ value, color, pop, fontSize, reduceMotion }: { value: number; color: string; pop: boolean; fontSize: number; reduceMotion: boolean }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (!pop) return;
+    if (!pop || reduceMotion) return;
     scale.setValue(0.55);
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 260 }).start();
-  }, [pop, value, scale]);
+  }, [pop, value, scale, reduceMotion]);
 
   return (
     <Animated.View style={{ transform: [{ scale: pop ? scale : 1 }] }}>
@@ -410,6 +492,9 @@ function Control({ icon, label, onPress, active, disabled, compact }: { icon: an
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active, disabled: !!disabled }}
       style={({ pressed }) => ({
         flex: 1, height: compact ? 44 : 52, borderRadius: 10,
         backgroundColor: active ? theme.color.primary : theme.color.surfaceAlt,

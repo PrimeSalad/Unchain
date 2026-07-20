@@ -17,6 +17,16 @@
     "src/domain/addictionJournal.ts",
     "src/domain/recoveryTrackSetup.ts",
     "src/domain/recoveryStateMigration.ts",
-    "src/domain/patternInsights.ts"
+    "src/domain/patternInsights.ts",
+    "src/domain/notificationPrivacy.ts",
+    "src/domain/urgeAnalytics.ts",
+    "src/domain/urgeLogging.ts",
+    "src/domain/games/calendar.ts",
+    "src/domain/games/clarity-words.ts",
+    "src/domain/games/clarity.ts",
+    "src/domain/games/checkers.ts",
+    "src/domain/games/sudoku.ts",
+    "src/domain/games/inhibition.ts",
+    "src/domain/games/blocks.ts"
   ]
 }

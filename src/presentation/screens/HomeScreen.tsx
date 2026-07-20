@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { AccessibilityInfo, Modal, Pressable, View } from 'react-native';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -37,6 +37,8 @@ import { cheersToChangeAvailability } from '@/domain/cheersToChange';
 import { QuoteFeed } from '../components/QuoteCards';
 import { CheckInInsightsCard } from '../components/CheckInInsightsCard';
 import { formatLastCheckedIn } from '@/domain/pornRecovery';
+import { normalizeSelectedAddictions } from '@/domain/multiAddiction';
+import { isCompleteRecoveryTrackSetup } from '@/domain/recoveryTrackSetup';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -71,6 +73,7 @@ export function HomeScreen() {
   const [showCatchPopup, setShowCatchPopup] = useState(false);
   const [showCheersPopup, setShowCheersPopup] = useState(false);
   const [showAddictionPicker, setShowAddictionPicker] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const [catchDismissed, setCatchDismissed] = useState(false);
   const [cheersDismissed, setCheersDismissed] = useState(false);
 
@@ -95,30 +98,31 @@ export function HomeScreen() {
   const lastCatchYourBreathAt = useStore((s) => s.lastCatchYourBreathAt);
   const lastCheersToChangeAt = useStore((s) => s.lastCheersToChangeAt);
   const setActiveAddiction = useStore((s) => s.setActiveAddiction);
+  const recoveryByAddiction = useStore((s) => s.recoveryByAddiction);
   const journalProgress = useDailyJournalProgress();
 
   // Show Catch Your Breath popup when weekly assessment is available (smoking only)
   useFocusEffect(
     useCallback(() => {
-      if (profile?.addictionType !== 'smoking' || catchDismissed) return;
+      if (profile?.addictionType !== 'smoking' || catchDismissed || showAddictionPicker) return;
       const avail = catchYourBreathAvailability(lastCatchYourBreathAt);
       if (avail.available) {
         const timer = setTimeout(() => setShowCatchPopup(true), 800);
         return () => clearTimeout(timer);
       }
-    }, [profile?.addictionType, lastCatchYourBreathAt, catchDismissed]),
+    }, [profile?.addictionType, lastCatchYourBreathAt, catchDismissed, showAddictionPicker]),
   );
 
   // Show Cheers to Change popup when weekly assessment is available (alcohol only)
   useFocusEffect(
     useCallback(() => {
-      if (profile?.addictionType !== 'alcohol' || cheersDismissed) return;
+      if (profile?.addictionType !== 'alcohol' || cheersDismissed || showAddictionPicker) return;
       const avail = cheersToChangeAvailability(lastCheersToChangeAt);
       if (avail.available) {
         const timer = setTimeout(() => setShowCheersPopup(true), 800);
         return () => clearTimeout(timer);
       }
-    }, [profile?.addictionType, lastCheersToChangeAt, cheersDismissed]),
+    }, [profile?.addictionType, lastCheersToChangeAt, cheersDismissed, showAddictionPicker]),
   );
 
   // Derive the current streak start from the event log - never from startedAt
@@ -172,15 +176,49 @@ export function HomeScreen() {
 
   if (!profile) return null;
 
-  const addictionChoices = profile.selectedAddictions?.length
-    ? profile.selectedAddictions
-    : [profile.addictionType];
+  const addictionChoices = normalizeSelectedAddictions(
+    profile.addictionType,
+    profile.selectedAddictions,
+  );
   const switchAddiction = (addiction: AddictionType) => {
-    Haptics.selectionAsync().catch(() => {});
+    if (addiction === useStore.getState().profile?.addictionType) {
+      setSwitchError(null);
+      setShowAddictionPicker(false);
+      return;
+    }
+
+    const target = useStore.getState().recoveryByAddiction[addiction];
+    if (!target) {
+      const message = `${addictionMeta(addiction).label} setup data is unavailable. Manage this track in Profile.`;
+      setSwitchError(message);
+      AccessibilityInfo.announceForAccessibility(message);
+      return;
+    }
+    if (!isCompleteRecoveryTrackSetup(target.setup)) {
+      Haptics.selectionAsync().catch(() => {});
+      setSwitchError(null);
+      setShowAddictionPicker(false);
+      router.push(`/recovery-track-setup?mode=review&type=${encodeURIComponent(addiction)}` as Href);
+      return;
+    }
+
     setActiveAddiction(addiction);
+    if (useStore.getState().profile?.addictionType !== addiction) {
+      const message = `Could not switch to ${addictionMeta(addiction).label}. Try again from Profile.`;
+      setSwitchError(message);
+      AccessibilityInfo.announceForAccessibility(message);
+      return;
+    }
+
+    Haptics.selectionAsync().catch(() => {});
+    setSwitchError(null);
     setShowAddictionPicker(false);
     setShowCatchPopup(false);
     setShowCheersPopup(false);
+    // Do not stack an automatic weekly check-in modal immediately on top of
+    // the switch confirmation. The reminder is suppressed for this session.
+    if (addiction === 'smoking') setCatchDismissed(true);
+    if (addiction === 'alcohol') setCheersDismissed(true);
   };
 
   return (
@@ -196,7 +234,16 @@ export function HomeScreen() {
       </View>
 
       <Pressable
-        onPress={() => setShowAddictionPicker(true)}
+        onPress={() => {
+          // Only one modal owns focus at a time. Opening the track picker also
+          // suppresses the current track's automatic reminder for this visit.
+          setShowCatchPopup(false);
+          setShowCheersPopup(false);
+          if (profile.addictionType === 'smoking') setCatchDismissed(true);
+          if (profile.addictionType === 'alcohol') setCheersDismissed(true);
+          setSwitchError(null);
+          setShowAddictionPicker(true);
+        }}
         accessibilityRole="button"
         accessibilityLabel={`Active addiction: ${addictionMeta(profile.addictionType).label}`}
         style={({ pressed }) => ({
@@ -410,7 +457,14 @@ export function HomeScreen() {
         Quick Actions
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        <QuickAction icon="pulse"  label="Log Urge"  onPress={() => router.push('/log-urge')} />
+        <QuickAction
+          icon="pulse"
+          label="Log Urge"
+          onPress={() => router.push({
+            pathname: '/log-urge',
+            params: { track: profile.addictionType },
+          })}
+        />
         <QuickAction icon="book"   label="Journal"   onPress={() => router.push('/(tabs)/journal')} />
         <QuickAction icon="warning" label="SOS"      accent onPress={() => router.push('/sos')} />
         <QuickAction icon="flower" label="Pause"     onPress={() => router.push('/mindful-pause')} />
@@ -532,33 +586,78 @@ export function HomeScreen() {
         )}
       </View>
 
-      <ActionSheet visible={showAddictionPicker} onClose={() => setShowAddictionPicker(false)}>
-        <Text variant="title2">Switch recovery track</Text>
-        <Text variant="footnote" dim style={{ marginTop: spacing.xs, marginBottom: spacing.md }}>
-          This changes Home, Progress, and addiction-specific tools. Today’s journal still includes every selected track.
-        </Text>
+      <ActionSheet
+        visible={showAddictionPicker}
+        onClose={() => {
+          setSwitchError(null);
+          setShowAddictionPicker(false);
+        }}
+        title="Switch recovery track"
+        description="This changes Home, Progress, and addiction-specific tools. Today’s journal still includes every selected track."
+      >
+        {switchError ? (
+          <View
+            accessible
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+            style={{
+              marginBottom: spacing.sm,
+              padding: spacing.md,
+              borderRadius: radius.input,
+              backgroundColor: theme.color.accentSoft,
+            }}
+          >
+            <Text variant="footnote" color={theme.color.accentText}>{switchError}</Text>
+          </View>
+        ) : null}
         <View style={{ gap: spacing.xs }}>
           {addictionChoices.map((addiction) => {
             const active = addiction === profile.addictionType;
             const meta = addictionMeta(addiction);
+            const snapshot = recoveryByAddiction[addiction];
+            const needsReview = !active && snapshot != null
+              && !isCompleteRecoveryTrackSetup(snapshot.setup);
+            const missing = !active && snapshot == null;
             return (
               <Pressable
                 key={addiction}
                 onPress={() => switchAddiction(addiction)}
+                disabled={active}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${meta.label} recovery track`}
+                accessibilityHint={active
+                  ? 'Currently active'
+                  : needsReview
+                    ? 'Opens setup questions before this track can become active'
+                    : missing
+                      ? 'Track setup data is unavailable'
+                      : 'Makes this recovery track active'}
+                accessibilityState={{ selected: active, disabled: active }}
                 style={({ pressed }) => ({
-                  minHeight: 52, borderRadius: radius.input, paddingHorizontal: spacing.md,
+                  minHeight: 56, borderRadius: radius.input, paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
                   flexDirection: 'row', alignItems: 'center',
                   backgroundColor: active ? theme.color.primarySoft : 'transparent',
-                  opacity: pressed ? 0.72 : 1,
+                  opacity: missing ? 0.62 : pressed ? 0.72 : 1,
                 })}
               >
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="callout" color={active ? theme.color.primary : theme.color.text}>{meta.label}</Text>
-                  <Text variant="caption" dim>{active ? 'Currently active' : 'Switch to this track'}</Text>
+                  <Text variant="caption" dim style={{ marginTop: 2 }}>
+                    {active
+                      ? 'Currently active'
+                      : needsReview
+                        ? 'Finish setup first'
+                        : missing
+                          ? 'Setup unavailable'
+                          : 'Switch to this track'}
+                  </Text>
                 </View>
-                <Ionicons name={active ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={active ? theme.color.primary : theme.color.textDim} />
+                <Ionicons
+                  name={active ? 'checkmark-circle' : needsReview ? 'clipboard-outline' : 'ellipse-outline'}
+                  size={22}
+                  color={active ? theme.color.primary : needsReview ? theme.color.accentText : theme.color.textDim}
+                />
               </Pressable>
             );
           })}

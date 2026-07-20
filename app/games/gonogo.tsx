@@ -7,9 +7,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, View, useWindowDimensions } from 'react-native';
+import { AppState, Animated, Easing, Pressable, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/presentation/components/Text';
@@ -29,6 +29,7 @@ import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
 import { playSound } from '@/application/sound';
 import { nextAchievementHint, type GameAchievement } from '@/domain/games/achievements';
+import { useReducedMotion } from '@/presentation/hooks/useReducedMotion';
 import {
   GAP_JITTER_MS,
   LIVES,
@@ -40,6 +41,7 @@ import {
   gonogoWindowMs,
   levelForTrial,
   holdPoints,
+  pausedRoundResumeAction,
   summarize,
 } from '@/domain/games/inhibition';
 
@@ -51,7 +53,7 @@ const NOGO_COLOR = '#D9534F';
 const GO_SOFT = '#E4F2E7';
 const NOGO_SOFT = '#F8E4E2';
 
-type Phase = 'idle' | 'countdown' | 'playing' | 'over';
+type Phase = 'idle' | 'countdown' | 'playing' | 'paused' | 'over';
 type Mode = 'standard' | 'extreme';
 
 interface Trial {
@@ -97,6 +99,7 @@ export default function GoNoGo() {
   const recordInhibition = useStore((s) => s.recordInhibition);
   const completeMission = useStore((s) => s.completeMission);
   const tutorial = useGameTutorial('gonogo');
+  const reduceMotion = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const isCompact = width < 380 || height < 700;
   const isTiny = width < 340 || height < 620;
@@ -131,8 +134,12 @@ export default function GoNoGo() {
   const maxComboRef = useRef(0);
   const reactionsRef = useRef<number[]>([]);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const generationRef = useRef(0);
   const overRef = useRef(false);
+  const terminalResultPendingRef = useRef(false);
   const modeRef = useRef<Mode>('standard');
+  const phaseRef = useRef<Phase>('idle');
+  const shouldResumeRef = useRef(false);
 
   // Stimulus entrance / verdict flash animation plumbing (stable values).
   const pop = useRef(new Animated.Value(0)).current;
@@ -140,13 +147,15 @@ export default function GoNoGo() {
   const windowMeter = useRef(new Animated.Value(0)).current;
 
   const clearTimers = useCallback(() => {
+    generationRef.current += 1;
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
   }, []);
   const after = useCallback((ms: number, fn: () => void) => {
+    const generation = generationRef.current;
     const timer = setTimeout(() => {
       timersRef.current = timersRef.current.filter((t) => t !== timer);
-      fn();
+      if (generation === generationRef.current) fn();
     }, ms);
     timersRef.current.push(timer);
   }, []);
@@ -155,14 +164,20 @@ export default function GoNoGo() {
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
 
   const endRound = useCallback(() => {
     if (overRef.current) return;
     overRef.current = true;
+    terminalResultPendingRef.current = false;
+    shouldResumeRef.current = false;
     clearTimers();
     setStimulus(null);
     setStatus('Round complete.');
     setPhase('over');
+    phaseRef.current = 'over';
     const summary = summarize(
       scoreRef.current, trialsRef.current, correctRef.current, maxComboRef.current, reactionsRef.current,
     );
@@ -179,15 +194,19 @@ export default function GoNoGo() {
     Haptics.notificationAsync(
       r.newBest ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning,
     ).catch(() => {});
-    setTimeout(() => setCelebrate(true), 550);
-  }, [clearTimers, recordInhibition, completeMission]);
+    after(reduceMotion ? 0 : 550, () => setCelebrate(true));
+  }, [after, clearTimers, recordInhibition, completeMission, reduceMotion]);
 
   /** Verdict flash: green pulse for correct, red shake-ish flash for wrong. */
   const flashVerdict = useCallback((good: boolean) => {
     setVerdict(good ? 'good' : 'bad');
+    if (reduceMotion) {
+      ring.setValue(0);
+      return;
+    }
     ring.setValue(1);
     Animated.timing(ring, { toValue: 0, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
-  }, [ring]);
+  }, [ring, reduceMotion]);
 
   const loseLife = useCallback(() => {
     livesRef.current -= 1;
@@ -197,7 +216,10 @@ export default function GoNoGo() {
     playSound('lose', 0.45);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     flashVerdict(false);
-    if (livesRef.current <= 0) after(500, endRound);
+    if (livesRef.current <= 0) {
+      terminalResultPendingRef.current = true;
+      after(500, endRound);
+    }
   }, [after, endRound, flashVerdict]);
 
   const scoreCorrect = useCallback((points: number, sound: 'place' | 'clear') => {
@@ -235,8 +257,10 @@ export default function GoNoGo() {
       trialRef.current = { isGo, shownAt: Date.now(), windowMs, handled: false };
       setStimulus(isGo ? 'go' : 'nogo');
       setStatus(isGo ? 'Tap.' : 'Do not tap.');
-      pop.setValue(0.3);
-      Animated.spring(pop, { toValue: 1, useNativeDriver: true, damping: 11, stiffness: 260 }).start();
+      pop.setValue(reduceMotion ? 1 : 0.3);
+      if (!reduceMotion) {
+        Animated.spring(pop, { toValue: 1, useNativeDriver: true, damping: 11, stiffness: 260 }).start();
+      }
       windowMeter.setValue(1);
       Animated.timing(windowMeter, {
         toValue: 0,
@@ -263,10 +287,10 @@ export default function GoNoGo() {
         scheduleNext();
       });
     });
-  }, [after, hideStimulus, loseLife, pop, scoreCorrect]);
+  }, [after, hideStimulus, loseLife, pop, scoreCorrect, reduceMotion]);
 
   const onTap = useCallback(() => {
-    if (phase !== 'playing') return;
+    if (phaseRef.current !== 'playing') return;
     const t = trialRef.current;
     if (!t || t.handled) return; // taps between stimuli are simply ignored
     windowMeter.stopAnimation();
@@ -284,11 +308,13 @@ export default function GoNoGo() {
     }
     hideStimulus();
     scheduleNext();
-  }, [phase, hideStimulus, loseLife, scheduleNext, scoreCorrect]);
+  }, [hideStimulus, loseLife, scheduleNext, scoreCorrect]);
 
   const start = () => {
     clearTimers();
     overRef.current = false;
+    terminalResultPendingRef.current = false;
+    shouldResumeRef.current = false;
     trialRef.current = null;
     scoreRef.current = 0; setScore(0);
     comboRef.current = 0; setCombo(0);
@@ -306,7 +332,52 @@ export default function GoNoGo() {
     setResult(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setPhase('countdown');
+    phaseRef.current = 'countdown';
   };
+
+  const pauseSession = useCallback(() => {
+    if (phaseRef.current !== 'playing' && phaseRef.current !== 'countdown') return;
+    shouldResumeRef.current = true;
+    clearTimers();
+    hideStimulus();
+    pop.stopAnimation();
+    ring.stopAnimation();
+    setStatus('Paused. Get ready to resume.');
+    setPhase('paused');
+    phaseRef.current = 'paused';
+  }, [clearTimers, hideStimulus, pop, ring]);
+
+  const resumeSession = useCallback(() => {
+    if (!shouldResumeRef.current || phaseRef.current !== 'paused' || tutorial.visible) return;
+    shouldResumeRef.current = false;
+    if (pausedRoundResumeAction(livesRef.current, terminalResultPendingRef.current) === 'finish') {
+      endRound();
+      return;
+    }
+    setStatus('Get ready.');
+    setPhase('countdown');
+    phaseRef.current = 'countdown';
+  }, [endRound, tutorial.visible]);
+
+  useEffect(() => {
+    if (tutorial.visible) pauseSession();
+    else resumeSession();
+  }, [tutorial.visible, pauseSession, resumeSession]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') resumeSession();
+      else pauseSession();
+    });
+    return () => subscription.remove();
+  }, [pauseSession, resumeSession]);
+
+  useFocusEffect(
+    useCallback(() => {
+      resumeSession();
+      return pauseSession;
+    }, [pauseSession, resumeSession]),
+  );
 
   const day = challengeDayNumber();
   const target = dailyChallengeTarget(games.gonogoBest, day);
@@ -382,6 +453,9 @@ export default function GoNoGo() {
         <Pressable
           onPress={onTap}
           disabled={phase !== 'playing'}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: phase !== 'playing' }}
+          accessibilityHint="Tap only when the visible command says TAP."
           accessibilityLabel={
             stimulus === 'go' ? 'Green circle - tap now'
             : stimulus === 'nogo' ? 'Red circle - do not tap'
@@ -390,7 +464,7 @@ export default function GoNoGo() {
           style={{ flex: 1 }}
         >
           {phase === 'countdown' ? (
-            <Countdown onDone={() => { setPhase('playing'); scheduleNext(); }} />
+            <Countdown onDone={() => { setPhase('playing'); phaseRef.current = 'playing'; scheduleNext(); }} />
           ) : phase === 'playing' ? (
             <View style={{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: isCompact ? spacing.xs : spacing.md, paddingBottom: isCompact ? spacing.xs : spacing.lg }}>
               <View
