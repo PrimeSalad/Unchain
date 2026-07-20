@@ -51,6 +51,19 @@ function moodColor(v: number, danger: string, celebrate: string, primary: string
   return success;
 }
 
+function urgeEmoji(v: number): string {
+  if (v <= 1) return '😌';
+  if (v <= 2) return '😐';
+  if (v <= 3) return '😑';
+  if (v <= 4) return '😤';
+  if (v <= 5) return '😠';
+  if (v <= 6) return '💢';
+  if (v <= 7) return '🔥';
+  if (v <= 8) return '😫';
+  if (v <= 9) return '🤯';
+  return '🆘';
+}
+
 function urgeLabel(v: number): string {
   if (v <= 2) return 'Very mild';
   if (v <= 4) return 'Mild';
@@ -239,6 +252,15 @@ export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: Slid
               style={{ fontSize: 42, lineHeight: 48 }}
             >
               {moodEmoji(value)}
+            </Text>
+          ) : null}
+          {kind === 'urge' ? (
+            <Text
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              style={{ fontSize: 42, lineHeight: 48 }}
+            >
+              {urgeEmoji(value)}
             </Text>
           ) : null}
           <Text variant="headline" color={color} style={{ fontFamily: 'Nunito_700Bold' }}>

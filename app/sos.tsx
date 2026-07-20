@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -212,6 +212,14 @@ export default function Sos() {
   const healthyHabits = useStore((s) => s.healthyHabitsCount);
   const logUrgeForTrack = useStore((s) => s.logUrgeForTrack);
   const urgeLogLock = useRef(false);
+
+  // Reset the urge log lock every time SOS regains focus so the button works
+  // again after navigating back from log-urge.
+  useFocusEffect(
+    useCallback(() => {
+      urgeLogLock.current = false;
+    }, []),
+  );
 
   const relapses = useStore((s) => s.relapses);
   const journal = useStore((s) => s.journal);
