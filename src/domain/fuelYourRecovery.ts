@@ -6,6 +6,9 @@
  * through better diet and lifestyle choices.
  */
 
+/** Fuel is account-wide and must never be partitioned by recovery track. */
+export const FUEL_DATA_SCOPE = 'global' as const;
+
 // ── Food entry ────────────────────────────────────────────────────────────
 
 export type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -67,7 +70,15 @@ export interface NutritionGoals {
   dailyFat: number;
   dailyFiber: number;
   fastingGoal: FastingGoal | null;
+  age?: number;
+  heightCm?: number;
+  weightKg?: number;
+  activityLevel?: ActivityLevel;
+  wellnessGoal?: WellnessGoal;
 }
+
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+export type WellnessGoal = 'steady_energy' | 'regular_meals' | 'hydration' | 'general_wellbeing';
 
 export const DEFAULT_GOALS: NutritionGoals = {
   dailyCalories: 2000,

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { ADDICTION_TYPES, RECOVERY_TRACKS, recoveryTrack, isAddictionType, tryRecoveryTrack } from '../.test-build/domain/recoveryTracks.js';
 import { RECOVERY_FEATURES, resolveRecoveryFeature } from '../.test-build/application/recoveryFeatureRegistry.js';
 import { planRecoveryReminders } from '../.test-build/domain/recoveryReminderPlanner.js';
+import { FUEL_DATA_SCOPE } from '../.test-build/domain/fuelYourRecovery.js';
 
 test('recovery catalog is exhaustive and every definition is complete', () => {
   assert.equal(ADDICTION_TYPES.length, 9);
@@ -45,6 +46,10 @@ test('safety-sensitive tracks retain explicit boundaries', () => {
   assert.equal(RECOVERY_TRACKS.drugs.safety.professionalHelp, true);
   assert.ok(RECOVERY_TRACKS.pornography.capabilities.includes('discreet'));
   assert.match(RECOVERY_TRACKS.gaming.safety.summary, /never recommended/i);
+});
+
+test('Fuel wellness data has one global scope across recovery tracks', () => {
+  assert.equal(FUEL_DATA_SCOPE, 'global');
 });
 
 test('reminder planner covers tracks, privacy, quiet hours, dedupe, archive, denial, and cap', () => {

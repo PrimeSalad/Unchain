@@ -12,6 +12,7 @@
   "files": [
     "src/domain/recoveryTracks.ts",
     "src/domain/recoveryReminderPlanner.ts",
+    "src/domain/fuelYourRecovery.ts",
     "src/application/recoveryFeatureRegistry.ts",
     "src/domain/protection.ts",
     "src/domain/gambling.ts",
