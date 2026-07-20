@@ -5,7 +5,7 @@ import {
   defaultUrgeTriggers,
   resolveUrgeDestination,
   triggerOptionsForAddiction,
-} from '../.test-build/urgeLogging.js';
+} from '../.test-build/domain/urgeLogging.js';
 
 const TRACKS = [
   'gambling',

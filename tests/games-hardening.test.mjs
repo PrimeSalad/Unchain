@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { performance } from 'node:perf_hooks';
 
-const calendar = await import('../.test-build/games/calendar.js');
-const clarity = await import('../.test-build/games/clarity.js');
-const checkers = await import('../.test-build/games/checkers.js');
-const sudoku = await import('../.test-build/games/sudoku.js');
-const inhibition = await import('../.test-build/games/inhibition.js');
-const blocks = await import('../.test-build/games/blocks.js');
+const calendar = await import('../.test-build/domain/games/calendar.js');
+const clarity = await import('../.test-build/domain/games/clarity.js');
+const checkers = await import('../.test-build/domain/games/checkers.js');
+const sudoku = await import('../.test-build/domain/games/sudoku.js');
+const inhibition = await import('../.test-build/domain/games/inhibition.js');
+const blocks = await import('../.test-build/domain/games/blocks.js');
 
 test('calendar ordinals advance exactly once across DST transition dates', () => {
   const spring = [

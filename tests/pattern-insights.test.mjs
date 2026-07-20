@@ -12,7 +12,7 @@ import {
   patternInsightUnlockProgress,
   projectDailyInsightSamples,
   topInsightTriggers,
-} from '../.test-build/patternInsights.js';
+} from '../.test-build/domain/patternInsights.js';
 
 // Exercise the spring-forward boundary even when the developer machine is in
 // a timezone without daylight-saving transitions.

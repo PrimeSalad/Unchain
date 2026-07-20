@@ -5,7 +5,7 @@ import {
   RECOVERY_STATE_SCHEMA_VERSION,
   migrateRecoveryState,
   migrateRecoveryStateToV4,
-} from '../.test-build/recoveryStateMigration.js';
+} from '../.test-build/domain/recoveryStateMigration.js';
 
 function localDateParts(timestamp) {
   const date = new Date(timestamp);

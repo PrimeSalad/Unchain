@@ -30,7 +30,7 @@ import { elevation, spacing, radius, palette, motion } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { useStore, useProfile } from '@/application/store';
 import { DEFAULT_CURRENCY, formatMoney, recoveryAdjustedBalance } from '@/domain/gambling';
-import { journalEntryOutcome, journalStatsForAddiction } from '@/domain/addictionJournal';
+import { journalConfig, journalEntryOutcome, journalStatsForAddiction } from '@/domain/addictionJournal';
 import type { JournalEntry } from '@/domain/records';
 
 // Enable layout animation on Android
@@ -851,7 +851,8 @@ export function JournalScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            router.push('/journal-sequence' as Parameters<typeof router.push>[0]);
+            if (!profile) return;
+            router.push(journalConfig(profile.addictionType).route as Parameters<typeof router.push>[0]);
           }}
           accessibilityRole="button"
           accessibilityLabel="Write new entry"

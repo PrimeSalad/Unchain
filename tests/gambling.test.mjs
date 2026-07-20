@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { recoveryFreeLabel } = require('../.test-build/gambling.js');
+const { recoveryFreeLabel } = require('../.test-build/domain/gambling.js');
 
 test('Home recovery label identifies every built-in addiction', () => {
   const expected = {

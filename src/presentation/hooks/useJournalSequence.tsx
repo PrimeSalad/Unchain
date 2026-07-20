@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import type { AddictionType } from '@/domain/gambling';
 import type { JournalEntry } from '@/domain/records';
 import { addictionMeta } from '@/domain/gambling';
@@ -16,7 +16,6 @@ import { radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function useJournalSequence(addiction: AddictionType, fallback: () => void) {
-  const router = useRouter();
   const params = useLocalSearchParams<{ sequence?: string }>();
   const sequence = params.sequence === '1';
   const profile = useProfileForAddiction(addiction);
@@ -34,12 +33,11 @@ export function useJournalSequence(addiction: AddictionType, fallback: () => voi
   }, [addJournal, addJournalForAddiction, addiction, sequence]);
 
   const finishSection = useCallback(() => {
-    if (sequence) {
-      router.replace('/journal-sequence' as Parameters<typeof router.replace>[0]);
-    } else {
-      fallback();
-    }
-  }, [fallback, router, sequence]);
+    // Journal sessions are active-track-only. Even a stale deep link carrying
+    // sequence=1 finishes normally instead of bouncing through the retired
+    // coordinator page.
+    fallback();
+  }, [fallback]);
 
   return {
     sequence,
@@ -60,6 +58,13 @@ export function JournalSequenceBanner({ addiction }: { addiction: AddictionType 
   const index = Math.max(0, progress.required.indexOf(addiction));
   const done = progress.completed.length;
   const total = Math.max(1, progress.required.length);
+
+  // Active-only journal sessions contain one form. The old horizontal
+  // sequence banner made multi-addiction users' form orientation differ from
+  // the regular single-addiction form even though there was nothing to
+  // sequence.
+  if (progress.required.length <= 1) return null;
+
   return (
     <View style={{
       marginBottom: spacing.lg,
@@ -80,7 +85,7 @@ export function JournalSequenceBanner({ addiction }: { addiction: AddictionType 
       </View>
       <ProgressBar progress={done / total} height={6} />
       <Text variant="caption" dim style={{ marginTop: spacing.xs }}>
-        {done} of {total} addiction check-ins completed
+        {done === total ? 'Journal entry complete' : 'One entry for your active recovery track'}
       </Text>
     </View>
   );

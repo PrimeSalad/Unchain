@@ -14,7 +14,6 @@ import { Button } from '@/presentation/components/Button';
 import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useStore } from '@/application/store';
-import { addictionMeta } from '@/domain/gambling';
 
 export { AppErrorBoundary as ErrorBoundary } from '@/presentation/components/AppErrorBoundary';
 
@@ -22,14 +21,7 @@ export default function Disclaimer() {
   const theme = useTheme();
   const router = useRouter();
   const acceptDisclaimer = useStore((s) => s.acceptDisclaimer);
-  const profile = useStore((s) => s.profile);
   const [agreed, setAgreed] = useState(false);
-
-  const addictionName = profile
-    ? (profile.addictionType === 'other' && profile.addictionDetail
-        ? profile.addictionDetail
-        : addictionMeta(profile.addictionType).label)
-    : 'recovery';
 
   const handleAccept = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -70,7 +62,7 @@ export default function Disclaimer() {
               </Text>
             </View>
             <Text variant="footnote" style={{ lineHeight: 22, marginBottom: spacing.sm }}>
-              Unchainly is a self-help tool designed to support personal {addictionName} recovery. It is not intended to diagnose, treat, cure, or prevent any disease or medical condition.
+              Unchainly is a self-help and wellness tool designed to support personal recovery goals across different habits and compulsive behaviors. It is not intended to diagnose, treat, cure, or prevent any disease or medical condition.
             </Text>
             <Text variant="footnote" style={{ lineHeight: 22, marginBottom: spacing.sm }}>
               This application is not a medical device as defined by the FDA or any other regulatory body. It does not provide medical advice, diagnosis, or treatment of any kind.
@@ -95,7 +87,7 @@ export default function Disclaimer() {
           </TermSection>
 
           <TermSection num="2" title="Description of Service">
-            Unchainly is a mobile application that provides self-help tools for personal {addictionName} recovery, including journaling, progress tracking, habit logging, urge management, and educational resources. All data is stored locally on the user's device.
+            Unchainly is a mobile application that provides voluntary self-help and wellness tools for personal recovery goals across different habits and compulsive behaviors. Features include journaling, progress tracking, habit logging, urge management, planning tools, and educational resources. Recovery categories are provided only to personalize the user's local experience and do not represent separate services or professional treatment programs. All recovery records are stored locally on the user's device.
           </TermSection>
 
           <TermSection num="3" title="Third-Party Independence">
@@ -155,10 +147,9 @@ export default function Disclaimer() {
             </Text>
           </View>
         </Animated.View>
-      </ScrollView>
 
       {/* ── Bottom (fixed) ────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xl }}>
+      <View style={{ paddingBottom: spacing.xl }}>
         <Pressable
           onPress={() => { Haptics.selectionAsync().catch(() => {}); setAgreed((v) => !v); }}
           accessibilityRole="checkbox"
@@ -193,6 +184,7 @@ export default function Disclaimer() {
           full
         />
       </View>
+      </ScrollView>
     </Screen>
   );
 }

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   ADDICTION_JOURNAL_CONFIGS,
   completedAddictionCount,
+  dailyJournalAddictions,
   isDailyJournalComplete,
   journalCompletedToday,
   journalConfig,
@@ -11,11 +12,16 @@ import {
   journalEntryOutcome,
   journalStatsForAddiction,
   nextIncompleteAddiction,
-} from '../.test-build/addictionJournal.js';
-import { normalizeSelectedAddictions } from '../.test-build/multiAddiction.js';
+} from '../.test-build/domain/addictionJournal.js';
+import { normalizeSelectedAddictions } from '../.test-build/domain/multiAddiction.js';
 
 const TODAY = new Date(2026, 6, 19, 12).getTime();
 const YESTERDAY = new Date(2026, 6, 18, 12).getTime();
+
+test('a journal session includes only the active recovery track', () => {
+  assert.deepEqual(dailyJournalAddictions('gaming'), ['gaming']);
+  assert.deepEqual(dailyJournalAddictions('online_shopping'), ['online_shopping']);
+});
 
 function entry(id, fields, at = TODAY) {
   return { id, at, text: '', ...fields };

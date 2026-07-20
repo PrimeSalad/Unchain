@@ -593,7 +593,7 @@ export function HomeScreen() {
           setShowAddictionPicker(false);
         }}
         title="Switch recovery track"
-        description="This changes Home, Progress, and addiction-specific tools. Today’s journal still includes every selected track."
+        description="Choose what you want to focus on now."
       >
         {switchError ? (
           <View
@@ -634,8 +634,8 @@ export function HomeScreen() {
                       : 'Makes this recovery track active'}
                 accessibilityState={{ selected: active, disabled: active }}
                 style={({ pressed }) => ({
-                  minHeight: 56, borderRadius: radius.input, paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.sm,
+                  minHeight: 52, borderRadius: radius.input, paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs,
                   flexDirection: 'row', alignItems: 'center',
                   backgroundColor: active ? theme.color.primarySoft : 'transparent',
                   opacity: missing ? 0.62 : pressed ? 0.72 : 1,
@@ -643,15 +643,11 @@ export function HomeScreen() {
               >
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="callout" color={active ? theme.color.primary : theme.color.text}>{meta.label}</Text>
-                  <Text variant="caption" dim style={{ marginTop: 2 }}>
-                    {active
-                      ? 'Currently active'
-                      : needsReview
-                        ? 'Finish setup first'
-                        : missing
-                          ? 'Setup unavailable'
-                          : 'Switch to this track'}
-                  </Text>
+                  {(active || needsReview || missing) ? (
+                    <Text variant="caption" dim style={{ marginTop: 1 }}>
+                      {active ? 'Active' : needsReview ? 'Setup required' : 'Unavailable'}
+                    </Text>
+                  ) : null}
                 </View>
                 <Ionicons
                   name={active ? 'checkmark-circle' : needsReview ? 'clipboard-outline' : 'ellipse-outline'}

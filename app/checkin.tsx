@@ -28,6 +28,7 @@ import {
   useProfile,
   useTodayJournalForAddiction,
 } from '@/application/store';
+import { journalConfig } from '@/domain/addictionJournal';
 
 export default function CheckIn() {
   const theme    = useTheme();
@@ -45,7 +46,7 @@ export default function CheckIn() {
   useEffect(() => {
     if (!alreadyDone) {
       Haptics.selectionAsync().catch(() => {});
-      router.replace('/journal-sequence' as any);
+      router.replace(journalConfig(addictionType).route as any);
     }
   }, [alreadyDone, addictionType, router]);
 

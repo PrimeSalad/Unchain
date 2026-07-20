@@ -6,8 +6,8 @@ import {
   PRIVATE_NOTIFICATION_TITLE,
   containsSensitiveNotificationDetail,
   privateNotificationContent,
-} from '../.test-build/notificationPrivacy.js';
-import { predictionNotificationMessage } from '../.test-build/urgeAnalytics.js';
+} from '../.test-build/domain/notificationPrivacy.js';
+import { predictionNotificationMessage } from '../.test-build/domain/urgeAnalytics.js';
 
 test('lock-screen notification copy is neutral and contains no recovery detail', () => {
   const content = privateNotificationContent();

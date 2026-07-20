@@ -25,6 +25,7 @@ import { radius, spacing } from '@/presentation/theme/tokens';
 import { useTheme } from '@/presentation/theme/ThemeProvider';
 import { useSafeBack } from '@/presentation/hooks/useSafeBack';
 import { useDailyJournalProgress, useProfile, useStore, useTodayAnyJournal } from '@/application/store';
+import { journalConfig } from '@/domain/addictionJournal';
 import { startCalmMusic, stopCalmMusic } from '@/application/sound';
 import { isExpoGo } from '@/application/expoGo';
 import {
@@ -1516,7 +1517,9 @@ export default function Alternatives() {
   // route below still picks the correct addiction-specific flow.
   const todayJournal = useTodayAnyJournal();
   const journalProgress = useDailyJournalProgress();
-  const journalRoute = '/journal-sequence';
+  const journalRoute = profile
+    ? journalConfig(profile.addictionType).route
+    : '/(tabs)/journal';
   const scrollRef = useRef<ScrollView>(null);
   const cardYRef = useRef<Record<string, number>>({});
 

@@ -35,6 +35,11 @@ export function journalConfig(addictionType: AddictionType): AddictionJournalCon
   return ADDICTION_JOURNAL_CONFIGS[addictionType];
 }
 
+/** A journal session belongs only to the recovery track active when it starts. */
+export function dailyJournalAddictions(activeAddiction: AddictionType): [AddictionType] {
+  return [activeAddiction];
+}
+
 export function journalEntryMatches(entry: JournalEntry, addictionType: AddictionType): boolean {
   return entry[journalConfig(addictionType).statusField] !== undefined;
 }

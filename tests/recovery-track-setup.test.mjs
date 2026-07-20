@@ -16,7 +16,7 @@ import {
   toLocalMidnight,
   validateRecoveryTrackDraft,
   validateRecoveryTrackSetup,
-} from '../.test-build/recoveryTrackSetup.js';
+} from '../.test-build/domain/recoveryTrackSetup.js';
 
 const NOW = new Date(2026, 6, 20, 15, 45, 12, 123).getTime();
 const ADDICTION_TYPES = [

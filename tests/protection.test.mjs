@@ -17,7 +17,7 @@ const {
   isUrlBlocked,
   activeBlockedDomains,
   siteLabel,
-} = require('../.test-build/protection.js');
+} = require('../.test-build/domain/protection.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // extractHostname

@@ -62,7 +62,7 @@ import { missionById, missionDayKey } from '@/domain/missions';
 import { challengeDayNumber, dailyChallengeTarget } from '@/domain/games/inhibition';
 import { nextDailyStreak } from '@/domain/games/clarity';
 import { normalizeSelectedAddictions } from '@/domain/multiAddiction';
-import { journalCompletedToday } from '@/domain/addictionJournal';
+import { dailyJournalAddictions, journalCompletedToday } from '@/domain/addictionJournal';
 import {
   RECOVERY_STATE_SCHEMA_VERSION,
   migrateRecoveryState,
@@ -2098,10 +2098,14 @@ export const useStore = create<RecoveryState>()(
         const s = get();
         if (!s.profile) return [];
         const day = missionDayKey();
-        if (s.dailyJournalPlan?.day === day && s.dailyJournalPlan.required.length > 0) {
+        const required = dailyJournalAddictions(s.profile.addictionType);
+        if (
+          s.dailyJournalPlan?.day === day
+          && s.dailyJournalPlan.required.length === 1
+          && s.dailyJournalPlan.required[0] === s.profile.addictionType
+        ) {
           return s.dailyJournalPlan.required;
         }
-        const required = selectedAddictions(s.profile);
         set({ dailyJournalPlan: { day, required, startedAt: Date.now() }, journalDrafts: {} });
         return required;
       },
@@ -2977,8 +2981,10 @@ export function useDailyJournalProgress(): {
   const recoveryByAddiction = useStore((s) => s.recoveryByAddiction);
   if (!profile) return { required: [], completed: [], complete: false };
   const required = plan?.day === missionDayKey()
+    && plan.required.length === 1
+    && plan.required[0] === profile.addictionType
     ? plan.required
-    : selectedAddictions(profile);
+    : dailyJournalAddictions(profile.addictionType);
   const completed = required.filter((addiction) => {
     const journal = profile.addictionType === addiction
       ? activeJournal

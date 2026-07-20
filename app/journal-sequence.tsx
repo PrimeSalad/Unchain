@@ -32,9 +32,9 @@ export default function JournalSequenceScreen() {
     const timer = setTimeout(() => {
       router.replace({
         pathname: journalConfig(next).route as never,
-        params: { sequence: '1', addiction: next },
+        params: { addiction: next },
       });
-    }, 450);
+    }, 0);
     return () => clearTimeout(timer);
   }, [next, progress.complete, ready, router]);
 
@@ -56,7 +56,7 @@ export default function JournalSequenceScreen() {
         </Pressable>
         <View style={{ flex: 1, marginLeft: spacing.md }}>
           <Text variant="headline">Today’s journal</Text>
-          <Text variant="caption" dim>{progress.completed.length} of {progress.required.length} completed</Text>
+          <Text variant="caption" dim>{addictionMeta(progress.required[0] ?? 'other').label}</Text>
         </View>
       </View>
 
@@ -86,7 +86,7 @@ export default function JournalSequenceScreen() {
           <View style={{ alignItems: 'center', gap: spacing.sm }}>
             <Ionicons name="checkmark-circle" size={48} color={theme.color.success} />
             <Text variant="title2" center>Daily journal complete</Text>
-            <Text variant="footnote" dim center>Every selected recovery track has been checked in for today.</Text>
+            <Text variant="footnote" dim center>Your active recovery track has been checked in for today.</Text>
           </View>
           <Button label="View journal" onPress={() => router.replace('/(tabs)/journal')} full />
         </View>

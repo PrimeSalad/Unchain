@@ -854,7 +854,7 @@ export function ProfileScreen() {
         <View style={{ marginTop: spacing.xxl }}>
           <SectionTitle title="Recovery tracks" trailing={`${selectedTracks.length} selected`} />
           <Text variant="footnote" dim style={{ marginBottom: spacing.md }}>
-            Tap a track to make it active. Added or archived tracks apply to your next daily journal.
+            Choose which track is active. Your other tracks stay saved.
           </Text>
           <View style={{ gap: spacing.sm }}>
             {selectedTracks.map((addiction) => {
@@ -874,7 +874,6 @@ export function ProfileScreen() {
                   onSelect={() => needsReview
                     ? openRecoveryTrackSetup('review', addiction)
                     : switchRecoveryTrack(addiction)}
-                  onFinishSetup={() => openRecoveryTrackSetup('review', addiction)}
                   onArchive={() => confirmArchiveRecoveryTrack(addiction)}
                 />
               );
@@ -1370,7 +1369,6 @@ function RecoveryTrackCard({
   needsReview,
   canArchive,
   onSelect,
-  onFinishSetup,
   onArchive,
 }: {
   label: string;
@@ -1379,7 +1377,6 @@ function RecoveryTrackCard({
   needsReview: boolean;
   canArchive: boolean;
   onSelect: () => void;
-  onFinishSetup: () => void;
   onArchive: () => void;
 }) {
   const theme = useTheme();
@@ -1405,22 +1402,23 @@ function RecoveryTrackCard({
             : `Makes ${label} your active recovery track`}
         accessibilityState={{ selected: active, disabled: active }}
         style={({ pressed }) => ({
-          minHeight: 68,
+          minHeight: 64,
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.md,
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.lg,
+          paddingRight: canArchive ? 60 : spacing.lg,
+          paddingVertical: spacing.md,
           backgroundColor: pressed ? theme.color.surfaceAlt : 'transparent',
         })}
       >
         <View
           accessible={false}
           style={{
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
             flexShrink: 0,
-            borderRadius: 22,
+            borderRadius: 18,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: active ? theme.color.primary : theme.color.surfaceAlt,
@@ -1428,7 +1426,7 @@ function RecoveryTrackCard({
         >
           <Ionicons
             name={active ? 'checkmark' : 'shield-checkmark-outline'}
-            size={21}
+            size={18}
             color={active ? theme.color.onPrimary : theme.color.primary}
           />
         </View>
@@ -1437,11 +1435,7 @@ function RecoveryTrackCard({
             {label}
           </Text>
           <Text variant="caption" dim style={{ marginTop: 2 }}>
-            {detail?.trim() || (active
-              ? 'Currently active'
-              : needsReview
-                ? 'Finish setup before making active'
-                : 'Tap to make active')}
+            {detail?.trim() || (active ? 'Active' : needsReview ? 'Setup required' : 'Ready')}
           </Text>
         </View>
         {active ? (
@@ -1456,76 +1450,38 @@ function RecoveryTrackCard({
           >
             <Text variant="caption" color={theme.color.onPrimary}>Active</Text>
           </View>
-        ) : (
+        ) : needsReview ? (
           <Ionicons
-            name={needsReview ? 'clipboard-outline' : 'chevron-forward'}
+            name="clipboard-outline"
             size={19}
-            color={needsReview ? theme.color.accentText : theme.color.textDim}
+            color={theme.color.accentText}
           />
+        ) : canArchive ? null : (
+          <Ionicons name="chevron-forward" size={18} color={theme.color.textDim} />
         )}
       </Pressable>
 
-      {needsReview || canArchive ? (
-        <View
-          style={{
-            minHeight: 52,
-            flexDirection: 'row',
+      {canArchive ? (
+        <Pressable
+          onPress={onArchive}
+          accessibilityRole="button"
+          accessibilityLabel={`Archive ${label} recovery track`}
+          accessibilityHint="Keeps its history saved and removes it from your selected tracks"
+          hitSlop={8}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            right: spacing.sm,
+            top: 10,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
             alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: spacing.sm,
-            paddingHorizontal: spacing.sm,
-            paddingVertical: spacing.xs,
-            borderTopWidth: 1,
-            borderTopColor: theme.color.hairline,
-          }}
+            justifyContent: 'center',
+            opacity: pressed ? 0.55 : 1,
+          })}
         >
-          {needsReview ? (
-            <Pressable
-              onPress={onFinishSetup}
-              accessibilityRole="button"
-              accessibilityLabel={`Finish setup for ${label}`}
-              accessibilityHint="Opens the recovery track setup questions"
-              style={({ pressed }) => ({
-                minHeight: 44,
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: spacing.xs,
-                paddingHorizontal: spacing.sm,
-                borderRadius: radius.chip,
-                backgroundColor: theme.color.accentSoft,
-                opacity: pressed ? 0.72 : 1,
-              })}
-            >
-              <Ionicons name="clipboard-outline" size={17} color={theme.color.accentText} />
-              <Text variant="footnote" color={theme.color.accentText}>Finish setup</Text>
-            </Pressable>
-          ) : null}
-          {canArchive ? (
-            <Pressable
-              onPress={onArchive}
-              accessibilityRole="button"
-              accessibilityLabel={`Archive ${label} recovery track`}
-              accessibilityHint="Keeps its history saved and removes it from your selected tracks"
-              style={({ pressed }) => ({
-                minHeight: 44,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: spacing.xs,
-                paddingHorizontal: spacing.md,
-                borderRadius: radius.chip,
-                borderWidth: 1,
-                borderColor: theme.color.danger,
-                opacity: pressed ? 0.68 : 1,
-              })}
-            >
-              <Ionicons name="archive-outline" size={17} color={theme.color.danger} />
-              <Text variant="footnote" color={theme.color.danger}>Archive</Text>
-            </Pressable>
-          ) : null}
-        </View>
+          <Ionicons name="archive-outline" size={18} color={theme.color.textDim} />
+        </Pressable>
       ) : null}
     </View>
   );
@@ -1556,12 +1512,14 @@ function AddRecoveryTrackButton({
         gap: spacing.sm,
         paddingHorizontal: spacing.lg,
         borderRadius: radius.input,
-        backgroundColor: theme.color.primary,
+        borderWidth: 1,
+        borderColor: theme.color.hairline,
+        backgroundColor: theme.color.surface,
         opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
       })}
     >
-      <Ionicons name={disabled ? 'checkmark' : 'add'} size={21} color={theme.color.onPrimary} />
-      <Text variant="callout" color={theme.color.onPrimary}>
+      <Ionicons name={disabled ? 'checkmark' : 'add'} size={20} color={theme.color.primary} />
+      <Text variant="callout" color={theme.color.primary}>
         {disabled ? 'No new categories available' : 'Add recovery track'}
       </Text>
     </Pressable>
