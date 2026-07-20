@@ -58,6 +58,10 @@ export interface FastingGoal {
   schedule: FastingSchedule;
   /** What time to start eating (24h format, e.g. 12 for 12:00 PM). */
   startEatingHour: number;
+  /** Minute component for the eating-window start time. */
+  startEatingMinute?: number;
+  /** User-selected duration when schedule is custom. */
+  customMinutes?: number;
 }
 
 // ── Goals ─────────────────────────────────────────────────────────────────
@@ -103,6 +107,7 @@ export const FASTING_SCHEDULES: Record<string, { label: string; hours: number; d
   '18:6': { label: '18:6', hours: 18, description: '18 hours fasting, 6 hours eating' },
   '20:4': { label: '20:4', hours: 20, description: '20 hours fasting, 4 hours eating' },
   'omad': { label: 'OMAD', hours: 23, description: 'One Meal A Day' },
+  'custom': { label: 'Custom', hours: 0, description: 'Choose your own fasting duration' },
 };
 
 // ── Daily summary ─────────────────────────────────────────────────────────
@@ -133,12 +138,17 @@ function dayStart(ts: number): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+function nextDayStart(ts: number): number {
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+}
+
 /** Sum all food entries for a given day. */
 export function dailyFoodSummary(entries: FoodEntry[], targetDay?: number): {
   calories: number; protein: number; carbs: number; fat: number; fiber: number; mealCount: number;
 } {
   const start = targetDay ?? dayStart(Date.now());
-  const end = start + MS_PER_DAY;
+  const end = nextDayStart(start);
   const today = entries.filter((e) => e.at >= start && e.at < end);
   return {
     calories: today.reduce((s, e) => s + e.calories, 0),
@@ -150,17 +160,58 @@ export function dailyFoodSummary(entries: FoodEntry[], targetDay?: number): {
   };
 }
 
+export type CalorieDayStatus = 'none' | 'under' | 'reached' | 'over';
+
+export interface CalorieDayRecord {
+  date: string;
+  label: string;
+  calories: number;
+  goal: number;
+  status: CalorieDayStatus;
+}
+
+/** Builds a calendar-day calorie record, including days with no entries. */
+export function calorieDayRecords(
+  entries: FoodEntry[],
+  dailyGoal: number,
+  days = 7,
+  now = Date.now(),
+): CalorieDayRecord[] {
+  const count = Math.max(1, Math.floor(days));
+  const end = dayStart(now);
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(end);
+    date.setDate(date.getDate() - (count - index - 1));
+    const start = date.getTime();
+    const calories = dailyFoodSummary(entries, start).calories;
+    const status: CalorieDayStatus = calories === 0
+      ? 'none'
+      : calories < dailyGoal
+        ? 'under'
+        : calories === dailyGoal
+          ? 'reached'
+          : 'over';
+    return {
+      date: dayKey(start),
+      label: new Date(start).toLocaleDateString([], { weekday: 'short' }).slice(0, 2),
+      calories,
+      goal: dailyGoal,
+      status,
+    };
+  });
+}
+
 /** Sum water intake for a given day in mL. */
 export function dailyWaterTotal(entries: WaterEntry[], targetDay?: number): number {
   const start = targetDay ?? dayStart(Date.now());
-  const end = start + MS_PER_DAY;
+  const end = nextDayStart(start);
   return entries.filter((e) => e.at >= start && e.at < end).reduce((s, e) => s + e.amountMl, 0);
 }
 
 /** Total fasting minutes for a given day. */
 export function dailyFastingMinutes(sessions: FastingSession[], targetDay?: number): number {
   const start = targetDay ?? dayStart(Date.now());
-  const end = start + MS_PER_DAY;
+  const end = nextDayStart(start);
   return sessions
     .filter((s) => s.endedAt != null && s.endedAt >= start && s.endedAt < end && s.completed)
     .reduce((sum, s) => sum + Math.round((s.endedAt! - s.startedAt) / 60_000), 0);

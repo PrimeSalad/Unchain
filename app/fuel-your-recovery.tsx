@@ -13,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -35,6 +36,7 @@ import {
   dailyFoodSummary,
   dailyWaterTotal,
   dailyFastingMinutes,
+  calorieDayRecords,
   mealStreak,
   waterStreak,
   todaysTip,
@@ -53,6 +55,11 @@ function fmtAmount(n: number): string {
 
 function fmtTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtClock(hour24: number, minute = 0): string {
+  const hour = hour24 % 12 || 12;
+  return `${hour}:${String(minute).padStart(2, '0')} ${hour24 >= 12 ? 'PM' : 'AM'}`;
 }
 
 function formatFastDuration(ms: number): string {
@@ -87,6 +94,15 @@ function StatCard({ icon, value, label, color, delay }: {
   );
 }
 
+function ChartLegend({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+      <Text variant="caption" dim>{label}</Text>
+    </View>
+  );
+}
+
 // ── Progress ring ─────────────────────────────────────────────────────────
 
 function ProgressRing({ progress, size, label, value, color }: {
@@ -117,7 +133,12 @@ function ProgressRing({ progress, size, label, value, color }: {
 export default function FuelYourRecovery() {
   const theme = useTheme();
   const { width } = useResponsive();
+  const { height: viewportHeight } = useWindowDimensions();
   const compact = width < 380;
+  const isLandscape = width > viewportHeight;
+  const shortViewport = viewportHeight < 700;
+  const stackTrackers = compact && !isLandscape;
+  const sheetMaxHeight = Math.max(280, Math.min(viewportHeight * 0.88, 680));
   const router = useRouter();
   const safeBack = useSafeBack();
 
@@ -166,8 +187,40 @@ export default function FuelYourRecovery() {
 
   // ── Fasting state ───────────────────────────────────────────────────────
   const [fastingGoal, setFastingGoal] = useState<FastingGoal | null>(goals.fastingGoal);
+  const [customFastHours, setCustomFastHours] = useState(
+    goals.fastingGoal?.schedule === 'custom' ? String(Math.floor((goals.fastingGoal.customMinutes ?? 0) / 60)) : '12',
+  );
+  const [customFastMinutes, setCustomFastMinutes] = useState(
+    goals.fastingGoal?.schedule === 'custom' ? String((goals.fastingGoal.customMinutes ?? 0) % 60) : '0',
+  );
+  const initialEatingHour = goals.fastingGoal?.startEatingHour ?? 12;
+  const [showCustomEatingTime, setShowCustomEatingTime] = useState(
+    Boolean(goals.fastingGoal && ![6, 8, 10, 12, 14, 16, 18].includes(initialEatingHour)),
+  );
+  const [customEatingHour, setCustomEatingHour] = useState(
+    String(initialEatingHour % 12 || 12),
+  );
+  const [customEatingMinute, setCustomEatingMinute] = useState('00');
+  const [customEatingPeriod, setCustomEatingPeriod] = useState<'AM' | 'PM'>(
+    initialEatingHour >= 12 ? 'PM' : 'AM',
+  );
   const activeFast = fastingSessions.find((s) => s.endedAt === null);
+  const selectedFastMinutes = fastingGoal?.schedule === 'custom'
+    ? fastingGoal.customMinutes ?? 0
+    : fastingGoal
+      ? (FASTING_SCHEDULES[fastingGoal.schedule]?.hours ?? 0) * 60
+      : 0;
+  const canStartSelectedFast = selectedFastMinutes > 0 && selectedFastMinutes <= 24 * 60;
   const [, setTick] = useState(0);
+
+  const applyCustomEatingTime = (hourText: string, minuteText: string, period: 'AM' | 'PM') => {
+    if (!fastingGoal) return;
+    const hour12 = Math.min(12, Math.max(1, Number(hourText) || 0));
+    const minute = Math.min(59, Math.max(0, Number(minuteText) || 0));
+    if (!hour12) return;
+    const hour24 = (hour12 % 12) + (period === 'PM' ? 12 : 0);
+    setFastingGoal({ ...fastingGoal, startEatingHour: hour24, startEatingMinute: minute });
+  };
 
   // Timer for active fast countdown
   useEffect(() => {
@@ -185,6 +238,11 @@ export default function FuelYourRecovery() {
     const wStreak = waterStreak(waterEntries, goals.dailyWaterMl);
     return { food, water, fasting, mStreak, wStreak };
   }, [foodEntries, waterEntries, fastingSessions, goals]);
+  const calorieHistory = useMemo(
+    () => calorieDayRecords(foodEntries, goals.dailyCalories, 7),
+    [foodEntries, goals.dailyCalories],
+  );
+  const calorieChartMax = Math.max(goals.dailyCalories, ...calorieHistory.map((day) => day.calories), 1);
 
   const calPct = goals.dailyCalories > 0 ? Math.min(1, today.food.calories / goals.dailyCalories) : 0;
   const waterPct = goals.dailyWaterMl > 0 ? Math.min(1, today.water / goals.dailyWaterMl) : 0;
@@ -192,6 +250,14 @@ export default function FuelYourRecovery() {
 
   const calRemaining = Math.max(0, goals.dailyCalories - today.food.calories);
   const waterRemaining = Math.max(0, goals.dailyWaterMl - today.water);
+  const caloriesExceeded = Math.max(0, today.food.calories - goals.dailyCalories);
+  const calorieGoalReached = goals.dailyCalories > 0 && today.food.calories >= goals.dailyCalories;
+  const calorieGoalExceeded = goals.dailyCalories > 0 && today.food.calories > goals.dailyCalories;
+  const calorieRingColor = calorieGoalExceeded
+    ? theme.color.danger
+    : calorieGoalReached
+      ? theme.color.success
+      : theme.color.celebrateText;
 
   // ── Actions ─────────────────────────────────────────────────────────────
   const submitFood = () => {
@@ -220,8 +286,10 @@ export default function FuelYourRecovery() {
     if (activeFast) {
       endFuelFast();
     } else {
-      const hours = fastingGoal ? FASTING_SCHEDULES[fastingGoal.schedule]?.hours ?? 16 : 16;
-      startFuelFast(hours * 60);
+      const targetMinutes = fastingGoal?.schedule === 'custom'
+        ? fastingGoal.customMinutes ?? 0
+        : (FASTING_SCHEDULES[fastingGoal?.schedule ?? '16:8']?.hours ?? 16) * 60;
+      if (targetMinutes > 0) startFuelFast(targetMinutes);
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
   };
@@ -276,7 +344,7 @@ export default function FuelYourRecovery() {
   // ── Render: Setup Step 1 - Body Info ────────────────────────────────────
   if (needsSetup && setupStep === 'body') {
     return (
-      <Screen edges={['top', 'bottom']}>
+      <Screen scroll={false} edges={['top', 'bottom']}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm }}>
           <Pressable onPress={safeBack} hitSlop={12} accessibilityRole="button"
             style={({ pressed }) => ({ width: 40, height: 40, borderRadius: radius.round, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
@@ -285,7 +353,7 @@ export default function FuelYourRecovery() {
           <Text variant="headline" style={{ flex: 1 }}>Your Body Info</Text>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: spacing.xl, paddingBottom: spacing.xl }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: shortViewport ? spacing.sm : spacing.xl, paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
           <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
             <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: theme.color.successSoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
               <Ionicons name="nutrition" size={32} color={theme.color.success} />
@@ -372,7 +440,7 @@ export default function FuelYourRecovery() {
   // ── Render: Setup Step 2 - Activity Level ───────────────────────────────
   if (needsSetup && setupStep === 'activity') {
     return (
-      <Screen edges={['top', 'bottom']}>
+      <Screen scroll={false} edges={['top', 'bottom']}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm }}>
           <Pressable onPress={() => setSetupStep('body')} hitSlop={12} accessibilityRole="button"
             style={({ pressed }) => ({ width: 40, height: 40, borderRadius: radius.round, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
@@ -381,7 +449,7 @@ export default function FuelYourRecovery() {
           <Text variant="headline" style={{ flex: 1 }}>Activity Level</Text>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: spacing.xl, paddingBottom: spacing.xl }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: shortViewport ? spacing.sm : spacing.xl, paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
           <Text variant="footnote" dim style={{ marginBottom: spacing.lg }}>
             How active are you on a typical week? This helps us calculate your daily calorie needs.
           </Text>
@@ -435,7 +503,7 @@ export default function FuelYourRecovery() {
   // ── Render: Setup Step 3 - Calorie Plan ─────────────────────────────────
   if (needsSetup && setupStep === 'plan') {
     return (
-      <Screen edges={['top', 'bottom']}>
+      <Screen scroll={false} edges={['top', 'bottom']}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm }}>
           <Pressable onPress={() => setSetupStep('activity')} hitSlop={12} accessibilityRole="button"
             style={({ pressed }) => ({ width: 40, height: 40, borderRadius: radius.round, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
@@ -444,7 +512,7 @@ export default function FuelYourRecovery() {
           <Text variant="headline" style={{ flex: 1 }}>Choose Your Plan</Text>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: spacing.xl, paddingBottom: spacing.xl }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: shortViewport ? spacing.sm : spacing.xl, paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
           <Text variant="footnote" dim style={{ marginBottom: spacing.lg }}>
             Based on your body info, here are recommended nutrition plans. Choose what fits your recovery goals.
           </Text>
@@ -487,7 +555,7 @@ export default function FuelYourRecovery() {
   // ── Render: Goals confirmation ──────────────────────────────────────────
   if (needsSetup && setupStep === 'goals') {
     return (
-      <Screen edges={['top', 'bottom']}>
+      <Screen scroll={false} edges={['top', 'bottom']}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm }}>
           <Pressable onPress={() => setSetupStep('plan')} hitSlop={12} accessibilityRole="button"
             style={({ pressed }) => ({ width: 40, height: 40, borderRadius: radius.round, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
@@ -496,7 +564,7 @@ export default function FuelYourRecovery() {
           <Text variant="headline" style={{ flex: 1 }}>Set Your Goals</Text>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: spacing.xl, paddingBottom: spacing.xl }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: shortViewport ? spacing.sm : spacing.xl, paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
           <Text variant="footnote" dim style={{ marginBottom: spacing.lg }}>Adjust your daily targets. These are personal goals, not restrictions.</Text>
 
           {/* Calorie goal */}
@@ -574,35 +642,46 @@ export default function FuelYourRecovery() {
   return (
     <Screen scroll={false} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, marginTop: spacing.xs, marginBottom: spacing.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, marginBottom: spacing.md }}>
         <Pressable onPress={safeBack} hitSlop={12} accessibilityRole="button"
           style={({ pressed }) => ({ width: 40, height: 40, flexShrink: 0, borderRadius: 20, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1, marginRight: spacing.sm })}>
           <Ionicons name="chevron-back" size={20} color={theme.color.primary} />
         </Pressable>
-        <Text variant={compact ? 'title2' : 'title1'} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}
-          style={{ flex: 1, fontFamily: 'Nunito_900Black', marginRight: spacing.xs }}>Fuel Your Recovery</Text>
+        <Text
+          variant="title2"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.9}
+          style={{ flex: 1, lineHeight: 40, fontFamily: 'Nunito_900Black', marginRight: spacing.xs }}
+        >
+          Fuel Your Recovery
+        </Text>
         <Pressable onPress={() => setShowGoalsModal(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Fuel settings"
-          style={({ pressed }) => ({ width: 40, height: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}>
+          style={({ pressed }) => ({ width: 40, height: 40, flexShrink: 0, borderRadius: 20, backgroundColor: theme.color.surfaceAlt, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}>
           <Ionicons name="settings-outline" size={22} color={theme.color.textDim} />
         </Pressable>
-        <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setShowFoodModal(true); }}
-          hitSlop={8} accessibilityRole="button" accessibilityLabel="Log a meal"
-          style={({ pressed }) => ({ width: 40, height: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}>
-          <Ionicons name="add-circle-outline" size={24} color={theme.color.primary} />
-        </Pressable>
       </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.md }} showsVerticalScrollIndicator={false}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+        <Text variant="headline" style={{ flex: 1, fontFamily: 'Nunito_800ExtraBold' }}>Today</Text>
+        <Text variant="caption" dim>{todayMeals.length} meals logged</Text>
+      </View>
 
       {/* ── Calorie summary ───────────────────────────────────────────── */}
       <View style={{
         flexDirection: 'row', alignItems: 'center', gap: compact ? spacing.sm : spacing.lg,
         backgroundColor: theme.color.surface, borderRadius: radius.card,
-        borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.md, marginBottom: spacing.md,
+        borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.lg,
+        minHeight: compact ? 104 : 116, marginBottom: spacing.md,
       }}>
-        <ProgressRing progress={calPct} size={compact ? 56 : 64} label="" value={`${today.food.calories}`} color={theme.color.primary} />
+        <ProgressRing progress={calPct} size={compact ? 64 : 72} label="" value={`${today.food.calories}`} color={calorieRingColor} />
         <View style={{ flex: 1, gap: spacing.xs }}>
-          <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>
-            {calRemaining} cal remaining
+          <Text variant="callout" color={calorieRingColor} style={{ fontFamily: 'Nunito_700Bold' }}>
+            {calorieGoalExceeded
+              ? `${caloriesExceeded} cal over goal`
+              : calorieGoalReached
+                ? 'Daily goal reached'
+                : `${calRemaining} cal remaining`}
           </Text>
           <Text variant="caption" dim>of {goals.dailyCalories} cal goal</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: 2, marginTop: spacing.xs }}>
@@ -613,11 +692,13 @@ export default function FuelYourRecovery() {
       </View>
 
       {/* ── Water + Fasting (side by side) ──────────────────────────────── */}
-      <View style={{ flexDirection: compact ? 'column' : 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+      <View style={{ flexDirection: stackTrackers ? 'column' : 'row', gap: spacing.md, marginBottom: spacing.md }}>
         {/* Water tracker */}
         <View style={{
-          flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card,
-          borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.md,
+          flex: stackTrackers ? undefined : 1, width: stackTrackers ? '100%' : undefined,
+          backgroundColor: theme.color.surface, borderRadius: radius.card,
+          borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.lg,
+          minHeight: stackTrackers ? 132 : shortViewport ? 138 : 154,
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
             <Ionicons name="water" size={14} color="#4A6FA5" />
@@ -636,7 +717,7 @@ export default function FuelYourRecovery() {
             {WATER_PRESETS.slice(0, 3).map((ml) => (
               <Pressable key={ml} onPress={() => quickAddWater(ml)}
                 style={({ pressed }) => ({
-                  flex: 1, height: 28, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
+                  flex: 1, height: 36, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: theme.color.primarySoft,
                   opacity: pressed ? 0.7 : 1,
                 })}>
@@ -648,8 +729,10 @@ export default function FuelYourRecovery() {
 
         {/* Fasting tracker */}
         <View style={{
-          flex: 1, backgroundColor: theme.color.surface, borderRadius: radius.card,
-          borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.md,
+          flex: stackTrackers ? undefined : 1, width: stackTrackers ? '100%' : undefined,
+          backgroundColor: theme.color.surface, borderRadius: radius.card,
+          borderWidth: 1, borderColor: theme.color.hairline, padding: spacing.lg,
+          minHeight: stackTrackers ? 132 : shortViewport ? 138 : 154,
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
             <Ionicons name="timer" size={14} color={activeFast ? theme.color.success : theme.color.textDim} />
@@ -664,7 +747,7 @@ export default function FuelYourRecovery() {
               </Text>
               <Text variant="caption" dim style={{ marginBottom: spacing.sm }}>elapsed</Text>
               <Pressable onPress={toggleFast}
-                style={({ pressed }) => ({ height: 28, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.danger, opacity: pressed ? 0.8 : 1 })}>
+                style={({ pressed }) => ({ height: 36, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.danger, opacity: pressed ? 0.8 : 1 })}>
                 <Text variant="caption" color="#FFFFFF" style={{ fontFamily: 'Nunito_700Bold' }}>End Fast</Text>
               </Pressable>
             </>
@@ -681,25 +764,26 @@ export default function FuelYourRecovery() {
                   opacity: pressed ? 0.8 : 1,
                 })}>
                 <Text variant="caption" color={fastingGoal ? theme.color.text : theme.color.textDim} style={{ fontFamily: fastingGoal ? 'Nunito_700Bold' : undefined }}>
-                  {fastingGoal ? FASTING_SCHEDULES[fastingGoal.schedule]?.label ?? 'Select' : 'Select schedule'}
+                  {fastingGoal?.schedule === 'custom'
+                    ? formatFastDuration(selectedFastMinutes * 60_000)
+                    : fastingGoal ? FASTING_SCHEDULES[fastingGoal.schedule]?.label ?? 'Select' : 'Select schedule'}
                 </Text>
                 <Ionicons name="chevron-down" size={14} color={theme.color.textDim} />
               </Pressable>
               {/* Start button */}
               <Pressable onPress={() => {
-                if (fastingGoal) {
-                  const hours = FASTING_SCHEDULES[fastingGoal.schedule]?.hours ?? 16;
-                  startFuelFast(hours * 60);
+                if (canStartSelectedFast) {
+                  startFuelFast(selectedFastMinutes);
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                 }
               }}
                 style={({ pressed }) => ({
-                  height: 28, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: fastingGoal ? theme.color.success : theme.color.surfaceAlt,
-                  opacity: pressed ? 0.8 : fastingGoal ? 1 : 0.5,
+                  height: 36, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: canStartSelectedFast ? theme.color.success : theme.color.surfaceAlt,
+                  opacity: pressed ? 0.8 : canStartSelectedFast ? 1 : 0.5,
                 })}>
-                <Text variant="caption" color={fastingGoal ? '#FFFFFF' : theme.color.textDim} style={{ fontFamily: 'Nunito_700Bold' }}>
-                  {fastingGoal ? 'Start' : 'Pick first'}
+                <Text variant="caption" color={canStartSelectedFast ? '#FFFFFF' : theme.color.textDim} style={{ fontFamily: 'Nunito_700Bold' }}>
+                  {canStartSelectedFast ? 'Start' : 'Pick first'}
                 </Text>
               </Pressable>
             </>
@@ -710,7 +794,7 @@ export default function FuelYourRecovery() {
       {/* ── Today's tip ───────────────────────────────────────────────── */}
       <View style={{
         backgroundColor: theme.color.primarySoft, borderRadius: radius.card,
-        padding: spacing.md, marginBottom: spacing.md,
+        padding: spacing.lg, minHeight: 84, marginBottom: spacing.md,
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
           <Ionicons name="bulb" size={14} color={theme.color.primary} />
@@ -719,18 +803,68 @@ export default function FuelYourRecovery() {
         <Text variant="caption" style={{ lineHeight: 19 }}>{todaysTip()}</Text>
       </View>
 
+      <View style={{
+        backgroundColor: theme.color.surface,
+        borderRadius: radius.card,
+        borderWidth: 1,
+        borderColor: theme.color.hairline,
+        padding: spacing.lg,
+        marginBottom: spacing.md,
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.lg }}>
+          <View style={{ flex: 1 }}>
+            <Text variant="callout" style={{ fontFamily: 'Nunito_800ExtraBold' }}>7-day calorie trend</Text>
+            <Text variant="caption" dim style={{ marginTop: 2 }}>Every day stays on your record</Text>
+          </View>
+          <Ionicons name="stats-chart-outline" size={20} color={theme.color.primary} />
+        </View>
+        <View style={{ height: shortViewport ? 104 : 132, flexDirection: 'row', alignItems: 'flex-end', gap: compact ? 5 : spacing.sm }}>
+          {calorieHistory.map((day) => {
+            const color = day.status === 'over'
+              ? theme.color.danger
+              : day.status === 'reached'
+                ? theme.color.success
+                : day.status === 'under'
+                  ? theme.color.celebrateText
+                  : theme.color.hairline;
+            const barHeight = day.calories === 0
+              ? 5
+              : Math.max(12, Math.round((day.calories / calorieChartMax) * 92));
+            return (
+              <View key={day.date} style={{ flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <Text variant="caption" dim style={{ fontSize: 9, marginBottom: 3 }}>
+                  {day.calories > 0 ? day.calories : '—'}
+                </Text>
+                <View
+                  accessibilityLabel={`${day.label}: ${day.calories} calories, ${day.status}`}
+                  style={{ width: '68%', minWidth: 12, height: barHeight, borderRadius: radius.round, backgroundColor: color }}
+                />
+                <Text variant="caption" dim style={{ marginTop: spacing.xs }}>{day.label}</Text>
+              </View>
+            );
+          })}
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md }}>
+          <ChartLegend color={theme.color.celebrateText} label="Under" />
+          <ChartLegend color={theme.color.success} label="Reached" />
+          <ChartLegend color={theme.color.danger} label="Over" />
+          <ChartLegend color={theme.color.hairline} label="No entries" />
+        </View>
+      </View>
+
       {/* Keep the dashboard focused; detailed logs live in History. */}
       <Pressable
         onPress={() => setShowHistoryModal(true)}
         accessibilityRole="button"
         accessibilityLabel="Show meal history"
         style={({ pressed }) => ({
-          minHeight: 64,
+          minHeight: 68,
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.md,
-          padding: spacing.md,
-          marginBottom: spacing.sm,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+          marginBottom: spacing.md,
           borderRadius: radius.card,
           borderWidth: 1,
           borderColor: theme.color.hairline,
@@ -738,7 +872,7 @@ export default function FuelYourRecovery() {
           opacity: pressed ? 0.75 : 1,
         })}
       >
-        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.primarySoft }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.primarySoft }}>
           <Ionicons name="time-outline" size={20} color={theme.color.primary} />
         </View>
         <View style={{ flex: 1 }}>
@@ -747,6 +881,14 @@ export default function FuelYourRecovery() {
         </View>
         <Ionicons name="chevron-forward" size={20} color={theme.color.textDim} />
       </Pressable>
+      <Button
+        label="Log a meal"
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          setShowFoodModal(true);
+        }}
+        full
+      />
       </ScrollView>
 
       {/* ── Meal history modal ─────────────────────────────────────────── */}
@@ -760,7 +902,7 @@ export default function FuelYourRecovery() {
             paddingTop: spacing.md,
             paddingHorizontal: spacing.xl,
             paddingBottom: 40,
-            maxHeight: '82%',
+            maxHeight: Math.min(viewportHeight * (isLandscape ? 0.82 : 0.65), 520),
           }}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.color.hairline, alignSelf: 'center', marginBottom: spacing.lg }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
@@ -778,7 +920,12 @@ export default function FuelYourRecovery() {
                 <Ionicons name="close" size={20} color={theme.color.text} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.lg }}>
+            <ScrollView
+              style={{ maxHeight: Math.min(viewportHeight * (isLandscape ? 0.56 : 0.44), 360) }}
+              showsVerticalScrollIndicator
+              nestedScrollEnabled
+              contentContainerStyle={{ paddingBottom: spacing.lg }}
+            >
               {mealHistory.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: spacing.xxxl }}>
                   <Ionicons name="restaurant-outline" size={32} color={theme.color.textDim} />
@@ -815,18 +962,20 @@ export default function FuelYourRecovery() {
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setShowFoodModal(false)} />
           <View style={{
             backgroundColor: theme.color.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet,
-            padding: spacing.xl, paddingBottom: 40, maxHeight: '85%',
+            padding: shortViewport ? spacing.lg : spacing.xl,
+            paddingBottom: shortViewport ? spacing.lg : 40,
+            maxHeight: sheetMaxHeight,
           }}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.color.hairline, alignSelf: 'center', marginBottom: spacing.lg }} />
             <Text variant="headline" style={{ fontFamily: 'Nunito_800ExtraBold', marginBottom: spacing.lg }}>Log Meal</Text>
 
             {/* Meal category */}
             <Text variant="caption" dim style={{ marginBottom: spacing.xs }}>Category</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: compact ? 'wrap' : 'nowrap', gap: spacing.sm, marginBottom: spacing.md }}>
               {(['breakfast', 'lunch', 'dinner', 'snack'] as MealCategory[]).map((cat) => (
                 <Pressable key={cat} onPress={() => setFoodCategory(cat)}
                   style={({ pressed }) => ({
-                    flex: 1, height: 36, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
+                    flexGrow: 1, flexBasis: compact ? '46%' : 0, height: 40, borderRadius: radius.round, alignItems: 'center', justifyContent: 'center',
                     backgroundColor: foodCategory === cat ? theme.color.primary : theme.color.surfaceAlt,
                     opacity: pressed ? 0.8 : 1,
                   })}>
@@ -840,7 +989,7 @@ export default function FuelYourRecovery() {
               style={{ backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md, color: theme.color.text, fontSize: 16, marginBottom: spacing.md }} />
 
             {/* Macros row */}
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
               {[
                 { label: 'Cal', value: foodCalories, set: setFoodCalories, color: theme.color.primary },
                 { label: 'Protein', value: foodProtein, set: setFoodProtein, color: theme.color.success },
@@ -848,7 +997,7 @@ export default function FuelYourRecovery() {
                 { label: 'Fat', value: foodFat, set: setFoodFat, color: theme.color.accentText },
                 { label: 'Fiber', value: foodFiber, set: setFoodFiber, color: theme.color.celebrateText },
               ].map((f) => (
-                <View key={f.label} style={{ flex: 1 }}>
+                <View key={f.label} style={{ flexGrow: 1, flexBasis: compact ? '29%' : 0, minWidth: 54 }}>
                   <Text variant="caption" dim style={{ marginBottom: 2 }}>{f.label}</Text>
                   <TextInput value={f.value} onChangeText={f.set} keyboardType="numeric" placeholder="0" placeholderTextColor={theme.color.textDim}
                     style={{ backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.sm, color: theme.color.text, fontSize: 14, textAlign: 'center' }} />
@@ -897,7 +1046,7 @@ export default function FuelYourRecovery() {
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setShowFastModal(false)} />
           <View style={{
             backgroundColor: theme.color.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet,
-            maxHeight: '85%', paddingBottom: 40,
+            maxHeight: sheetMaxHeight, paddingBottom: shortViewport ? spacing.lg : 40,
           }}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.color.hairline, alignSelf: 'center', marginTop: spacing.md, marginBottom: spacing.lg }} />
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.xl }}>
@@ -911,7 +1060,14 @@ export default function FuelYourRecovery() {
                 <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
                   {Object.entries(FASTING_SCHEDULES).map(([key, sched]) => (
                     <Pressable key={key} onPress={() => {
-                      setFastingGoal({ schedule: key as any, startEatingHour: fastingGoal?.startEatingHour ?? 12 });
+                      setFastingGoal({
+                        schedule: key as any,
+                        startEatingHour: fastingGoal?.startEatingHour ?? 12,
+                        startEatingMinute: fastingGoal?.startEatingMinute ?? 0,
+                        customMinutes: key === 'custom'
+                          ? (Number(customFastHours) || 0) * 60 + (Number(customFastMinutes) || 0)
+                          : undefined,
+                      });
                       Haptics.selectionAsync().catch(() => {});
                     }}
                       style={({ pressed }) => ({
@@ -933,10 +1089,60 @@ export default function FuelYourRecovery() {
                         <Text variant="callout" style={{ fontFamily: 'Nunito_700Bold' }}>{sched.label}</Text>
                         <Text variant="caption" dim>{sched.description}</Text>
                       </View>
-                      <Text variant="caption" color={theme.color.primary} style={{ fontFamily: 'Nunito_700Bold' }}>{sched.hours}h</Text>
+                      <Text variant="caption" color={theme.color.primary} style={{ fontFamily: 'Nunito_700Bold' }}>
+                        {key === 'custom' ? 'Set time' : `${sched.hours}h`}
+                      </Text>
                     </Pressable>
                   ))}
                 </View>
+
+                {fastingGoal?.schedule === 'custom' && (
+                  <View style={{ backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md, marginBottom: spacing.lg }}>
+                    <Text variant="footnote" style={{ fontFamily: 'Nunito_700Bold', marginBottom: spacing.sm }}>Custom duration</Text>
+                    <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="caption" dim style={{ marginBottom: spacing.xs }}>Hours</Text>
+                        <TextInput
+                          value={customFastHours}
+                          onChangeText={(value) => {
+                            const cleaned = value.replace(/\D/g, '').slice(0, 2);
+                            setCustomFastHours(cleaned);
+                            const total = (Number(cleaned) || 0) * 60 + (Number(customFastMinutes) || 0);
+                            setFastingGoal({ ...fastingGoal, customMinutes: total });
+                          }}
+                          keyboardType="number-pad"
+                          placeholder="12"
+                          placeholderTextColor={theme.color.textDim}
+                          accessibilityLabel="Custom fasting hours"
+                          style={{ height: 48, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, backgroundColor: theme.color.surface, paddingHorizontal: spacing.md, color: theme.color.text, fontSize: 16 }}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="caption" dim style={{ marginBottom: spacing.xs }}>Minutes</Text>
+                        <TextInput
+                          value={customFastMinutes}
+                          onChangeText={(value) => {
+                            const cleaned = value.replace(/\D/g, '').slice(0, 2);
+                            const minutes = Math.min(59, Number(cleaned) || 0);
+                            setCustomFastMinutes(cleaned === '' ? '' : String(minutes));
+                            const total = (Number(customFastHours) || 0) * 60 + minutes;
+                            setFastingGoal({ ...fastingGoal, customMinutes: total });
+                          }}
+                          keyboardType="number-pad"
+                          placeholder="0"
+                          placeholderTextColor={theme.color.textDim}
+                          accessibilityLabel="Custom fasting minutes"
+                          style={{ height: 48, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, backgroundColor: theme.color.surface, paddingHorizontal: spacing.md, color: theme.color.text, fontSize: 16 }}
+                        />
+                      </View>
+                    </View>
+                    <Text variant="caption" color={canStartSelectedFast ? theme.color.success : theme.color.danger} style={{ marginTop: spacing.sm }}>
+                      {canStartSelectedFast
+                        ? `Fast duration: ${formatFastDuration(selectedFastMinutes * 60_000)}`
+                        : 'Choose a duration between 1 minute and 24 hours.'}
+                    </Text>
+                  </View>
+                )}
 
                 {/* Start eating time */}
                 {fastingGoal && (
@@ -945,7 +1151,8 @@ export default function FuelYourRecovery() {
                     <View style={{ flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm, flexWrap: 'wrap' }}>
                       {[6, 8, 10, 12, 14, 16, 18].map((h) => (
                         <Pressable key={h} onPress={() => {
-                          setFastingGoal({ ...fastingGoal, startEatingHour: h });
+                          setShowCustomEatingTime(false);
+                          setFastingGoal({ ...fastingGoal, startEatingHour: h, startEatingMinute: 0 });
                           Haptics.selectionAsync().catch(() => {});
                         }}
                           style={({ pressed }) => ({
@@ -960,7 +1167,89 @@ export default function FuelYourRecovery() {
                           </Text>
                         </Pressable>
                       ))}
+                      <Pressable
+                        onPress={() => {
+                          setShowCustomEatingTime(true);
+                          applyCustomEatingTime(customEatingHour, customEatingMinute, customEatingPeriod);
+                          Haptics.selectionAsync().catch(() => {});
+                        }}
+                        style={({ pressed }) => ({
+                          paddingHorizontal: spacing.md,
+                          height: 36,
+                          borderRadius: radius.round,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: showCustomEatingTime ? theme.color.primary : theme.color.surfaceAlt,
+                          borderWidth: 1,
+                          borderColor: showCustomEatingTime ? theme.color.primary : theme.color.hairline,
+                          opacity: pressed ? 0.8 : 1,
+                        })}
+                      >
+                        <Text variant="caption" color={showCustomEatingTime ? '#FFFFFF' : theme.color.text} style={{ fontFamily: 'Nunito_700Bold' }}>
+                          Other time
+                        </Text>
+                      </Pressable>
                     </View>
+
+                    {showCustomEatingTime && (
+                      <View style={{ backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md, marginBottom: spacing.md }}>
+                        <Text variant="caption" dim style={{ marginBottom: spacing.sm }}>Enter your start time</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                          <TextInput
+                            value={customEatingHour}
+                            onChangeText={(value) => {
+                              const cleaned = value.replace(/\D/g, '').slice(0, 2);
+                              const normalized = cleaned === '' ? '' : String(Math.min(12, Number(cleaned) || 0));
+                              setCustomEatingHour(normalized);
+                              applyCustomEatingTime(normalized, customEatingMinute, customEatingPeriod);
+                            }}
+                            keyboardType="number-pad"
+                            placeholder="8"
+                            placeholderTextColor={theme.color.textDim}
+                            accessibilityLabel="Eating start hour"
+                            style={{ flex: 1, height: 48, textAlign: 'center', borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, backgroundColor: theme.color.surface, color: theme.color.text, fontSize: 16 }}
+                          />
+                          <Text variant="headline">:</Text>
+                          <TextInput
+                            value={customEatingMinute}
+                            onChangeText={(value) => {
+                              const cleaned = value.replace(/\D/g, '').slice(0, 2);
+                              const normalized = cleaned === '' ? '' : String(Math.min(59, Number(cleaned) || 0));
+                              setCustomEatingMinute(normalized);
+                              applyCustomEatingTime(customEatingHour, normalized, customEatingPeriod);
+                            }}
+                            keyboardType="number-pad"
+                            placeholder="00"
+                            placeholderTextColor={theme.color.textDim}
+                            accessibilityLabel="Eating start minute"
+                            style={{ flex: 1, height: 48, textAlign: 'center', borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, backgroundColor: theme.color.surface, color: theme.color.text, fontSize: 16 }}
+                          />
+                          {(['AM', 'PM'] as const).map((period) => (
+                            <Pressable
+                              key={period}
+                              onPress={() => {
+                                setCustomEatingPeriod(period);
+                                applyCustomEatingTime(customEatingHour, customEatingMinute, period);
+                              }}
+                              style={({ pressed }) => ({
+                                height: 48,
+                                minWidth: 48,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: radius.card,
+                                backgroundColor: customEatingPeriod === period ? theme.color.primary : theme.color.surface,
+                                opacity: pressed ? 0.75 : 1,
+                              })}
+                            >
+                              <Text variant="caption" color={customEatingPeriod === period ? '#FFFFFF' : theme.color.text}>{period}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                        <Text variant="caption" color={theme.color.primary} style={{ marginTop: spacing.sm }}>
+                          Starts at {fmtClock(fastingGoal.startEatingHour, fastingGoal.startEatingMinute)}
+                        </Text>
+                      </View>
+                    )}
 
                     {/* Time window preview */}
                     <View style={{ backgroundColor: theme.color.surfaceAlt, borderRadius: radius.card, padding: spacing.md, marginBottom: spacing.lg }}>
@@ -969,7 +1258,7 @@ export default function FuelYourRecovery() {
                         <View style={{ alignItems: 'center' }}>
                           <Ionicons name="sunny" size={18} color="#F9A825" />
                           <Text variant="footnote" style={{ fontFamily: 'Nunito_700Bold', marginTop: 4 }}>
-                            {fastingGoal.startEatingHour > 12 ? `${fastingGoal.startEatingHour - 12} PM` : `${fastingGoal.startEatingHour} AM`}
+                            {fmtClock(fastingGoal.startEatingHour, fastingGoal.startEatingMinute)}
                           </Text>
                           <Text variant="caption" dim>Start eating</Text>
                         </View>
@@ -988,7 +1277,9 @@ export default function FuelYourRecovery() {
                         </View>
                       </View>
                       <Text variant="caption" dim center style={{ marginTop: spacing.sm }}>
-                        {FASTING_SCHEDULES[fastingGoal.schedule]?.hours ?? 16} hours fasting
+                        {fastingGoal.schedule === 'custom'
+                          ? `${formatFastDuration(selectedFastMinutes * 60_000)} fasting`
+                          : `${FASTING_SCHEDULES[fastingGoal.schedule]?.hours ?? 16} hours fasting`}
                       </Text>
                     </View>
                   </>
@@ -1001,13 +1292,13 @@ export default function FuelYourRecovery() {
                 </View>
 
                 <Button label="Start Fast" onPress={() => {
-                  if (fastingGoal) {
-                    const hours = FASTING_SCHEDULES[fastingGoal.schedule]?.hours ?? 16;
-                    startFuelFast(hours * 60);
+                  if (canStartSelectedFast) {
+                    startFuelFast(selectedFastMinutes);
+                    updateFuelGoals({ fastingGoal });
                     setShowFastModal(false);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                   }
-                }} disabled={!fastingGoal} full />
+                }} disabled={!canStartSelectedFast} full />
               </>
             ) : (
               <View style={{ alignItems: 'center', gap: spacing.md }}>
@@ -1041,7 +1332,9 @@ export default function FuelYourRecovery() {
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setShowGoalsModal(false)} />
           <View style={{
             backgroundColor: theme.color.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet,
-            padding: spacing.xl, paddingBottom: 40, maxHeight: '85%',
+            padding: shortViewport ? spacing.lg : spacing.xl,
+            paddingBottom: shortViewport ? spacing.lg : 40,
+            maxHeight: sheetMaxHeight,
           }}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.color.hairline, alignSelf: 'center', marginBottom: spacing.lg }} />
 

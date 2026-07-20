@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ADDICTION_TYPES, RECOVERY_TRACKS, recoveryTrack, isAddictionType, tryRecoveryTrack } from '../.test-build/domain/recoveryTracks.js';
 import { RECOVERY_FEATURES, resolveRecoveryFeature } from '../.test-build/application/recoveryFeatureRegistry.js';
 import { planRecoveryReminders } from '../.test-build/domain/recoveryReminderPlanner.js';
-import { FUEL_DATA_SCOPE } from '../.test-build/domain/fuelYourRecovery.js';
+import { calorieDayRecords, FASTING_SCHEDULES, FUEL_DATA_SCOPE } from '../.test-build/domain/fuelYourRecovery.js';
 
 test('recovery catalog is exhaustive and every definition is complete', () => {
   assert.equal(ADDICTION_TYPES.length, 9);
@@ -50,6 +50,20 @@ test('safety-sensitive tracks retain explicit boundaries', () => {
 
 test('Fuel wellness data has one global scope across recovery tracks', () => {
   assert.equal(FUEL_DATA_SCOPE, 'global');
+  assert.equal(FASTING_SCHEDULES.custom.hours, 0);
+  assert.match(FASTING_SCHEDULES.custom.description, /own fasting duration/i);
+});
+
+test('Fuel calorie history retains every calendar day and classifies its goal status', () => {
+  const now = new Date(2026, 6, 20, 12).getTime();
+  const today = new Date(2026, 6, 20, 9).getTime();
+  const yesterday = new Date(2026, 6, 19, 9).getTime();
+  const records = calorieDayRecords([
+    { id: 'a', at: yesterday, name: 'Meal', category: 'lunch', servingSize: '1', calories: 1800, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+    { id: 'b', at: today, name: 'Meal', category: 'dinner', servingSize: '1', calories: 2200, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+  ], 2000, 3, now);
+  assert.deepEqual(records.map((record) => record.status), ['none', 'under', 'over']);
+  assert.deepEqual(records.map((record) => record.calories), [0, 1800, 2200]);
 });
 
 test('reminder planner covers tracks, privacy, quiet hours, dedupe, archive, denial, and cap', () => {
