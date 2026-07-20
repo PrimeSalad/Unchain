@@ -2839,11 +2839,14 @@ export const useStore = create<RecoveryState>()(
         set({
           onboarded: false,
           profile: null,
+          // This removes every inactive track snapshot as well as its SOS and
+          // manually logged urges. Urge-pattern charts are derived from these
+          // records, so no separate analytics cache can survive the wipe.
           recoveryByAddiction: {},
           dailyJournalPlan: null,
           journalDrafts: {},
           checkIns: [],
-          urges: [],
+          urges: [], // Active-track SOS/manual urge records.
           relapses: [],
           journal: [],
           reflections: [],

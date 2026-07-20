@@ -22,6 +22,20 @@ interface SliderProps {
   kind?: 'mood' | 'urge';
 }
 
+/** One distinct expression for every point on the 1–10 mood scale. */
+function moodEmoji(v: number): string {
+  if (v <= 1) return '😔';
+  if (v <= 2) return '😞';
+  if (v <= 3) return '😕';
+  if (v <= 4) return '😐';
+  if (v <= 5) return '🙂';
+  if (v <= 6) return '😊';
+  if (v <= 7) return '😄';
+  if (v <= 8) return '😁';
+  if (v <= 9) return '🥰';
+  return '🤩';
+}
+
 function moodLabel(v: number): string {
   if (v <= 2) return 'Very low';
   if (v <= 4) return 'Low';
@@ -218,6 +232,15 @@ export function Slider({ value, onChange, max = 10, label, kind = 'mood' }: Slid
       >
         {/* Current value + label — swiping here also works. */}
         <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
+          {kind === 'mood' ? (
+            <Text
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              style={{ fontSize: 42, lineHeight: 48 }}
+            >
+              {moodEmoji(value)}
+            </Text>
+          ) : null}
           <Text variant="headline" color={color} style={{ fontFamily: 'Nunito_700Bold' }}>
             {value} / {max}
           </Text>

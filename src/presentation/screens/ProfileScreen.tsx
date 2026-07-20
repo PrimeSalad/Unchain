@@ -568,7 +568,7 @@ export function ProfileScreen() {
   const openDeleteAllModal = () =>
     setModal({
       title: 'Delete all local data?',
-      body: 'Every piece of data will be permanently deleted - your profile, streak, journal, check-ins, and all records.\n\nThe app will return to the welcome screen.\n\nThis cannot be undone.',
+      body: 'Every piece of data will be permanently deleted - your profile, streak, journals, check-ins, SOS urge records, pattern charts, and all recovery-track history.\n\nThe app will return to the welcome screen.\n\nThis cannot be undone.',
       confirmLabel: 'Delete everything',
       onConfirm: () => {
         try {

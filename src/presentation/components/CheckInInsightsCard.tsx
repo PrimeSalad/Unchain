@@ -8,12 +8,12 @@ import { useTheme } from '../theme/ThemeProvider';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useStore } from '@/application/store';
 import { addictionMeta } from '@/domain/gambling';
-import { journalConfig } from '@/domain/addictionJournal';
 import {
   averageInsightMood,
   averageInsightUrgePeak,
   hasUnlockedPatternInsights,
   insightMoodTrend,
+  isSyntheticInsightUrge,
   localDateKey,
   localDateOrdinal,
   localDateOrdinalFromKey,
@@ -100,32 +100,42 @@ export function CheckInInsightsCard() {
   const trend = insightMoodTrend(samples);
   const topTriggers = topInsightTriggers(samples14, 3);
   const loggedCount = recentKeys.filter((key) => sampleByDate.has(key)).length;
+  const recentManualUrges = urges
+    .filter((urge) => !isSyntheticInsightUrge(urge, journal))
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 5);
+  const timeBuckets = recentManualUrges.reduce<Record<string, number>>((counts, urge) => {
+    const hour = new Date(urge.at).getHours();
+    const bucket = hour < 6 ? 'Overnight'
+      : hour < 12 ? 'Morning'
+        : hour < 18 ? 'Afternoon'
+          : 'Evening';
+    counts[bucket] = (counts[bucket] ?? 0) + 1;
+    return counts;
+  }, {});
+  const commonUrgeTime = Object.entries(timeBuckets).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const toggle = () => {
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((value) => !value);
+  };
 
-  if (!unlocked) {
+  if (false && !unlocked) {
     return (
-      <Pressable
-        onPress={todayHasSample ? undefined : () => router.push({
-          pathname: journalConfig(track).route as never,
-          params: { addiction: track },
-        })}
-        disabled={todayHasSample}
-        accessibilityRole="button"
-        accessibilityLabel={`Unlock your ${trackLabel} patterns, ${progress.qualifyingDays} of ${progress.requiredDays} days complete`}
-        accessibilityHint={todayHasSample ? 'A new calendar day is needed for the next sample' : "Opens today's recovery journal"}
-        accessibilityState={{ disabled: todayHasSample }}
-        style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
-      >
-        <View style={{
-          minHeight: 76,
-          backgroundColor: theme.color.surface,
-          borderRadius: radius.card,
-          borderWidth: 1,
-          borderColor: theme.color.hairline,
-          padding: spacing.md,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.md,
-        }}>
+      <View style={{ backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, overflow: 'hidden' }}>
+        <Pressable
+          onPress={toggle}
+          accessibilityRole="button"
+          accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} your ${trackLabel} pattern evidence, ${progress.qualifyingDays} of ${progress.requiredDays} days complete`}
+          accessibilityState={{ expanded }}
+          style={({ pressed }) => ({
+            minHeight: 76,
+            padding: spacing.md,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            opacity: pressed ? 0.75 : 1,
+          })}
+        >
           <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: theme.color.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="bar-chart" size={21} color={theme.color.primary} />
           </View>
@@ -144,24 +154,51 @@ export function CheckInInsightsCard() {
               ))}
             </View>
           </View>
-          <Ionicons name={todayHasSample ? 'calendar-outline' : 'chevron-forward'} size={18} color={theme.color.textDim} />
-        </View>
-      </Pressable>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.color.textDim} />
+        </Pressable>
+        {expanded ? (
+          <View style={{ borderTopWidth: 1, borderTopColor: theme.color.hairline, padding: spacing.md, gap: spacing.md }}>
+            <Text variant="caption" dim>
+              Your logged urge evidence appears now. Full averages and recurring patterns unlock after {progress.requiredDays} different days.
+            </Text>
+            {recentManualUrges.length ? recentManualUrges.map((urge) => {
+              const triggers = urge.triggers?.length ? urge.triggers : urge.trigger ? [urge.trigger] : [];
+              return (
+                <View key={urge.id} style={{ borderRadius: radius.input, backgroundColor: theme.color.bg, padding: spacing.sm, gap: spacing.xs }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Text variant="callout" style={{ flex: 1 }}>{urge.intensity}/10 urge</Text>
+                    {urge.mood != null ? <Text variant="caption" color={theme.color.primary}>Mood {urge.mood}/10</Text> : null}
+                  </View>
+                  <Text variant="caption" dim>
+                    {new Date(urge.at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                  <Text variant="caption" dim>{triggers.length ? `Triggers: ${triggers.join(', ')}` : 'No trigger selected'}</Text>
+                </View>
+              );
+            }) : (
+              <Text variant="footnote" dim>No manual urges logged for this recovery track yet.</Text>
+            )}
+            {!todayHasSample ? (
+              <Pressable
+                onPress={toggle}
+                accessibilityRole="button"
+                style={({ pressed }) => ({ minHeight: 44, borderRadius: radius.round, backgroundColor: theme.color.primarySoft, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text variant="footnote" color={theme.color.primary}>Add today’s journal evidence</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
     );
   }
-
-  const toggle = () => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded((value) => !value);
-  };
 
   return (
     <View style={{ backgroundColor: theme.color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: theme.color.hairline, overflow: 'hidden' }}>
       <Pressable
-        onPress={toggle}
+        onPress={() => router.push('/urge-patterns')}
         accessibilityRole="button"
-          accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} ${trackLabel} pattern insights`}
-        accessibilityState={{ expanded }}
+        accessibilityLabel={`Open ${trackLabel} urge records`}
         style={({ pressed }) => ({
           minHeight: 56,
           flexDirection: 'row',
@@ -176,22 +213,15 @@ export function CheckInInsightsCard() {
           <Ionicons name="analytics" size={18} color={theme.color.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text variant="callout">Your {trackLabel} patterns</Text>
-          <Text variant="caption" dim>From journals and manually logged urges</Text>
+          <Text variant="callout">Your {trackLabel} urge records</Text>
+          <Text variant="caption" dim>
+            {recentManualUrges[0]
+              ? `Last urge ${new Date(recentManualUrges[0].at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · ${recentManualUrges[0].intensity}/10`
+              : 'No SOS or manually logged urges yet'}
+          </Text>
         </View>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={17} color={theme.color.textDim} />
+        <Ionicons name="chevron-forward" size={17} color={theme.color.textDim} />
       </Pressable>
-
-      <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          {recentKeys.map((key) => {
-            const mood = sampleByDate.get(key)?.mood;
-            return <Dot key={key} color={mood == null ? theme.color.hairline : moodColor(mood, theme)} />;
-          })}
-          <Text variant="caption" dim>{moodAverage == null ? 'Mood' : `${round1(moodAverage)}/10`}</Text>
-        </View>
-        <Text variant="caption" dim>{loggedCount}/7 days logged</Text>
-      </View>
 
       {expanded ? (
         <View style={{ borderTopWidth: 1, borderTopColor: theme.color.hairline, padding: spacing.md, gap: spacing.md }}>
@@ -222,6 +252,57 @@ export function CheckInInsightsCard() {
                   </View>
                 ))}
               </View>
+            </View>
+          ) : null}
+          {commonUrgeTime ? (
+            <MetricRow label="Most common urge time">
+              <Text variant="caption" color={theme.color.primary}>{commonUrgeTime}</Text>
+            </MetricRow>
+          ) : null}
+          {recentManualUrges.length ? (
+            <View style={{ gap: spacing.sm }}>
+              <Text variant="footnote" dim>Recent urge check-ins</Text>
+              {recentManualUrges.map((urge) => {
+                const triggers = urge.triggers?.length
+                  ? urge.triggers
+                  : urge.trigger
+                    ? [urge.trigger]
+                    : [];
+                return (
+                  <View
+                    key={urge.id}
+                    style={{
+                      borderRadius: radius.input,
+                      borderWidth: 1,
+                      borderColor: theme.color.hairline,
+                      backgroundColor: theme.color.bg,
+                      padding: spacing.sm,
+                      gap: spacing.xs,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="callout">{urge.intensity}/10 urge</Text>
+                        <Text variant="caption" dim>
+                          {new Date(urge.at).toLocaleString([], {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+                      {urge.mood != null ? (
+                        <Text variant="caption" color={theme.color.primary}>Mood {urge.mood}/10</Text>
+                      ) : null}
+                    </View>
+                    <Text variant="caption" dim>
+                      {triggers.length ? `Triggers: ${triggers.join(', ')}` : 'No trigger selected'}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           ) : null}
           <MetricRow label="Evidence days in the last week">

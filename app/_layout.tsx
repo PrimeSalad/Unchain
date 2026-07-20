@@ -188,6 +188,7 @@ export default function RootLayout() {
             <Stack.Screen name="checkin" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="journal-sequence" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="log-urge" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="urge-patterns" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="porn-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="alcohol-journal-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
