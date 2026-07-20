@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useNavigation, useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Screen } from '@/presentation/components/Screen';
@@ -108,7 +108,6 @@ function sameStrings(a: readonly string[], b: readonly string[]): boolean {
 export default function LogUrge() {
   const theme = useTheme();
   const router = useRouter();
-  const navigation = useNavigation();
   const params = useLocalSearchParams<RouteParams>();
   const safeBack = useSafeBack();
   const profile = useProfile();
@@ -169,8 +168,6 @@ export default function LogUrge() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const saveLock = useRef(false);
-  const allowClose = useRef(false);
-  const dismissalAlertOpen = useRef(false);
   const focusScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dirty = !committed && (
@@ -204,62 +201,10 @@ export default function LogUrge() {
   const level = urgeLevel(intensity);
 
   const closeWithoutPrompt = () => {
-    allowClose.current = true;
     safeBack();
   };
 
-  const confirmDiscard = (discard: () => void) => {
-    if (dismissalAlertOpen.current) return;
-    dismissalAlertOpen.current = true;
-    Alert.alert(
-      existing ? 'Discard urge changes?' : 'Discard this urge log?',
-      'Your unsaved answers will be lost.',
-      [
-        {
-          text: 'Keep editing',
-          style: 'cancel',
-          onPress: () => { dismissalAlertOpen.current = false; },
-        },
-        {
-          text: 'Discard',
-          style: 'destructive',
-          onPress: () => {
-            dismissalAlertOpen.current = false;
-            discard();
-          },
-        },
-      ],
-      { onDismiss: () => { dismissalAlertOpen.current = false; } },
-    );
-  };
-
-  const requestClose = () => {
-    if (dirty && !saved) {
-      confirmDiscard(closeWithoutPrompt);
-      return;
-    }
-    closeWithoutPrompt();
-  };
-
-  // When opened to view/edit an existing urge (e.g. from SOS), allow the
-  // first close so the swipe-to-dismiss gesture doesn't flash the discard
-  // alert before the user has had a chance to interact with the form.
-  useEffect(() => {
-    if (existing && !dirty) {
-      allowClose.current = true;
-    } else if (dirty) {
-      allowClose.current = false;
-    }
-  }, [existing, dirty]);
-
-  useEffect(() => navigation.addListener('beforeRemove', (event: any) => {
-    if (allowClose.current || !dirty || saved) return;
-    event.preventDefault();
-    confirmDiscard(() => {
-      allowClose.current = true;
-      navigation.dispatch(event.data.action);
-    });
-  }), [dirty, navigation, saved]);
+  const requestClose = closeWithoutPrompt;
 
   useEffect(() => {
     if (!saved) return;
@@ -341,7 +286,6 @@ export default function LogUrge() {
         }
         setCommitted(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        allowClose.current = true;
         safeBack();
         return;
       }
@@ -371,7 +315,6 @@ export default function LogUrge() {
   };
 
   const navigateAfterSave = (href: Href) => {
-    allowClose.current = true;
     router.replace(href);
   };
 
@@ -421,7 +364,6 @@ export default function LogUrge() {
         <Button
           label="Start a new urge log"
           onPress={() => {
-            allowClose.current = true;
             router.replace({
               pathname: '/log-urge',
               params: { track: profile.addictionType },
@@ -448,7 +390,6 @@ export default function LogUrge() {
         <Button
           label={`Finish ${addictionMeta(setupTarget).label} setup`}
           onPress={() => {
-            allowClose.current = true;
             router.replace(
               `/recovery-track-setup?mode=review&type=${encodeURIComponent(setupTarget)}` as Href,
             );
