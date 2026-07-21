@@ -43,18 +43,18 @@ export default function ShareAchievement() {
   const categoryLabel = gameAch ? GAME_NAMES[gameAch.game] : 'Healthy Habits';
   const unlockedGameCount = GAME_ACHIEVEMENTS.filter((a) => games.achievements[a.id]).length;
   const unlockedAt =
-    (gameAch ? games.achievements[gameAch.id] : altAchievements[achievement.id]) ?? Date.now();
+    (gameAch ? games.achievements[gameAch.id] : (altAchievements ?? {})[achievement.id]) ?? Date.now();
   const date = new Date(unlockedAt).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
 
   // Stats that make the card feel earned - per game, or habit totals.
   const stats: { label: string; value: string }[] = (() => {
     if (!gameAch) {
-      const counts = { ...altCounts, journal: journalCount };
+      const counts = { ...(altCounts ?? {}), journal: journalCount };
       const totalDone = ALTERNATIVES.reduce((sum, a) => sum + (counts[a.id] ?? 0), 0);
       return [
         { label: 'Activities done', value: `${totalDone}` },
         { label: 'Journal entries', value: `${journalCount}` },
-        { label: 'Habit badges', value: `${Object.keys(altAchievements).length}` },
+        { label: 'Habit badges', value: `${Object.keys(altAchievements ?? {}).length}` },
       ];
     }
     switch (gameAch.game) {
@@ -103,13 +103,23 @@ export default function ShareAchievement() {
     }
   })();
 
-  const summary = `Achievement unlocked: ${achievement.title} - ${categoryLabel} 🏆\n${achievement.desc}\nRecovering, one calm day at a time. - Unchainly`;
+  const summary = `Achievement unlocked: ${achievement?.title ?? 'Achievement'} - ${categoryLabel} 🏆\n${achievement?.desc ?? ''}\nRecovering, one calm day at a time. - Unchainly`;
 
   const shareImage = async () => {
+    if (busy) return;
     setPendingAction('share');
     try {
+      // Null-guard the ref before capture to avoid native crash on iOS.
+      if (!cardRef.current) {
+        await Share.share({ message: summary }).catch(() => {});
+        return;
+      }
       const uri = await captureShareRef(cardRef);
-      await shareCapturedContent({ uri: uri ?? '', summary, dialogTitle: 'Share your achievement' });
+      if (uri) {
+        await shareCapturedContent({ uri, summary, dialogTitle: 'Share your achievement' });
+      } else {
+        await Share.share({ message: summary }).catch(() => {});
+      }
     } catch {
       await Share.share({ message: summary }).catch(() => {});
     } finally {
@@ -118,14 +128,21 @@ export default function ShareAchievement() {
   };
 
   const saveImage = async () => {
+    if (busy) return;
     setPendingAction('save');
     try {
+      if (!cardRef.current) {
+        Alert.alert('Could not render image', 'The share card is not ready yet. Please try again.');
+        return;
+      }
       let result = await saveShareRefToPhotos(cardRef);
       if (!result.ok && (result.reason === 'capture-unavailable' || result.reason === 'failed')) {
         result = await saveSvgRefToPhotos(svgRef);
       }
       const message = saveToPhotosMessage(result);
       Alert.alert(message.title, message.message);
+    } catch {
+      Alert.alert('Save failed', 'The card could not be saved right now. Please try again.');
     } finally {
       setPendingAction(null);
     }
@@ -190,7 +207,7 @@ export default function ShareAchievement() {
                   }}
                 >
                   <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#E3B34C', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name={achievement.icon as keyof typeof Ionicons.glyphMap} size={44} color="#FFFFFF" />
+                    <Ionicons name={(achievement.icon ?? 'trophy') as keyof typeof Ionicons.glyphMap} size={44} color="#FFFFFF" />
                   </View>
                 </View>
                 <Text variant="caption" color="rgba(255,255,255,0.8)" style={{ marginTop: spacing.lg, letterSpacing: 2, textTransform: 'uppercase' }}>
