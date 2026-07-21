@@ -207,10 +207,19 @@ export default function ShareActivity() {
     `Day ${streak} of recovery, one calm choice at a time. - Unchainly`;
 
   const shareImage = async () => {
+    if (busy) return;
     setPendingAction('share');
     try {
+      if (!cardRef.current) {
+        await Share.share({ message: summary }).catch(() => {});
+        return;
+      }
       const uri = await captureShareRef(cardRef);
-      await shareCapturedContent({ uri: uri ?? '', summary, dialogTitle: 'Share your session' });
+      if (uri) {
+        await shareCapturedContent({ uri, summary, dialogTitle: 'Share your session' });
+      } else {
+        await Share.share({ message: summary }).catch(() => {});
+      }
     } catch {
       await Share.share({ message: summary }).catch(() => {});
     } finally {
@@ -219,14 +228,21 @@ export default function ShareActivity() {
   };
 
   const saveImage = async () => {
+    if (busy) return;
     setPendingAction('save');
     try {
+      if (!cardRef.current) {
+        Alert.alert('Could not render image', 'The share card is not ready yet. Please try again.');
+        return;
+      }
       let result = await saveShareRefToPhotos(cardRef);
       if (!result.ok && (result.reason === 'capture-unavailable' || result.reason === 'failed')) {
         result = await saveSvgRefToPhotos(svgRef);
       }
       const message = saveToPhotosMessage(result);
       Alert.alert(message.title, message.message);
+    } catch {
+      Alert.alert('Save failed', 'The card could not be saved right now. Please try again.');
     } finally {
       setPendingAction(null);
     }

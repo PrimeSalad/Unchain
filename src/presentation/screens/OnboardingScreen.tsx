@@ -206,7 +206,9 @@ export function OnboardingScreen() {
           }
           completedRef.current = true;
           AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY).catch(() => {});
-          router.replace('/disclaimer');
+          // Give Zustand persist middleware time to flush to AsyncStorage
+          // before navigating, so the home screen rehydrates from fresh data.
+          setTimeout(() => router.replace('/disclaimer'), 200);
           return true;
         }}
       />
