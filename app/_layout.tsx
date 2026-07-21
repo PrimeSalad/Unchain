@@ -38,8 +38,8 @@ function ThemedStatusBar() {
 /**
  * Wait for the persisted store to rehydrate from AsyncStorage before any
  * route renders. Without this gate, app/index.tsx reads `onboarded` while it
- * is still the default `false` and cold launches race returning users onto
- * the onboarding screen. The splash stays up during the (brief) wait.
+ * is still the default `false` and cold launches redirecting users onto the
+ * onboarding screen. The splash stays up during the (brief) wait.
  */
 function useStoreHydrated(): boolean {
   const [hydrated, setHydrated] = useState(() => useStore.persist.hasHydrated());
@@ -49,7 +49,7 @@ function useStoreHydrated(): boolean {
       return;
     }
     const unsub = useStore.persist.onFinishHydration(() => setHydrated(true));
-    // Corrupt/blocked browser storage must not leave the root returning null
+    // Corrupt/blocked browser storage must not leave the root returning null]
     // forever. Native hydration normally completes long before this fallback.
     const fallback = setTimeout(() => setHydrated(true), 5000);
     return () => {
@@ -180,7 +180,7 @@ export default function RootLayout() {
               name="mindful-pause"
               options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }}
             />
-            <Stack.Screen name="celebrate" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+            <Stack.Screen name="celebrate" options={{ presentation: 'fullScreenModal', animation: 'fade', animationForReplace: 'none' }} />
             <Stack.Screen name="alternatives" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="need-or-want" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="need-or-want-flow" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
