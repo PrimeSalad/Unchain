@@ -26,8 +26,7 @@ export default function Disclaimer() {
   const handleAccept = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     acceptDisclaimer();
-    // index.tsx auto-redirects to /(tabs)/home once disclaimerAccepted is true.
-    // Do NOT router.replace here — it causes a double-navigation flicker.
+    router.replace('/celebrate');
   };
 
   return (
