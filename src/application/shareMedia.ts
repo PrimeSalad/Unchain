@@ -38,10 +38,15 @@ export async function writePngBase64ToCache(base64: string, fileName = 'unchainl
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([promise, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
+}
+
 export async function captureShareRef(ref: RefObject<View | null>): Promise<string | null> {
   try {
     const { captureRef } = await import('react-native-view-shot');
-    const base64 = await captureRef(ref, { format: 'png', quality: 1, result: 'base64' });
+    const base64 = await withTimeout(captureRef(ref, { format: 'png', quality: 1, result: 'base64' }), 10000);
+    if (!base64) return null;
     return await writePngBase64ToCache(base64);
   } catch {
     return null;
@@ -52,8 +57,8 @@ export async function shareCapturedContent({ uri, summary, dialogTitle, mimeType
   try {
     if (uri) {
       const Sharing = await import('expo-sharing');
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType, dialogTitle });
+      if (await withTimeout(Sharing.isAvailableAsync(), 5000)) {
+        await withTimeout(Sharing.shareAsync(uri, { mimeType, dialogTitle }), 15000);
         return;
       }
     }
