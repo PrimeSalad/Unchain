@@ -16,7 +16,7 @@ export function StatTile({ value, label, emoji, tone = 'surface' }: StatTileProp
     <Card tone={tone} padding={spacing.md} style={{ flex: 1 }}>
       {emoji ? <Text style={{ fontSize: 20, marginBottom: spacing.xs }}>{emoji}</Text> : null}
       <View accessibilityRole="text" accessibilityLabel={`${value} ${label}`}>
-        <Text variant="headline" style={{ fontVariant: ['tabular-nums'], fontSize: 18, lineHeight: 23 }}>
+        <Text variant="headline" numberOfLines={1} adjustsFontSizeToFit style={{ fontVariant: ['tabular-nums'], fontSize: 18, lineHeight: 23 }}>
           {value}
         </Text>
         <Text variant="footnote" dim style={{ marginTop: 2 }}>

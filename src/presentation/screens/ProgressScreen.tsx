@@ -19,6 +19,7 @@ import {
   currentStreakStart,
   journalMoneyStats,
   formatMoney,
+  formatMoneyOrDash,
   formatMoneyInput,
   parseMoneyInput,
   nextMilestone,
@@ -329,7 +330,7 @@ export function ProgressScreen() {
           label="Weekly trend (avg/day)"
           value={
             moneyStats.weeklyTrend != null
-              ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency)
+              ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoneyOrDash(moneyStats.weeklyTrend, currency)
               : '-'
           }
         />
@@ -337,7 +338,7 @@ export function ProgressScreen() {
           label="Monthly trend (avg/day)"
           value={
             moneyStats.monthlyTrend != null
-              ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency)
+              ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoneyOrDash(moneyStats.monthlyTrend, currency)
               : '-'
           }
         />

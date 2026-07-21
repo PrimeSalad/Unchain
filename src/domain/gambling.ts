@@ -381,6 +381,14 @@ export function formatMoney(amount: number, currency = DEFAULT_CURRENCY): string
   return (n < 0 ? '-' : '') + currency + Math.abs(n).toLocaleString('en-PH');
 }
 
+/** Like formatMoney but returns '-' when the amount is exactly 0. */
+export function formatMoneyOrDash(amount: number | null, currency = DEFAULT_CURRENCY): string {
+  if (amount == null) return '-';
+  const n = Math.round(amount);
+  if (n === 0) return '-';
+  return (n < 0 ? '-' : '') + currency + Math.abs(n).toLocaleString('en-PH');
+}
+
 // ---------------------------------------------------------------------------
 // Journal-based financial stats
 //

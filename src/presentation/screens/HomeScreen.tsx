@@ -26,6 +26,7 @@ import {
   nextMilestone,
   journalMoneyStats,
   formatMoney,
+  formatMoneyOrDash,
   milestoneCrossed,
   recoveryFreeLabel,
   addictionMeta,
@@ -331,7 +332,7 @@ export function HomeScreen() {
                 <StatTile
                   value={
                     moneyStats.weeklyTrend != null
-                      ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.weeklyTrend, currency) + '/day'
+                      ? (moneyStats.weeklyTrend >= 0 ? '+' : '') + formatMoneyOrDash(moneyStats.weeklyTrend, currency) + '/day'
                       : '-'
                   }
                   label="Weekly Trend"
@@ -339,7 +340,7 @@ export function HomeScreen() {
                 <StatTile
                   value={
                     moneyStats.monthlyTrend != null
-                      ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoney(moneyStats.monthlyTrend, currency) + '/day'
+                      ? (moneyStats.monthlyTrend >= 0 ? '+' : '') + formatMoneyOrDash(moneyStats.monthlyTrend, currency) + '/day'
                       : '-'
                   }
                   label="Monthly Trend"
