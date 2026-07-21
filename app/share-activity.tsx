@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Pressable, Share, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -81,6 +81,7 @@ const BREATH_CYCLE_SECONDS = 12;
 /** Strava-style share card for a just-finished Healthy Alternative session. */
 export default function ShareActivity() {
   const safeBack = useSafeBack();
+  const insets = useSafeAreaInsets();
   const theme = useTheme();
   const params = useLocalSearchParams<{
     id?: string;
@@ -245,9 +246,9 @@ export default function ShareActivity() {
         stats={stats}
         footer={`Day ${streak} of recovery · ${dateStr}`}
       />
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
         {/* Top bar */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: insets.top + spacing.sm }}>
           <Text variant="title2" style={{ flex: 1 }}>Share your session</Text>
           <Pressable onPress={safeBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
             <Ionicons name="close" size={26} color={theme.color.textDim} />
