@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useStore } from '@/application/store';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   useAnimatedStyle,
@@ -49,7 +50,12 @@ export default function Celebrate() {
     transform: [{ scale: 0.6 + burst.value * 1.4 }],
     opacity: 0.5 * (1 - burst.value * 0.7),
   }));
-  const done = () => router.replace('/(tabs)/home');
+  const pushTimeline = useStore((s) => s.pushTimeline);
+  const done = () => {
+    // Log a milestone entry so the home screen doesn't trigger a second celebration.
+    if (title) pushTimeline('milestone', title);
+    router.replace('/(tabs)/home');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.grapeDeep }}>
