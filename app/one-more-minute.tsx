@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
+import { BackHandler, Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -100,6 +100,7 @@ export default function PomodoroTimer() {
   const [completedToday, setCompletedToday] = useState(stats.todaySessions);
   const [showCelebration, setShowCelebration] = useState(false);
   const [unlockedAchievements, setUnlockedAchievements] = useState<OneMoreMinuteAchievement[]>([]);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const endAtRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -139,6 +140,16 @@ export default function PomodoroTimer() {
     }
     messageRef.current = setInterval(() => setMessage(randomMotivationalMessage()), 90_000);
     return () => { if (messageRef.current) clearInterval(messageRef.current); };
+  }, [phase]);
+
+  // Android hardware back button - show confirmation when timer is running
+  useEffect(() => {
+    if (phase !== 'running' && phase !== 'paused') return;
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      setShowExitConfirm(true);
+      return true; // prevent default back
+    });
+    return () => handler.remove();
   }, [phase]);
 
   const startSession = () => {
@@ -308,7 +319,7 @@ export default function PomodoroTimer() {
       <Screen edges={['top', 'bottom']} scroll={false}>
         <View style={{ flex: 1, justifyContent: 'space-between', paddingTop: spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 48 }}>
-            <Pressable onPress={cancel} hitSlop={12} accessibilityRole="button" accessibilityLabel="Reset timer"
+            <Pressable onPress={() => setShowExitConfirm(true)} hitSlop={12} accessibilityRole="button" accessibilityLabel="Reset timer"
               style={({ pressed }) => ({ width: 44, height: 44, borderRadius: radius.round, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.hairline, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
               <Ionicons name="chevron-back" size={22} color={theme.color.primary} />
             </Pressable>
@@ -356,9 +367,42 @@ export default function PomodoroTimer() {
             ) : (
               <Button label="Resume" onPress={resume} full />
             )}
-            <Button label="Reset timer" kind="tertiary" onPress={cancel} full />
+            <Button label="Reset timer" kind="tertiary" onPress={() => setShowExitConfirm(true)} full />
           </View>
         </View>
+
+        {/* Exit confirmation modal */}
+        <Modal visible={showExitConfirm} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setShowExitConfirm(false)}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 32 }}>
+            <View style={{
+              backgroundColor: theme.color.surface,
+              borderRadius: radius.card,
+              padding: spacing.xl,
+              alignItems: 'center',
+              gap: spacing.md,
+              maxWidth: 320,
+              width: '100%',
+            }}>
+              <View style={{
+                width: 56, height: 56, borderRadius: 28,
+                backgroundColor: theme.color.accentSoft,
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="warning" size={28} color={theme.color.accentText} />
+              </View>
+              <Text variant="headline" center style={{ fontFamily: 'Nunito_800ExtraBold' }}>
+                Leave session?
+              </Text>
+              <Text variant="footnote" dim center style={{ lineHeight: 20 }}>
+                Your {modeMeta.label.toLowerCase()} timer is still running. If you leave now, the session won't count toward your progress.
+              </Text>
+              <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.sm }}>
+                <Button label="Keep focusing" onPress={() => setShowExitConfirm(false)} full />
+                <Button label="End session" kind="tertiary" onPress={() => { setShowExitConfirm(false); cancel(); }} full />
+              </View>
+            </View>
+          </View>
+        </Modal>
       </Screen>
     );
   }
