@@ -210,20 +210,12 @@ export default function ShareActivity() {
     if (busy) return;
     setPendingAction('share');
     try {
-      if (!cardRef.current) {
-        await Share.share({ message: summary }).catch(() => {});
-        return;
-      }
-      const uri = await captureShareRef(cardRef);
-      if (uri) {
-        await shareCapturedContent({ uri, summary, dialogTitle: 'Share your session' });
-      } else {
-        await Share.share({ message: summary }).catch(() => {});
-      }
-    } catch {
       await Share.share({ message: summary }).catch(() => {});
+    } catch {
+      // Share failed silently
     } finally {
-      setPendingAction(null);
+      // Delay to prevent freeze from rapid state change while share sheet is up
+      setTimeout(() => setPendingAction(null), 300);
     }
   };
 

@@ -110,21 +110,11 @@ export default function ShareAchievement() {
     if (busy) return;
     setPendingAction('share');
     try {
-      // Null-guard the ref before capture to avoid native crash on iOS.
-      if (!cardRef.current) {
-        await Share.share({ message: summary }).catch(() => {});
-        return;
-      }
-      const uri = await captureShareRef(cardRef);
-      if (uri) {
-        await shareCapturedContent({ uri, summary, dialogTitle: 'Share your achievement' });
-      } else {
-        await Share.share({ message: summary }).catch(() => {});
-      }
-    } catch {
       await Share.share({ message: summary }).catch(() => {});
+    } catch {
+      // Share failed silently
     } finally {
-      setPendingAction(null);
+      setTimeout(() => setPendingAction(null), 300);
     }
   };
 
