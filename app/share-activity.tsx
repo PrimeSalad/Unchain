@@ -62,6 +62,7 @@ const HERO_LABEL: Record<AlternativeId, string> = {
   'back-on-track': 'Back on Track',
   'where-did-it-go': 'Where Did It Go?',
   'beyond-the-screen': 'Beyond the Screen',
+  'press-pause': 'Press Pause',
 };
 
 const TAGLINE: Record<AlternativeId, string> = {
@@ -77,6 +78,7 @@ const TAGLINE: Record<AlternativeId, string> = {
   'back-on-track': 'Every check-in is a step forward in recovery.',
   'where-did-it-go': 'Small financial choices build lasting habits.',
   'beyond-the-screen': 'Life beyond the screen is where real connection happens.',
+  'press-pause': 'Balance is a practice, not a destination.',
 };
 
 // Full breathing cycle: inhale 4s + hold 2s + exhale 6s.

@@ -23,6 +23,7 @@ import { cancelCheersToChangeReminders, scheduleCheersToChangeReminder } from '@
 import { cancelBackOnTrackReminders, scheduleBackOnTrackReminder } from '@/application/backOnTrackReminder';
 import { cancelWhereDidItGoReminders, scheduleWhereDidItGoReminder } from '@/application/whereDidItGoReminder';
 import { cancelBeyondTheScreenReminders, scheduleBeyondTheScreenReminder } from '@/application/beyondTheScreenReminder';
+import { cancelPressPauseReminders, schedulePressPauseReminder } from '@/application/pressPauseReminder';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -164,6 +165,15 @@ export default function RootLayout() {
       : cancelBeyondTheScreenReminders();
     sync.catch(() => {});
   }, [activeAddiction, lastBeyondTheScreenAt]);
+
+  // ── Press Pause weekly reminder ───────────────────────────────────────
+  const lastPressPauseAt = useStore((s) => s.lastPressPauseAt);
+  useEffect(() => {
+    const sync = activeAddiction === 'gaming'
+      ? schedulePressPauseReminder(lastPressPauseAt)
+      : cancelPressPauseReminders();
+    sync.catch(() => {});
+  }, [activeAddiction, lastPressPauseAt]);
 
   if (!ready) {
     // iOS keeps the native splash visible. Web has no equivalent guarantee,

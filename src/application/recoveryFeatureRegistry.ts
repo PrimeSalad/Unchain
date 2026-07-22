@@ -21,6 +21,7 @@ export const RECOVERY_FEATURES = {
   'back-on-track': { id: 'back-on-track', title: 'Back on Track', subtitle: 'Weekly recovery reflection', icon: 'trending-up', route: '/back-on-track', scope: 'track', release: 'stable', cadence: 'weekly' },
   'where-did-it-go': { id: 'where-did-it-go', title: 'Where Did It Go?', subtitle: 'Weekly financial reflection', icon: 'wallet', route: '/where-did-it-go', scope: 'track', release: 'stable', cadence: 'weekly' },
   'beyond-the-screen': { id: 'beyond-the-screen', title: 'Beyond the Screen', subtitle: 'Weekly well-being reflection', icon: 'eye', route: '/beyond-the-screen', scope: 'track', release: 'stable', cadence: 'weekly' },
+  'press-pause': { id: 'press-pause', title: 'Press Pause', subtitle: 'Weekly balance reflection', icon: 'pause', route: '/press-pause', scope: 'track', release: 'stable', cadence: 'weekly' },
   'bet-breaker': { id: 'bet-breaker', title: 'Bet Breaker', subtitle: 'Pause an intended bet', icon: 'pause-circle', route: '/recovery-plan', scope: 'track', release: 'internal' },
   'private-shield': { id: 'private-shield', title: 'Private Shield Plan', subtitle: 'Plan for a risky window', icon: 'shield-checkmark', route: '/recovery-plan', scope: 'track', release: 'internal' },
   'scroll-reclaim': { id: 'scroll-reclaim', title: 'Scroll Reclaim', subtitle: 'Set an intentional stop time', icon: 'timer', route: '/recovery-plan', scope: 'track', release: 'internal' },

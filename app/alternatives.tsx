@@ -1578,6 +1578,7 @@ export default function Alternatives() {
   const isDrugs = profile?.addictionType === 'drugs';
   const isGambling = profile?.addictionType === 'gambling';
   const isPornography = profile?.addictionType === 'pornography';
+  const isGaming = profile?.addictionType === 'gaming';
 
   /** Only show 'need-or-want' if the user selected online shopping addiction. */
   const needOrWantAlt = isOnlineShopping ? ALTERNATIVES.find((a) => a.id === 'need-or-want') ?? null : null;
@@ -1591,7 +1592,9 @@ export default function Alternatives() {
   const whereDidItGoAlt = isGambling ? ALTERNATIVES.find((a) => a.id === 'where-did-it-go') ?? null : null;
   /** Only show 'beyond-the-screen' if the user selected pornography addiction. */
   const beyondTheScreenAlt = isPornography ? ALTERNATIVES.find((a) => a.id === 'beyond-the-screen') ?? null : null;
-  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want' && a.id !== 'catch-your-breath' && a.id !== 'cheers-to-change' && a.id !== 'back-on-track' && a.id !== 'where-did-it-go' && a.id !== 'beyond-the-screen');
+  /** Only show 'press-pause' if the user selected gaming addiction. */
+  const pressPauseAlt = isGaming ? ALTERNATIVES.find((a) => a.id === 'press-pause') ?? null : null;
+  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want' && a.id !== 'catch-your-breath' && a.id !== 'cheers-to-change' && a.id !== 'back-on-track' && a.id !== 'where-did-it-go' && a.id !== 'beyond-the-screen' && a.id !== 'press-pause');
 
   const isDone = (id: AlternativeId): boolean =>
     id === 'journal'
@@ -1607,8 +1610,10 @@ export default function Alternatives() {
               : id === 'where-did-it-go'
                 ? false
                 : id === 'beyond-the-screen'
-                ? false
-                : completions[id] != null && sameDay(completions[id]!, Date.now());
+                  ? false
+                  : id === 'press-pause'
+                    ? false
+                    : completions[id] != null && sameDay(completions[id]!, Date.now());
 
   const doneAt = (id: AlternativeId): number | undefined =>
     id === 'journal' ? todayJournal?.at : completions[id];
@@ -1769,6 +1774,18 @@ export default function Alternatives() {
             index={visibleAlternatives.length + 4}
             done={false}
             onPress={() => router.push('/beyond-the-screen-log')}
+          />
+        </View>
+      )}
+
+      {/* ── Press Pause — weekly balance reflection (gaming only) ── */}
+      {pressPauseAlt && (
+        <View style={{ marginBottom: spacing.lg }}>
+          <ActivityCard
+            alt={pressPauseAlt}
+            index={visibleAlternatives.length + 5}
+            done={false}
+            onPress={() => router.push('/press-pause-log')}
           />
         </View>
       )}
