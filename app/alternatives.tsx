@@ -1577,6 +1577,7 @@ export default function Alternatives() {
   const isAlcohol = profile?.addictionType === 'alcohol';
   const isDrugs = profile?.addictionType === 'drugs';
   const isGambling = profile?.addictionType === 'gambling';
+  const isPornography = profile?.addictionType === 'pornography';
 
   /** Only show 'need-or-want' if the user selected online shopping addiction. */
   const needOrWantAlt = isOnlineShopping ? ALTERNATIVES.find((a) => a.id === 'need-or-want') ?? null : null;
@@ -1588,7 +1589,9 @@ export default function Alternatives() {
   const backOnTrackAlt = isDrugs ? ALTERNATIVES.find((a) => a.id === 'back-on-track') ?? null : null;
   /** Only show 'where-did-it-go' if the user selected gambling addiction. */
   const whereDidItGoAlt = isGambling ? ALTERNATIVES.find((a) => a.id === 'where-did-it-go') ?? null : null;
-  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want' && a.id !== 'catch-your-breath' && a.id !== 'cheers-to-change' && a.id !== 'back-on-track' && a.id !== 'where-did-it-go');
+  /** Only show 'beyond-the-screen' if the user selected pornography addiction. */
+  const beyondTheScreenAlt = isPornography ? ALTERNATIVES.find((a) => a.id === 'beyond-the-screen') ?? null : null;
+  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want' && a.id !== 'catch-your-breath' && a.id !== 'cheers-to-change' && a.id !== 'back-on-track' && a.id !== 'where-did-it-go' && a.id !== 'beyond-the-screen');
 
   const isDone = (id: AlternativeId): boolean =>
     id === 'journal'
@@ -1602,6 +1605,8 @@ export default function Alternatives() {
             : id === 'back-on-track'
               ? false
               : id === 'where-did-it-go'
+                ? false
+                : id === 'beyond-the-screen'
                 ? false
                 : completions[id] != null && sameDay(completions[id]!, Date.now());
 
@@ -1752,6 +1757,18 @@ export default function Alternatives() {
             index={visibleAlternatives.length + 3}
             done={false}
             onPress={() => router.push('/where-did-it-go-log')}
+          />
+        </View>
+      )}
+
+      {/* ── Beyond the Screen — weekly well-being reflection (pornography only) ── */}
+      {beyondTheScreenAlt && (
+        <View style={{ marginBottom: spacing.lg }}>
+          <ActivityCard
+            alt={beyondTheScreenAlt}
+            index={visibleAlternatives.length + 4}
+            done={false}
+            onPress={() => router.push('/beyond-the-screen-log')}
           />
         </View>
       )}

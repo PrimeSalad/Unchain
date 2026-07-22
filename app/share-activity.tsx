@@ -61,6 +61,7 @@ const HERO_LABEL: Record<AlternativeId, string> = {
   'cheers-to-change': 'Cheers to Change',
   'back-on-track': 'Back on Track',
   'where-did-it-go': 'Where Did It Go?',
+  'beyond-the-screen': 'Beyond the Screen',
 };
 
 const TAGLINE: Record<AlternativeId, string> = {
@@ -75,6 +76,7 @@ const TAGLINE: Record<AlternativeId, string> = {
   'cheers-to-change': 'Every step forward in recovery matters.',
   'back-on-track': 'Every check-in is a step forward in recovery.',
   'where-did-it-go': 'Small financial choices build lasting habits.',
+  'beyond-the-screen': 'Life beyond the screen is where real connection happens.',
 };
 
 // Full breathing cycle: inhale 4s + hold 2s + exhale 6s.

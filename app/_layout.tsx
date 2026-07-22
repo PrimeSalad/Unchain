@@ -22,6 +22,7 @@ import { cancelCatchYourBreathReminders, scheduleCatchYourBreathReminder } from 
 import { cancelCheersToChangeReminders, scheduleCheersToChangeReminder } from '@/application/cheersToChangeReminder';
 import { cancelBackOnTrackReminders, scheduleBackOnTrackReminder } from '@/application/backOnTrackReminder';
 import { cancelWhereDidItGoReminders, scheduleWhereDidItGoReminder } from '@/application/whereDidItGoReminder';
+import { cancelBeyondTheScreenReminders, scheduleBeyondTheScreenReminder } from '@/application/beyondTheScreenReminder';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -154,6 +155,15 @@ export default function RootLayout() {
       : cancelWhereDidItGoReminders();
     sync.catch(() => {});
   }, [activeAddiction, lastWhereDidItGoAt]);
+
+  // ── Beyond the Screen weekly reminder ─────────────────────────────────
+  const lastBeyondTheScreenAt = useStore((s) => s.lastBeyondTheScreenAt);
+  useEffect(() => {
+    const sync = activeAddiction === 'pornography'
+      ? scheduleBeyondTheScreenReminder(lastBeyondTheScreenAt)
+      : cancelBeyondTheScreenReminders();
+    sync.catch(() => {});
+  }, [activeAddiction, lastBeyondTheScreenAt]);
 
   if (!ready) {
     // iOS keeps the native splash visible. Web has no equivalent guarantee,

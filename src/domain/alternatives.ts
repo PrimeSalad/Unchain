@@ -16,7 +16,8 @@ export type AlternativeId =
   | 'catch-your-breath'
   | 'cheers-to-change'
   | 'back-on-track'
-  | 'where-did-it-go';
+  | 'where-did-it-go'
+  | 'beyond-the-screen';
 
 export interface Alternative {
   id: AlternativeId;
@@ -40,6 +41,7 @@ export const ALTERNATIVES: Alternative[] = [
   { id: 'cheers-to-change', title: 'Cheers to Change',     subtitle: 'Weekly body wellness reflection',      icon: 'wine',                 tint: 'success' },
   { id: 'back-on-track', title: 'Back on Track',          subtitle: 'Weekly recovery check-in',             icon: 'trending-up',          tint: 'primary' },
   { id: 'where-did-it-go', title: 'Where Did It Go?',    subtitle: 'Weekly financial reflection',          icon: 'wallet',               tint: 'primary' },
+  { id: 'beyond-the-screen', title: 'Beyond the Screen', subtitle: 'Weekly well-being reflection',         icon: 'eye',                  tint: 'primary' },
 ];
 
 export function alternativeById(id: AlternativeId): Alternative {
@@ -144,6 +146,8 @@ export const ALT_ACHIEVEMENTS: AltAchievement[] = [
     desc: 'Complete 5 Back on Track reflections.', ...countOf('back-on-track', 5) },
   { id: 'alt-where-did-it-go-5', title: 'Financial Tracker', icon: 'wallet',
     desc: 'Complete 5 Where Did It Go? reflections.', ...countOf('where-did-it-go', 5) },
+  { id: 'alt-beyond-the-screen-5', title: 'Life Beyond', icon: 'eye',
+    desc: 'Complete 5 Beyond the Screen reflections.', ...countOf('beyond-the-screen', 5) },
 ];
 
 export function altAchievementById(id: string): AltAchievement | undefined {

@@ -45,6 +45,8 @@ import type { BackOnTrackEntry } from '@/domain/backOnTrack';
 import { backOnTrackAvailability } from '@/domain/backOnTrack';
 import type { WhereDidItGoEntry } from '@/domain/whereDidItGo';
 import { whereDidItGoAvailability } from '@/domain/whereDidItGo';
+import type { BeyondTheScreenEntry } from '@/domain/beyondTheScreen';
+import { beyondTheScreenAvailability } from '@/domain/beyondTheScreen';
 import type { OneMoreMinuteSession } from '@/domain/oneMoreMinute';
 import { computeStats as computeOmmStats, evaluateOmmAchievements } from '@/domain/oneMoreMinute';
 import type { FoodEntry, WaterEntry, FastingSession, NutritionGoals } from '@/domain/fuelYourRecovery';
@@ -117,7 +119,7 @@ export interface GamesState {
   /** Daily-challenge completion day per game (challengeDayNumber), so each
    *  game's challenge can only pay out once per local day. */
   challengeDoneDay: Record<string, number>;
-  /** Permanently unlocked game achievements: id â†’ unlockedAt (ms). */
+  /** Permanently unlocked game achievements: id ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ unlockedAt (ms). */
   achievements: Record<string, number>;
   /** Games whose "How to play" popup the user opted out of ("Don't show
    *  this again"). The header info button always re-opens it on demand. */
@@ -184,6 +186,12 @@ export interface AddictionRecoverySnapshot {
   lastBackOnTrackAt: number | null;
   whereDidItGoEntries: WhereDidItGoEntry[];
   lastWhereDidItGoAt: number | null;
+
+  // â”€â”€ Beyond the Screen (pornography-only weekly reflection) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  /** All weekly well-being reflection entries, newest first. */
+  beyondTheScreenEntries: BeyondTheScreenEntry[];
+  /** Timestamp of the last completed assessment. null = never completed. */
+  lastBeyondTheScreenAt: number | null;
   lastCheckedIn: number | null;
   urgesResisted: number;
   urgesResistedWeek: number;
@@ -229,14 +237,14 @@ export interface RecoveryState {
   games: GamesState;
   themePref: ThemePref;
 
-  // â”€â”€ Healthy Alternatives â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Healthy Alternatives ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** Last completion timestamp per activity. "Done today" = sameDay(ts, now),
    *  so state resets automatically at local midnight without a scheduler. */
   alternatives: Partial<Record<AlternativeId, number>>;
   /** Lifetime completion counts (one per activity per day) - powers the
    *  healthy-habit achievements. `journal` is derived, not stored here. */
   altCounts: AltCounts;
-  /** Permanently unlocked habit achievements: id â†’ unlockedAt (ms). */
+  /** Permanently unlocked habit achievements: id ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ unlockedAt (ms). */
   altAchievements: Record<string, number>;
   /** Lifetime seconds spent per timed activity - powers the Strava-style
    *  session share cards. Every session adds, including same-day repeats. */
@@ -253,42 +261,48 @@ export interface RecoveryState {
   /** Need or Want? cooldown - timestamp when the 24-hour cooldown started.
    *  null means no active cooldown. Persists across app restarts. */
   needOrWantCooldown: number | null;
-  /** All need-or-want entries â€” the item, reflections, and outcome. */
+  /** All need-or-want entries ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the item, reflections, and outcome. */
   needOrWantEntries: NeedOrWantEntry[];
   /** Active need-or-want entry id during cooldown (so follow-up can load it). */
   activeNeedOrWantId: string | null;
 
-  // â”€â”€ Catch Your Breath (smoking-only weekly reflection) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Catch Your Breath (smoking-only weekly reflection) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** All weekly lung health assessment entries, newest first. */
   catchYourBreathEntries: CatchYourBreathEntry[];
   /** Timestamp of the last completed assessment. null = never completed. */
   lastCatchYourBreathAt: number | null;
 
-  // â”€â”€ Cheers to Change (alcohol-only weekly reflection) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Cheers to Change (alcohol-only weekly reflection) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** All weekly wellness assessment entries, newest first. */
   cheersToChangeEntries: CheersToChangeEntry[];
   /** Timestamp of the last completed assessment. null = never completed. */
   lastCheersToChangeAt: number | null;
 
-  // â”€â”€ Back on Track (drug/substance-only weekly reflection) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Back on Track (drug/substance-only weekly reflection) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** All weekly recovery check-in entries, newest first. */
   backOnTrackEntries: BackOnTrackEntry[];
   /** Timestamp of the last completed assessment. null = never completed. */
   lastBackOnTrackAt: number | null;
 
-  // â”€â”€ Where Did It Go? (gambling-only weekly financial reflection) â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Where Did It Go? (gambling-only weekly financial reflection) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** All weekly financial reflection entries, newest first. */
   whereDidItGoEntries: WhereDidItGoEntry[];
   /** Timestamp of the last completed assessment. null = never completed. */
   lastWhereDidItGoAt: number | null;
 
-  // â”€â”€ One More Minute (universal recovery timer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ Beyond the Screen (pornography-only weekly reflection) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  /** All weekly well-being reflection entries, newest first. */
+  beyondTheScreenEntries: BeyondTheScreenEntry[];
+  /** Timestamp of the last completed assessment. null = never completed. */
+  lastBeyondTheScreenAt: number | null;
+
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ One More Minute (universal recovery timer) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** All timer sessions (history). */
   ommSessions: OneMoreMinuteSession[];
-  /** Permanently unlocked OMM achievements: id â†’ unlockedAt (ms). */
+  /** Permanently unlocked OMM achievements: id ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ unlockedAt (ms). */
   ommAchievements: Record<string, number>;
 
-  // â”€â”€ Fuel Your Recovery (universal nutrition companion) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Fuel Your Recovery (universal nutrition companion) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** All food entries (history). */
   fuelFoodEntries: FoodEntry[];
   /** All water entries (history). */
@@ -299,17 +313,17 @@ export interface RecoveryState {
   fuelGoals: NutritionGoals;
   /** Whether the user has completed the body info setup (BMI, lifestyle). */
   fuelBodyInfoSet: boolean;
-  /** Permanently unlocked Fuel achievements: id â†’ unlockedAt (ms). */
+  /** Permanently unlocked Fuel achievements: id ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ unlockedAt (ms). */
   fuelAchievements: Record<string, number>;
 
-  // â”€â”€ Porn Recovery Metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Porn Recovery Metrics ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   lastCheckedIn: number | null;
   urgesResisted: number;
   urgesResistedWeek: number;
   healthyHabitsCount: number;
   updateLastCheckedIn: () => void;
 
-  // â”€â”€ Education Hub â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Education Hub ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** Bookmarked guide/resource ids. */
   eduBookmarks: string[];
   /** Reading progress per built-in guide: fraction read + scroll offset so
@@ -320,20 +334,20 @@ export interface RecoveryState {
   toggleEduBookmark: (id: string) => void;
   setEduProgress: (guideId: string, pct: number, offset: number) => void;
 
-  // â”€â”€ Focus Protection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Focus Protection ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** The user's permanent blocklist - every entry added explicitly by them,
    *  protected until manually removed. No timers, no expiry. Stored locally
    *  only; never uploaded, never auto-populated. */
   blockedSites: BlockedSite[];
 
-  // â”€â”€ Daily Missions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Daily Missions ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** Today's mission completion state. Resets automatically on a new local
    *  calendar day (checked on every completeMission call and on hydration). */
   dailyMissions: DailyMissionState;
   /** Lifetime XP accumulated from missions. Powers the level system. */
   missionXp: number;
 
-  // â”€â”€ Recovery Motivation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Recovery Motivation ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   /** Quotes the user has hearted. Survive restarts/updates via persistence. */
   favoriteQuotes: FavoriteQuote[];
   /** Today's quote - same all day, rotates once per local calendar day. */
@@ -383,7 +397,7 @@ export interface RecoveryState {
   recordAltSession: (id: AlternativeId, seconds: number) => void;
   /** Add a finished walk's steps + metres to the lifetime totals. */
   recordWalkMetrics: (steps: number, meters: number) => void;
-  /** Log glasses of water for today (clamped 1â€“24 per log). Returns today's
+  /** Log glasses of water for today (clamped 1ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“24 per log). Returns today's
    *  running total after the log. */
   logWater: (glasses: number) => number;
   /** Start the 24-hour Need or Want? cooldown. Completes the alternative
@@ -423,6 +437,13 @@ export interface RecoveryState {
   canCompleteWhereDidItGo: () => { available: boolean; nextAt?: number; daysLeft?: number };
   /** Delete a Where Did It Go? entry from history. */
   deleteWhereDidItGoEntry: (id: string) => void;
+  /** Save a Beyond the Screen weekly assessment. Returns any habit achievements
+   *  newly unlocked. Increments healthyHabitsCount and awards points. */
+  saveBeyondTheScreenEntry: (entry: Omit<BeyondTheScreenEntry, 'id' | 'at'>) => AltAchievement[];
+  /** Whether the Beyond the Screen assessment is available now (7-day cooldown). */
+  canCompleteBeyondTheScreen: () => { available: boolean; nextAt?: number; daysLeft?: number };
+  /** Delete a Beyond the Screen entry from history. */
+  deleteBeyondTheScreenEntry: (id: string) => void;
   /** Complete a One More Minute session. Awards points, achievements, and timeline events. */
   completeOmmSession: (session: Omit<OneMoreMinuteSession, 'id'>) => void;
   /** Log a food entry. */
@@ -593,7 +614,7 @@ function setupFromLegacyProfile(
               ? profile.expenseAmount
               : 0,
             period: profile.expensePeriod ?? 'weekly',
-            currency: profile.currency || 'â‚±',
+            currency: profile.currency || 'ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â±',
           },
         }
       : {}),
@@ -686,6 +707,7 @@ function createAddictionSnapshot(
     cheersToChangeEntries: [], lastCheersToChangeAt: null,
     backOnTrackEntries: [], lastBackOnTrackAt: null,
     whereDidItGoEntries: [], lastWhereDidItGoAt: null,
+    beyondTheScreenEntries: [], lastBeyondTheScreenAt: null,
     lastCheckedIn: null, urgesResisted: 0, urgesResistedWeek: 0,
     healthyHabitsCount: 0, dailyMissions: { day: missionDayKey(), completed: [] }, missionXp: 0,
   };
@@ -733,6 +755,7 @@ function captureAddictionSnapshot(s: RecoveryState): AddictionRecoverySnapshot |
     cheersToChangeEntries: s.cheersToChangeEntries, lastCheersToChangeAt: s.lastCheersToChangeAt,
     backOnTrackEntries: s.backOnTrackEntries, lastBackOnTrackAt: s.lastBackOnTrackAt,
     whereDidItGoEntries: s.whereDidItGoEntries, lastWhereDidItGoAt: s.lastWhereDidItGoAt,
+    beyondTheScreenEntries: s.beyondTheScreenEntries, lastBeyondTheScreenAt: s.lastBeyondTheScreenAt,
     lastCheckedIn: s.lastCheckedIn, urgesResisted: s.urgesResisted,
     urgesResistedWeek: s.urgesResistedWeek, healthyHabitsCount: s.healthyHabitsCount,
     dailyMissions: s.dailyMissions, missionXp: s.missionXp,
@@ -765,6 +788,7 @@ function activeStateFromSnapshot(snapshot: AddictionRecoverySnapshot): Omit<Addi
     cheersToChangeEntries: activeState.cheersToChangeEntries ?? [],
     backOnTrackEntries: activeState.backOnTrackEntries ?? [],
     whereDidItGoEntries: activeState.whereDidItGoEntries ?? [],
+    beyondTheScreenEntries: activeState.beyondTheScreenEntries ?? [],
     dailyMissions: activeState.dailyMissions ?? { day: missionDayKey(), completed: [] },
   };
 }
@@ -961,6 +985,8 @@ export const useStore = create<RecoveryState>()(
       lastBackOnTrackAt: null,
       whereDidItGoEntries: [],
       lastWhereDidItGoAt: null,
+      beyondTheScreenEntries: [],
+      lastBeyondTheScreenAt: null,
       ommSessions: [],
       ommAchievements: {},
       fuelFoodEntries: [],
@@ -1273,6 +1299,58 @@ export const useStore = create<RecoveryState>()(
       deleteWhereDidItGoEntry: (id) =>
         set((s) => ({
           whereDidItGoEntries: s.whereDidItGoEntries.filter((e) => e.id !== id),
+        })),
+
+      saveBeyondTheScreenEntry: (data) => {
+        let unlocked: AltAchievement[] = [];
+        const now = Date.now();
+
+        const { lastBeyondTheScreenAt } = get();
+        const avail = beyondTheScreenAvailability(lastBeyondTheScreenAt, now);
+        if (!avail.available) return [];
+
+        const entry: BeyondTheScreenEntry = {
+          ...data,
+          id: uid(),
+          at: now,
+        };
+        set((s) => {
+          const altCounts: AltCounts = { ...s.altCounts, 'beyond-the-screen': (s.altCounts['beyond-the-screen'] ?? 0) + 1 };
+          const counts: AltCounts = { ...altCounts, journal: s.journal.length };
+          unlocked = newAltUnlocks(
+            counts,
+            altFullDay(s.alternatives, s.journal, now, s.profile?.addictionType),
+            s.altAchievements,
+          );
+          return {
+            beyondTheScreenEntries: [entry, ...s.beyondTheScreenEntries],
+            lastBeyondTheScreenAt: now,
+            alternatives: { ...s.alternatives, 'beyond-the-screen': now },
+            altCounts,
+            altAchievements: unlocked.length
+              ? { ...s.altAchievements, ...Object.fromEntries(unlocked.map((a) => [a.id, now])) }
+              : s.altAchievements,
+            points: s.points + 5 + unlocked.length * 5,
+            healthyHabitsCount: s.healthyHabitsCount + 1,
+            timeline: [
+              ...unlocked.map((a) => evt('achievement', `Achievement unlocked - ${a.title}`)),
+              evt('activity', 'Recovery activity - Beyond the Screen'),
+              ...s.timeline,
+            ],
+          };
+        });
+        return unlocked;
+      },
+
+      canCompleteBeyondTheScreen: () => {
+        const { lastBeyondTheScreenAt } = get();
+        const avail = beyondTheScreenAvailability(lastBeyondTheScreenAt);
+        return avail.available ? { available: true } : { available: false, nextAt: avail.nextAt, daysLeft: avail.daysLeft };
+      },
+
+      deleteBeyondTheScreenEntry: (id) =>
+        set((s) => ({
+          beyondTheScreenEntries: s.beyondTheScreenEntries.filter((e) => e.id !== id),
         })),
 
       completeOmmSession: (sessionData) => {
@@ -1757,11 +1835,11 @@ export const useStore = create<RecoveryState>()(
         }
         // If the user last used on a past day, seed:
         //   1. A RelapseEvent on that day (for streak math).
-        //   2. An addiction-specific JournalEntry on that day â†’ calendar shows red.
-        //      - gambling/smoking/alcohol/drugs/etc. â†’ gambled: true
-        //      - pornography                         â†’ watched: true
+        //   2. An addiction-specific JournalEntry on that day ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ calendar shows red.
+        //      - gambling/smoking/alcohol/drugs/etc. ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ gambled: true
+        //      - pornography                         ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ watched: true
         //   3. Addiction-specific clean entries for every day BETWEEN the relapse
-        //      and today (exclusive) â†’ calendar shows those days green.
+        //      and today (exclusive) ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ calendar shows those days green.
         //   Today itself is left blank - the user fills it in via the journal.
         const now = new Date();
         const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -2403,7 +2481,7 @@ export const useStore = create<RecoveryState>()(
         set((s) => {
           if (!s.profile) return s;
 
-          // â”€â”€ One journal entry per calendar day per addiction type â”€â”€â”€â”€â”€â”€
+          // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ One journal entry per calendar day per addiction type ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
           // Gambling entries are keyed by the `gambled` field; porn entries by
           // the `watched` field.  This lets the gates stay completely separate
           // so neither addiction type ever blocks the other.
@@ -2478,7 +2556,7 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
-          // â”€â”€ Porn recovery: watched=true â†’ relapse; watched=false â†’ clean â”€â”€
+          // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Porn recovery: watched=true ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ relapse; watched=false ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clean ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
           if (data.watched === true) {
             const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
             const prevDays = streakDays(streakStart);
@@ -2564,7 +2642,7 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
-          // â”€â”€ Social media: binged=true â†’ relapse; binged=false â†’ clean â”€â”€â”€â”€â”€
+          // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Social media: binged=true ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ relapse; binged=false ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clean ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
           if (data.binged === true) {
             const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
             const prevDays = streakDays(streakStart);
@@ -2603,7 +2681,7 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
-          // â”€â”€ Smoking: smoked=true â†’ relapse; smoked=false â†’ clean â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Smoking: smoked=true ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ relapse; smoked=false ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clean ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
           if (data.smoked === true) {
             const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
             const prevDays = streakDays(streakStart);
@@ -2642,7 +2720,7 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
-          // â”€â”€ Alcohol: drank=true â†’ relapse; drank=false â†’ clean â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Alcohol: drank=true ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ relapse; drank=false ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clean ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
           if (data.drank === true) {
             const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
             const prevDays = streakDays(streakStart);
@@ -2681,7 +2759,7 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
-          // â”€â”€ Drugs / substances: used=true â†’ relapse; used=false â†’ clean â”€â”€â”€â”€
+          // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Drugs / substances: used=true ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ relapse; used=false ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clean ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
           if (data.used === true) {
             const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
             const prevDays = streakDays(streakStart);
@@ -2720,7 +2798,7 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
-          // â”€â”€ Gaming: played=true â†’ relapse; played=false â†’ clean â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Gaming: played=true ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ relapse; played=false ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clean ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
           if (data.played === true) {
             const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
             const prevDays = streakDays(streakStart);
@@ -2759,7 +2837,7 @@ export const useStore = create<RecoveryState>()(
             };
           }
 
-          // â”€â”€ Online Shopping: shopped=true â†’ relapse; shopped=false â†’ clean â”€â”€
+          // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Online Shopping: shopped=true ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ relapse; shopped=false ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ clean ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
           if (data.shopped === true) {
             const streakStart = currentStreakStart(s.profile.startedAt, s.relapses, s.journal);
             const prevDays = streakDays(streakStart);

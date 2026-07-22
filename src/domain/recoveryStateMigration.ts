@@ -63,6 +63,8 @@ const ACTIVE_SNAPSHOT_FIELDS = [
   'lastBackOnTrackAt',
   'whereDidItGoEntries',
   'lastWhereDidItGoAt',
+  'beyondTheScreenEntries',
+  'lastBeyondTheScreenAt',
   'lastCheckedIn',
   'urgesResisted',
   'urgesResistedWeek',
@@ -303,6 +305,8 @@ function emptySnapshot(
     lastBackOnTrackAt: null,
     whereDidItGoEntries: [],
     lastWhereDidItGoAt: null,
+    beyondTheScreenEntries: [],
+    lastBeyondTheScreenAt: null,
     lastCheckedIn: null,
     urgesResisted: 0,
     urgesResistedWeek: 0,
@@ -326,6 +330,7 @@ const NULLABLE_NUMBER_SNAPSHOT_FIELDS = new Set([
   'lastCheersToChangeAt',
   'lastBackOnTrackAt',
   'lastWhereDidItGoAt',
+  'lastBeyondTheScreenAt',
   'lastCheckedIn',
 ]);
 
