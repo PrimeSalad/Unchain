@@ -60,6 +60,7 @@ const HERO_LABEL: Record<AlternativeId, string> = {
   'catch-your-breath': 'Catch Your Breath',
   'cheers-to-change': 'Cheers to Change',
   'back-on-track': 'Back on Track',
+  'where-did-it-go': 'Where Did It Go?',
 };
 
 const TAGLINE: Record<AlternativeId, string> = {
@@ -73,6 +74,7 @@ const TAGLINE: Record<AlternativeId, string> = {
   'catch-your-breath': 'Tracking your breathing is tracking your recovery.',
   'cheers-to-change': 'Every step forward in recovery matters.',
   'back-on-track': 'Every check-in is a step forward in recovery.',
+  'where-did-it-go': 'Small financial choices build lasting habits.',
 };
 
 // Full breathing cycle: inhale 4s + hold 2s + exhale 6s.

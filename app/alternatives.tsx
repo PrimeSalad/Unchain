@@ -1576,6 +1576,7 @@ export default function Alternatives() {
   const isSmoking = profile?.addictionType === 'smoking';
   const isAlcohol = profile?.addictionType === 'alcohol';
   const isDrugs = profile?.addictionType === 'drugs';
+  const isGambling = profile?.addictionType === 'gambling';
 
   /** Only show 'need-or-want' if the user selected online shopping addiction. */
   const needOrWantAlt = isOnlineShopping ? ALTERNATIVES.find((a) => a.id === 'need-or-want') ?? null : null;
@@ -1585,7 +1586,9 @@ export default function Alternatives() {
   const cheersToChangeAlt = isAlcohol ? ALTERNATIVES.find((a) => a.id === 'cheers-to-change') ?? null : null;
   /** Only show 'back-on-track' if the user selected drug/substance addiction. */
   const backOnTrackAlt = isDrugs ? ALTERNATIVES.find((a) => a.id === 'back-on-track') ?? null : null;
-  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want' && a.id !== 'catch-your-breath' && a.id !== 'cheers-to-change' && a.id !== 'back-on-track');
+  /** Only show 'where-did-it-go' if the user selected gambling addiction. */
+  const whereDidItGoAlt = isGambling ? ALTERNATIVES.find((a) => a.id === 'where-did-it-go') ?? null : null;
+  const visibleAlternatives = ALTERNATIVES.filter((a) => a.id !== 'need-or-want' && a.id !== 'catch-your-breath' && a.id !== 'cheers-to-change' && a.id !== 'back-on-track' && a.id !== 'where-did-it-go');
 
   const isDone = (id: AlternativeId): boolean =>
     id === 'journal'
@@ -1598,7 +1601,9 @@ export default function Alternatives() {
             ? false
             : id === 'back-on-track'
               ? false
-              : completions[id] != null && sameDay(completions[id]!, Date.now());
+              : id === 'where-did-it-go'
+                ? false
+                : completions[id] != null && sameDay(completions[id]!, Date.now());
 
   const doneAt = (id: AlternativeId): number | undefined =>
     id === 'journal' ? todayJournal?.at : completions[id];
@@ -1735,6 +1740,18 @@ export default function Alternatives() {
             index={visibleAlternatives.length + 2}
             done={false}
             onPress={() => router.push('/back-on-track-log')}
+          />
+        </View>
+      )}
+
+      {/* ── Where Did It Go? — weekly financial reflection (gambling only) ── */}
+      {whereDidItGoAlt && (
+        <View style={{ marginBottom: spacing.lg }}>
+          <ActivityCard
+            alt={whereDidItGoAlt}
+            index={visibleAlternatives.length + 3}
+            done={false}
+            onPress={() => router.push('/where-did-it-go-log')}
           />
         </View>
       )}

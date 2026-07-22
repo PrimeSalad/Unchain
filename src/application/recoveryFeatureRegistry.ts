@@ -19,6 +19,7 @@ export const RECOVERY_FEATURES = {
   'catch-your-breath': { id: 'catch-your-breath', title: 'Catch Your Breath', subtitle: 'Weekly wellness reflection', icon: 'fitness', route: '/catch-your-breath', scope: 'track', release: 'stable', cadence: 'weekly' },
   'cheers-to-change': { id: 'cheers-to-change', title: 'Cheers to Change', subtitle: 'Weekly well-being reflection', icon: 'wine', route: '/cheers-to-change', scope: 'track', release: 'stable', cadence: 'weekly' },
   'back-on-track': { id: 'back-on-track', title: 'Back on Track', subtitle: 'Weekly recovery reflection', icon: 'trending-up', route: '/back-on-track', scope: 'track', release: 'stable', cadence: 'weekly' },
+  'where-did-it-go': { id: 'where-did-it-go', title: 'Where Did It Go?', subtitle: 'Weekly financial reflection', icon: 'wallet', route: '/where-did-it-go', scope: 'track', release: 'stable', cadence: 'weekly' },
   'bet-breaker': { id: 'bet-breaker', title: 'Bet Breaker', subtitle: 'Pause an intended bet', icon: 'pause-circle', route: '/recovery-plan', scope: 'track', release: 'internal' },
   'private-shield': { id: 'private-shield', title: 'Private Shield Plan', subtitle: 'Plan for a risky window', icon: 'shield-checkmark', route: '/recovery-plan', scope: 'track', release: 'internal' },
   'scroll-reclaim': { id: 'scroll-reclaim', title: 'Scroll Reclaim', subtitle: 'Set an intentional stop time', icon: 'timer', route: '/recovery-plan', scope: 'track', release: 'internal' },

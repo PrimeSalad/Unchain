@@ -15,7 +15,8 @@ export type AlternativeId =
   | 'need-or-want'
   | 'catch-your-breath'
   | 'cheers-to-change'
-  | 'back-on-track';
+  | 'back-on-track'
+  | 'where-did-it-go';
 
 export interface Alternative {
   id: AlternativeId;
@@ -38,6 +39,7 @@ export const ALTERNATIVES: Alternative[] = [
   { id: 'catch-your-breath', title: 'Catch Your Breath',   subtitle: 'Weekly lung health reflection',        icon: 'fitness',              tint: 'success' },
   { id: 'cheers-to-change', title: 'Cheers to Change',     subtitle: 'Weekly body wellness reflection',      icon: 'wine',                 tint: 'success' },
   { id: 'back-on-track', title: 'Back on Track',          subtitle: 'Weekly recovery check-in',             icon: 'trending-up',          tint: 'primary' },
+  { id: 'where-did-it-go', title: 'Where Did It Go?',    subtitle: 'Weekly financial reflection',          icon: 'wallet',               tint: 'primary' },
 ];
 
 export function alternativeById(id: AlternativeId): Alternative {
@@ -140,6 +142,8 @@ export const ALT_ACHIEVEMENTS: AltAchievement[] = [
     desc: 'Complete 5 Cheers to Change reflections.', ...countOf('cheers-to-change', 5) },
   { id: 'alt-back-on-track-5', title: 'Recovery Watcher', icon: 'trending-up',
     desc: 'Complete 5 Back on Track reflections.', ...countOf('back-on-track', 5) },
+  { id: 'alt-where-did-it-go-5', title: 'Financial Tracker', icon: 'wallet',
+    desc: 'Complete 5 Where Did It Go? reflections.', ...countOf('where-did-it-go', 5) },
 ];
 
 export function altAchievementById(id: string): AltAchievement | undefined {

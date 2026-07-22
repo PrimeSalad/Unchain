@@ -11,6 +11,7 @@ export type HeroMetricId =
 export type RecoveryFeatureId =
   | 'bet-breaker' | 'private-shield' | 'scroll-reclaim' | 'need-or-want'
   | 'catch-your-breath' | 'cheers-to-change' | 'back-on-track'
+  | 'where-did-it-go'
   | 'session-exit-plan' | 'replacement-plan';
 export type TrackCapability = 'expense' | 'time_baseline' | 'discreet' | 'professional_support';
 export type IntakeFieldDefinition = {

@@ -21,6 +21,7 @@ import {
 import { cancelCatchYourBreathReminders, scheduleCatchYourBreathReminder } from '@/application/catchYourBreathReminder';
 import { cancelCheersToChangeReminders, scheduleCheersToChangeReminder } from '@/application/cheersToChangeReminder';
 import { cancelBackOnTrackReminders, scheduleBackOnTrackReminder } from '@/application/backOnTrackReminder';
+import { cancelWhereDidItGoReminders, scheduleWhereDidItGoReminder } from '@/application/whereDidItGoReminder';
 
 // Any uncaught render error anywhere in the app lands on a friendly recovery
 // screen instead of a crash (App Review: no unhandled exceptions).
@@ -144,6 +145,15 @@ export default function RootLayout() {
       : cancelBackOnTrackReminders();
     sync.catch(() => {});
   }, [activeAddiction, lastBackOnTrackAt]);
+
+  // ── Where Did It Go? weekly reminder ──────────────────────────────────
+  const lastWhereDidItGoAt = useStore((s) => s.lastWhereDidItGoAt);
+  useEffect(() => {
+    const sync = activeAddiction === 'gambling'
+      ? scheduleWhereDidItGoReminder(lastWhereDidItGoAt)
+      : cancelWhereDidItGoReminders();
+    sync.catch(() => {});
+  }, [activeAddiction, lastWhereDidItGoAt]);
 
   if (!ready) {
     // iOS keeps the native splash visible. Web has no equivalent guarantee,
